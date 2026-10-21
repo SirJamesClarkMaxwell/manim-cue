@@ -1,0 +1,20 @@
+# środowisko i cache
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+
+# wyniki renderowania manimgl (odtwarzalne)
+media/
+videos/
+images/
+*.mp4
+*.mov
+*.png
+*.log
+
+# build
+dist/
+build/
+*.egg-info/

@@ -1,0 +1,35 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "manim-cue"
+version = "0.1.0"
+description = "Żywa scena Manima wyzwalana z zewnątrz: jedno miejsce, które steruje animacją i ją wyzwala"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "manimgl>=1.7.2",
+    # manimgl -> pydub -> audioop, a audioop wypadl ze stdlib w Pythonie 3.13 (PEP 594).
+    # Bez tego backportu import manimlib pada na ModuleNotFoundError: No module named 'audioop'.
+    # W projekcie seminarium manimgl dziala przypadkiem, bo Manim CE deklaruje audioop-lts
+    # dla 3.13+ i manimgl korzysta z tego ubocznie; tutaj CE nie ma, wiec trzeba wprost.
+    "audioop-lts>=0.2; python_version >= '3.13'",
+    # manimgl importuje pkg_resources na starcie i krzyczy "pin to Setuptools<81".
+    # manim-slides w swojej extrze [manimgl] pina <80.10.2 — bierzemy tę ciaśniejszą
+    # granicę, bo jest zweryfikowana w praniu, a luźniejsza <81 nigdy się nie nałożyła
+    # w projekcie seminarium i była tam realną miną.
+    "setuptools<80.10.2",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.4",
+    "ruff>=0.13",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/manimcue"]
+
+[tool.ruff]
+line-length = 100
