@@ -7,6 +7,9 @@
 Co sprawdzić w oknie (kryterium 5 fazy 1): notatki w oknie Info, podgląd następnego slajdu,
 slajd 2 zapętlony do naciśnięcia `→`, cofanie (`←`).
 
+Faza 5: slajd 5 osadza render innej sceny (`examples/orbit.py`), który wjeżdża i rośnie obok
+panelu live. Najpierw `uv run manim-cue render examples/orbit.py Orbit`.
+
 Faza 3/4: slajd 3 ma warstwę live `Panel` w prawym górnym rogu, slajd 4 — scenę 3D `Panel3D`.
 Przed startem procesu widać miniaturę (pierwszą klatkę sceny), potem obraz live. Klik w warstwę
 daje jej strzałki (żółta obwódka), Esc oddaje je slajdom. Na `Panel3D` mysz obraca kamerę.
@@ -14,7 +17,7 @@ daje jej strzałki (żółta obwódka), Esc oddaje je slajdom. Na `Panel3D` mysz
 
 from pathlib import Path
 
-from manimcue.slides import LiveLayer, Slide
+from manimcue.slides import ClipLayer, Keyframe, LiveLayer, Slide, slide_file
 from manimcue.slides.slide import MANIM
 
 if MANIM:
@@ -76,7 +79,9 @@ class Demo(Slide):
         self.play(GrowFromCenter(circle))
         self.add(dot)
 
-        self.next_slide(notes="**2/3** — pętla: kropka krąży, dopóki nie naciśniesz `→`.", loop=True)
+        self.next_slide(
+            notes="**2/3** — pętla: kropka krąży, dopóki nie naciśniesz `→`.", loop=True
+        )
         self.play(MoveAlongPath(dot, circle), run_time=2, rate_func=linear)
 
         self.next_slide(
@@ -94,3 +99,30 @@ class Demo(Slide):
             layers=[PANEL_3D],
         )
         self.play(square.animate.scale(0.5).to_corner(DL))
+
+        orbit_json = Path("slides/Orbit.json")
+        if not orbit_json.exists():
+            raise FileNotFoundError(
+                "Slajd 5 osadza render sceny Orbit: najpierw "
+                "`uv run manim-cue render examples/orbit.py Orbit`"
+            )
+        # Render innej sceny jako warstwa: wjeżdża zza prawej krawędzi i rośnie w 1,5 s.
+        orbit = ClipLayer(
+            file=slide_file(orbit_json, 0),
+            loop=True,
+            keyframes=[
+                Keyframe(t=0, rect=(1.0, 0.3, 0.2, 0.2)),
+                Keyframe(t=1.5, rect=(0.05, 0.1, 0.45, 0.45)),
+            ],
+        )
+        self.next_slide(
+            notes="**5/5** — render sceny Orbit wjeżdża i rośnie obok panelu live; "
+            "spacja pauzuje wszystko razem.",
+            layers=[
+                orbit,
+                LiveLayer(
+                    **PANEL.model_dump(exclude={"thumbnail"}) | {"rect": (0.55, 0.1, 0.4, 0.4)}
+                ),
+            ],
+        )
+        self.play(square.animate.move_to(ORIGIN).scale(2), run_time=1.5)

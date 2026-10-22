@@ -553,6 +553,25 @@ klatki granicznej (READY, koniec cue, `back`), nie do domyślnego kadru `Scene`.
 
 ---
 
+## Decyzje fazy 5 (2026-10-22, runda 11 + PoC)
+
+**D29. Warstwy z plików: `ClipLayer` obok `LiveLayer`.** Unia dyskryminowana po `kind`, format
+v3 (v2 migrowany przy odczycie). Klip to wideo albo obraz — także render innej sceny, wskazany
+pomocnikiem `slide_file(json, index)`. Prostokąty klipów i klatek kluczowych mogą wychodzić poza
+kadr; prostokąt live — nie, bo wyznacza rozdzielczość renderu.
+
+**D30. Ruch warstw: liniowe klatki kluczowe w aktywnym czasie slajdu.** `QElapsedTimer` od
+wspólnego startu, zatrzymywany pauzą i końcem bazy, zerowany przez replay. Odrzucone:
+`position()` bazy (50 ms, nieciągłości pętli i szybkości), wyzwalanie ruchu klawiszem (osobny
+model wyzwalania, poza F5), easing (rozszerzenie).
+
+**D31. Wspólny start przez przygotowanie pierwszych klatek.** Każdy player grupy gra do
+pierwszej poprawnej klatki i się zatrzymuje; wspólne `play()`, gdy gotowe wszystkie. PoC: rozjazd
+18 ms przy 4 źródłach 1080p60 (zamiast 67 ms z samą barierą `LoadedMedia`). Warstwy-klipy
+śledzą stan bazy, więc istniejące ścieżki playera sterują grupą bez zmian.
+
+---
+
 ## Zakres, którego nie wolno rozszerzyć bez decyzji
 
 **Synchronizacja co do klatki.** Warstwy startują i pauzują razem (D17) — i na tym koniec.

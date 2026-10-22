@@ -65,7 +65,7 @@ def test_newer_version_is_rejected(tmp_path: Path) -> None:
     [(0.6, 0.0, 0.5, 0.5), (0.0, 0.0, 0.0, 0.5), (-0.1, 0.0, 0.5, 0.5), (0.0, float("nan"), 1, 1)],
 )
 def test_layer_rect_outside_frame_is_rejected(rect) -> None:
-    with pytest.raises(ValidationError, match="kadrze"):
+    with pytest.raises(ValidationError, match=r"rect \("):
         LiveLayer(scene_file=LIVE_FILE, scene_name="LiveGLCorners", rect=rect)
 
 
@@ -263,7 +263,10 @@ def render(tmp_path: Path, renderer_args: list[str], scene_file: Path, scene: st
         ],
         cwd=tmp_path,
         capture_output=True,
-        text=True,
+        # Rich drukuje traceback ze źródłem (polskie komentarze, ramki) — kodowanie systemowe
+        # Windows (cp1252) gubiłoby całe wyjście, a test szuka w nim treści błędu.
+        encoding="utf-8",
+        errors="replace",
         timeout=600,
         check=False,
     )

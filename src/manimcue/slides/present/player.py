@@ -13,6 +13,7 @@ from qtpy.QtWidgets import (
     QWidget,
 )
 
+from manimcue.clip_layers import ClipGroup
 from manimcue.composition import SlideComposition, SlideView
 from manimcue.live_layers import LiveLayerController
 
@@ -267,6 +268,10 @@ class Player(QMainWindow):
         self.media_player = QMediaPlayer(self)
         self.media_player.setAudioOutput(self.audio_output)
         self.media_player.setVideoOutput(self.composition.video_item)
+        # F5 (D29-D31): warstwy-klipy, wspólny start z bazą i ruch warstw.
+        self.clips = ClipGroup(
+            self.composition, self.media_player, restored=lambda frame: frame == self.frame
+        )
         self.playback_rate = playback_rate
 
         self.presentation_changed.connect(self.presentation_changed_callback)
@@ -443,19 +448,26 @@ class Player(QMainWindow):
 
     def load_current_media(self, start_paused: bool = False) -> None:
         url = QUrl.fromLocalFile(str(self.current_file.resolve(strict=True)))
-        # F3: kadr bieżącej prezentacji i warstwy slajdu (w F3 miniatury, nieruchome także
-        # przy reverse, replay i pętli).
+        slide_config = self.current_slide_config
+        reversed_slide = self.playing_reversed_slide
+        base_video = slide_config.type == SlideType.Video or (
+            slide_config.type == SlideType.Image
+            and self.current_file.suffix.lower() == ".gif"
+        )
+        # F3: kadr bieżącej prezentacji i warstwy slajdu. F5: klipy jako elementy wideo grupy;
+        # przy reverse klipy to ostatnie klatki w prostokątach końcowych, bez playerów.
+        self.clips.clear()
         self.composition.set_resolution(self.current_presentation_config.resolution)
-        self.composition.set_layers(self.current_slide_config.layers)
+        self.composition.set_layers(slide_config.layers, video=True, at_end=reversed_slide)
         self.live.show(
             (self.current_presentation_index, self.current_slide_index),
-            self.current_slide_config,
+            slide_config,
             self.current_presentation_config.resolution,
         )
-        if self.current_slide_config.type == SlideType.Video or (
-            self.current_slide_config.type == SlideType.Image
-            and self.current_file.suffix.lower() == ".gif"
-        ):
+        grouped = not reversed_slide and self.clips.enter(
+            slide_config, base_video, start_paused, self.playback_rate
+        )
+        if base_video:
             self.media_player.setSource(url)
 
             self.composition.show_video()
@@ -470,7 +482,10 @@ class Player(QMainWindow):
                     self.current_slide_config.playback_rate * self.playback_rate
                 )
 
-            if start_paused:
+            if grouped:
+                # D31: baza gra do pierwszej klatki i staje; wspólny start daje grupa.
+                self.media_player.play()
+            elif start_paused:
                 self.media_player.pause()
             else:
                 self.media_player.play()
@@ -597,11 +612,27 @@ class Player(QMainWindow):
     def close(self) -> None:
         logger.info("Closing gracefully...")
         self.live.begin_shutdown()
+        self.clips.clear()
         self.info.close()
         super().close()
 
     @Slot()
     def next(self) -> None:
+        # F5: w trakcie przygotowania grupy baza stoi na pierwszej klatce — `next` nie może jej
+        # puścić osobno; pierwsze naciśnięcie zamawia start, kolejne przechodzi dalej.
+        if self.clips.preparing:
+            if not self.clips.requested_playing:
+                self.clips.requested_playing = True
+            else:
+                self.load_next_slide()
+            return
+        # Baza statyczna: bez logiki pętli bazy (jej player stoi) — wznowienie albo dalej.
+        if self.clips.static_active:
+            if self.clips.running:
+                self.load_next_slide()
+            else:
+                self.clips.play_all()
+            return
         if (
             self.media_player.playbackState() == QMediaPlayer.PlaybackState.PausedState
             and not self.__termination_achieved
@@ -628,14 +659,25 @@ class Player(QMainWindow):
 
     @Slot()
     def replay(self) -> None:
+        # F5: w trakcie przygotowania wszystko i tak stoi na pierwszej klatce (runda 12, p. 2).
+        if self.clips.preparing:
+            return
+        if self.clips.static_active:
+            self.clips.replay()
+            return
         self.__prev_pos = -1
         self.__termination_requested = False
         self.__termination_achieved = False
         self.media_player.setPosition(0)
         self.media_player.play()
+        self.clips.replay()
 
     @Slot()
     def play_pause(self) -> None:
+        # F5: przygotowanie i baza statyczna — stan trzyma grupa.
+        if self.clips.preparing or self.clips.static_active:
+            self.clips.toggle()
+            return
         state = self.media_player.playbackState()
         if (
             state == QMediaPlayer.PlaybackState.PausedState

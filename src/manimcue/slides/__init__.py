@@ -10,7 +10,15 @@ from typing import Any
 
 from .__version__ import __version__
 
-__all__ = ("LiveLayer", "Slide", "ThreeDSlide", "__version__")
+__all__ = (
+    "ClipLayer",
+    "Keyframe",
+    "LiveLayer",
+    "Slide",
+    "ThreeDSlide",
+    "__version__",
+    "slide_file",
+)
 
 
 def __getattr__(name: str) -> Any:
@@ -19,8 +27,8 @@ def __getattr__(name: str) -> Any:
         from . import slide
 
         return getattr(slide, name)
-    if name == "LiveLayer":
-        from .config import LiveLayer
+    if name in ("ClipLayer", "Keyframe", "LiveLayer", "slide_file"):
+        from . import config
 
-        return LiveLayer
+        return getattr(config, name)
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

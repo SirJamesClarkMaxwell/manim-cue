@@ -191,7 +191,7 @@ def test_leaving_slide_reaps_process_and_reentry_is_fresh(qapp, player_for) -> N
     shm_name = first._shm.name
 
     player.load_previous_slide()
-    assert player.live.sessions == []
+    assert player.live.sessions == {}
     pump(qapp, lambda: not player.live.stopping, what="odbiór procesu")
     assert mp.active_children() == []
 

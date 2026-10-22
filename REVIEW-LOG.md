@@ -830,3 +830,236 @@ D28 jako komendy niebędące cue jest wykonalne: `view` nie trafia do kolejki pr
 Nie wykazałem nowego błędu własności bajtów `QImage`: `frame` pozostaje lokalnie żywy przez synchroniczną aktualizację obrazu (`src/manimcue/live_layers.py:106–116`). Info nie ma podłączonych sygnałów myszy do kontrolera; połączenia dotyczą głównego widoku (`src/manimcue/slides/present/player.py:254–258`, `:59`). `exit_after_last_slide` prowadzi przez `close()` (`:521–522`), a ponowne zatrzymywanie sesji nie przesuwa terminu wymuszenia (`src/manimcue/live_session.py:172–175`).
 
 **Werdykt:** najpierw poprawić 1–5 i uzupełnić testy z punktu 6. Następnie próba dwóch ekranów powinna objąć rzeczywisty drag i reset, pan po obrocie, nawigację po końcu sekwencji oraz `back` po ręcznej zmianie kamery. Sama udana demonstracja obecnego testu D28 nie wystarczy, ponieważ omija on zdarzenia myszy (`tests/test_live_layers.py:282–289`).
+
+---
+
+## Runda 11 — codex, 2026-10-22: kontrakt F5 (warstwy pełne)
+
+Pytania: `codex-round11-prompt` (unia modelu, zegar ruchu, wspólny start D17, reverse/replay/
+pętla/auto_next, walidacja długości, kryteria i budżet). Przegląd read-only z próbą pydantic.
+
+**Co weszło** (kontrakt F5 w `PLAN.md`, decyzje D29-D31 w `SPEC.md`):
+- Unia dyskryminowana po `kind` z migracją v2 przed walidacją; `to_file` zawsze z bieżącą
+  wersją (p. 1-2).
+- Sesje live i playery klipów pod indeksem warstwy kompozycji; kryterium z przemieszanymi
+  rodzajami (p. 3).
+- `slide_file` = plik bazowy jednego slajdu przez `from_file`, test z innego CWD (p. 4).
+- Zegar ruchu: `QElapsedTimer`, aktywny czas slajdu, nie `position()` (p. 5).
+- Wspólny start: PoC zamiast założeń — przygotowanie pierwszych klatek obniżyło rozjazd z 67 ms
+  do 18 ms przy 4 źródłach 1080p60; bariera z timeoutem i błędem pojedynczej warstwy (p. 6).
+- Transport grupowy przez śledzenie stanu bazy (`playbackStateChanged`) — `next`, koniec pętli,
+  `skip_all`, `auto_next`, `start_paused` bez osobnych wywołań; żądany stan w trakcie
+  przygotowania (p. 7). Baza statyczna z własnym stanem, bez walidacji długości (p. 8).
+- Reverse: `end_thumbnail` z renderu (p. 9).
+- Walidacja długości: po renderze i raz przed prezentacją, tolerancja z czasów klatek,
+  zwolnienia i błędy nazwane (p. 10). Pozycja klatek kluczowych poza kadrem dozwolona (p. 11).
+- Kryteria: deterministyczne offscreen + integracyjne wideo z timeoutem; budżet 6 h jako cel
+  prototypu, raport przy 12 h (p. 12).
+
+**Odpowiedź codex (bez zmian):**
+
+Przegląd read-only. Nie uruchamiałem prezentacji ani testów multimedialnych; wykonałem jedynie izolowaną próbę unii pydantic w pamięci. Poniżej nowe problemy propozycji F5, bez ponownego zgłaszania ustaleń rund 6–10.
+
+1. **[WAŻNE] A: dyskryminator wymaga migracji przed walidacją, sam domyślny `kind` nie wystarczy.**
+
+   **Dowód:** obecny `LiveLayer` nie ma `kind` (`src/manimcue/slides/config.py:179`), a `from_file()` przekazuje przetworzony słownik bezpośrednio do `model_validate()` (`src/manimcue/slides/config.py:422`). Izolowana próba potwierdziła: brak tagu w unii dyskryminowanej daje `union_tag_not_found`, mimo domyślnego tagu w modelu.
+
+   **Konsekwencja:** dodanie `Field(discriminator="kind")` zerwie obiecaną obsługę plików v2.
+
+   **Poprawka planu:** wybrać unię dyskryminowaną z `Literal["live"]` i `Literal["clip"]`; przed walidacją starych prezentacji dopisywać `kind="live"`. Zwykła unia również może działać, ale wymaga odrzucenia niejednoznacznych danych zawierających jednocześnie pola obu rodzajów.
+
+   Wrapper nie wymaga osobnego adaptera: konstruuje model z argumentów i odczytuje adnotacje pól (`src/manimcue/slides/config.py:263`, `:273`). Przejścia przez `model_dump()` również zachowają poprawnie zadeklarowaną unię (`src/manimcue/slides/config.py:311`, `:365`). Dopisać test całej ścieżki `next_slide → PreSlideConfig → SlideConfig → JSON`, obejmujący słowniki i instancje modeli.
+
+2. **[WAŻNE] A: v3 jest uzasadnione, ale plan nie opisuje ponownego zapisu dokumentu v2.**
+
+   **Dowód:** wersja jest przechowywana w modelu (`src/manimcue/slides/config.py:384`), a `to_file()` zapisuje ją bez normalizacji (`src/manimcue/slides/config.py:427`). Obecny czytnik odrzuca wersje większe od obsługiwanej (`src/manimcue/slides/config.py:393`).
+
+   **Konsekwencja:** dokument wczytany jako v2, następnie rozszerzony o klip, może zostać zapisany nadal jako v2. Starszy fork nie dostanie wtedy zaplanowanego komunikatu o nowym formacie.
+
+   **Poprawka planu:** zapisywać aktualną wersję albo wyliczać minimalną wersję wymaganą przez zawartość. `FORMAT_VERSION = 3` jest właściwe dla nowej semantyki, lecz samo podniesienie stałej nie domyka migracji.
+
+3. **[KRYTYCZNE] A/C: filtrowanie warstw live musi zachować indeksy całej kompozycji.**
+
+   **Dowód:** kontroler tworzy sesję dla każdego elementu `slide.layers`, czytając `scene_file`, `scene_name` i `fps` (`src/manimcue/live_layers.py:74–83`). Następnie indeks sesji staje się indeksem elementu graficznego (`src/manimcue/live_layers.py:108–119`); klik również interpretuje indeks jako pozycję w `sessions` (`src/manimcue/live_layers.py:146–149`).
+
+   **Konsekwencja:** po dodaniu unii obecna pętla nie obsłuży `ClipLayer`. Proste odfiltrowanie klipów też jest błędne: dla `[clip, live]` klatka live trafi do warstwy 0, a klik warstwy 1 nie wybierze sesji.
+
+   **Poprawka planu:** przechowywać sesje pod indeksem warstwy kompozycji, np. `dict[layer_index, session]`. Tym samym indeksem adresować klatki, błędy, aktywację i geometrię. Kryterium musi zawierać przemieszane `[clip, live, image, live]`, nie tylko jeden live na końcu.
+
+4. **[WAŻNE] A: `slide_file()` rozwiązuje hashe, ale nie oznacza „renderu całego slajdu”.**
+
+   **Dowód:** plik bazowy powstaje niezależnie od warstw; miniatury warstw są dodawane dopiero później (`src/manimcue/slides/slide/base.py:654`, `:676–681`). Czytnik rozwiązuje bazowe ścieżki względem katalogu prezentacji (`src/manimcue/slides/config.py:407–414`), lecz dla warstw obecnie przepisuje tylko `scene_file` i `thumbnail` (`:417–420`).
+
+   **Konsekwencja:** helper zwracający `slides[index].file` jest dobrą drogą do znalezienia zahashowanego klipu, ale zgubi warstwy źródłowego slajdu. Względne `ClipLayer.file` także wymagają nowej obsługi.
+
+   **Poprawka planu:** nazwać kontrakt: „plik bazowy jednego slajdu”, określić numerację indeksów i zwracać rozwiązaną ścieżkę przez `PresentationConfig.from_file()`. Źródłowy deck musi być wcześniej wyrenderowany; jego ponowny render może zmienić wynik helpera. Dodać test z innym katalogiem roboczym.
+
+5. **[KRYTYCZNE] B: `position()` nie daje płynnego zegara ruchu, a „sekundy od startu” są niejednoznaczne.**
+
+   **Dowód:** FFmpeg Qt 6.12 aktualizuje pozycję timerem co **50 ms**; pauza zatrzymuje timer, pętla zgłasza `duration`, potem `0`, a koniec — końcową pozycję i `EndOfMedia` ([`qffmpegmediaplayer.cpp`, linie 38–40, 74–97, 290–305](https://raw.githubusercontent.com/qt/qtmultimedia/6.12/src/plugins/multimedia/ffmpeg/qffmpegmediaplayer.cpp)). Getter platformowy zwraca zapamiętaną pozycję, aktualizowaną przy zgłoszeniu zmiany ([`qplatformmediaplayer_p.h`, linie 37, 86–90](https://raw.githubusercontent.com/qt/qtmultimedia/6.12/src/multimedia/platform/qplatformmediaplayer_p.h)). Baza otrzymuje iloczyn szybkości slajdu i CLI (`src/manimcue/slides/present/player.py:469–470`).
+
+   **Konsekwencja:** częstsze odpytywanie nie zapewni 60 aktualizacji geometrii na sekundę. Przy szybkości 2× pozycja oznacza czas materiału, nie czas rzeczywisty od startu. Po pętli ruch cofnie się do początku, chociaż niezapętlona warstwa-klip może już stać na końcu.
+
+   **Poprawka planu:** wybrać jednoznacznie czas materiału albo aktywny czas prezentacji. Zalecam `QElapsedTimer` dla geometrii, z akumulacją przy pauzie i jawnym resetem przy replay; API jest dostępne lokalnie (`.venv/Lib/site-packages/PySide6/QtCore.pyi:2742`). Zdefiniować wpływ szybkości, pętli, końca bazy i buforowania. To zegar animacji prostokątów, bez sterowania seekiem dekoderów. Jeśli pozostaje czas materiału, potrzebna jest interpolacja między próbkami oraz jawna obsługa nieciągłości.
+
+6. **[KRYTYCZNE] C: bariera `LoadedMedia` nie gwarantuje wspólnego pierwszego obrazu.**
+
+   **Dowód:** backend zgłasza `LoadedMedia` po ustawieniu źródła; buforowanie jest odrębnym etapem uruchamiania odtwarzania ([`qffmpegmediaplayer.cpp`, linie 234–285](https://raw.githubusercontent.com/qt/qtmultimedia/6.12/src/plugins/multimedia/ffmpeg/qffmpegmediaplayer.cpp)). Silnik ustala początek własnego czasu po znalezieniu pierwszego pakietu ([`qffmpegplaybackengine.cpp`, linie 93–108](https://raw.githubusercontent.com/qt/qtmultimedia/6.12/src/plugins/multimedia/ffmpeg/qffmpegplaybackengine.cpp)). Lokalne API rozróżnia `LoadedMedia`, `BufferedMedia`, `InvalidMedia` oraz `errorOccurred` (`.venv/Lib/site-packages/PySide6/QtMultimedia.pyi:863`, `:891–899`).
+
+   **Konsekwencja:** N wywołań `play()` w jednej iteracji oznacza wspólne wydanie poleceń, nie wspólną widoczną klatkę. Zastąpienie bariery oczekiwaniem na `BufferedMedia` przed pierwszym `play()` również nie jest bezpiecznym rozwiązaniem.
+
+   **Poprawka planu:** zachować `LoadedMedia` jako barierę przygotowania źródeł. Podłączać sygnały przed `setSource()`, obsługiwać błąd i timeout, rozróżnić awarię bazy od opcjonalnej warstwy. Bariera powinna należeć do konkretnego wejścia na slajd i uruchamiać grupę najwyżej raz. Widoczny start mierzyć osobno; jeśli jest wymagany ostrzejszy próg, najpierw PoC przygotowania pierwszych klatek pod miniaturami.
+
+7. **[KRYTYCZNE] C/D: wspólny transport musi obejmować więcej niż `play_pause()` i replay.**
+
+   **Dowód:** `next()` wznawia wyłącznie bazę (`src/manimcue/slides/present/player.py:604–609`); zakończenie pętli przewija i pauzuje wyłącznie bazę (`:329–337`). `skip_all` oraz `auto_next` przechodzą dalej z sygnału bazy (`:307–325`). Start początkowy osobno przekazuje `start_paused` (`:345`), a zwykłe ładowanie natychmiast wywołuje `play()` (`:473–476`).
+
+   **Konsekwencja:** po wdrożeniu tylko opisanych metod strzałka wznowi samą bazę, warstwy będą grały po zakończeniu pętli, a polecenie wydane podczas ładowania może zostać nadpisane późniejszym startem bariery.
+
+   **Poprawka planu:** dodać wspólny stan żądany: przygotowanie, odtwarzanie, pauza, koniec, reverse. Wszystkie wymienione wejścia muszą korzystać z operacji grupowych. Dopisać przypadki: pauza przed gotowością, `next` po pauzie, replay podczas ładowania, `skip_all`, `auto_next`, zakończenie pętli z obiema wartościami `auto_next`.
+
+8. **[WAŻNE] B/E: slajd-obraz wymaga własnego stanu transportu i reguły długości.**
+
+   **Dowód:** dla obrazu baza zatrzymuje player (`src/manimcue/slides/present/player.py:477–480`), natomiast `play_pause()` obsługuje tylko stan Playing i Paused (`:638–646`). GIF jest wyjątkiem odtwarzanym przez player (`:455–458`).
+
+   **Konsekwencja:** sam nowy zegar nie sprawi, że spacja zatrzyma ruch nad PNG. Nie ma też skończonej długości bazy, z którą można porównać niezapętlony klip nad obrazem.
+
+   **Poprawka planu:** dla statycznej bazy przyjąć ręczny koniec slajdu i zwolnienie z porównania długości albo dodać jawną długość slajdu. Obraz-warstwa nie podlega walidacji czasu. GIF sklasyfikować świadomie jako animowane medium albo statyczną pierwszą klatkę — identycznie podczas renderu, walidacji i prezentacji.
+
+9. **[KRYTYCZNE] D: „ostatnia klatka” przy reverse wymaga osobnego przygotowania.**
+
+   **Dowód:** reverse przechodzi na poprzedni slajd (`src/manimcue/slides/present/player.py:625–627`), którego warstwy nie musiały wcześniej grać w tej sesji. Miniatura F5 ma przedstawiać pierwszą klatkę (`PLAN.md:359`), a replay obecnie uruchamia player ponownie od zera (`src/manimcue/slides/present/player.py:630–635`).
+
+   **Konsekwencja:** zatrzymanie bieżących warstw nie zapewnia końcowego obrazu poprzedniego slajdu. Dla zapętlonej warstwy nie wiadomo dodatkowo, czy „ostatnia” oznacza koniec pliku, czy obraz w chwili końca bazy.
+
+   **Poprawka planu:** najprościej generować końcowy obraz zastępczy klipu do reverse. Określić osobno końcowy prostokąt, obraz klipu zapętlonego oraz replay w trybie reverse. Testować wejście reverse bez wcześniejszego odtworzenia docelowego slajdu. Nie rozszerzać tego automatycznie na końcowy stan live — to wymaga osobnej decyzji.
+
+10. **[WAŻNE] E: walidacja długości potrzebuje metadanych i obsługi nieznanej długości.**
+
+    **Dowód:** `get_duration_ms()` otwiera kontener i czyta długość pierwszego strumienia wideo; nie dekoduje całości, ale zgłasza błąd przy braku `duration` lub `time_base` (`src/manimcue/slides/convert.py:122–130`). Każde wywołanie ponownie otwiera plik (`:124`). Model szybkości bazy nie wymusza wartości dodatniej ani skończonej (`src/manimcue/slides/config.py:210–211`).
+
+    **Konsekwencja:** „jedna klatka” nie określa tolerancji dla 24 fps kontra 60 fps, VFR ani GIF. Dzielenie przez zerową szybkość jest niezdefiniowane, a ponawianie odczytów przy każdym wejściu na slajd jest zbędne.
+
+    **Poprawka planu:** wspólny walidator wywoływać po uzyskaniu plików renderu oraz raz przed prezentacją, po rozwiązaniu ścieżek. `from_file()` pozostawić bez sondowania multimediów. Buforować metadane według ścieżki, rozmiaru i mtime; odrzucać szybkości niefinitywne i ≤0. Dla CFR określić np. tolerancję jako większy z czasów klatki obu materiałów po uwzględnieniu szybkości. Dla VFR/GIF i nieznanej długości ustalić jawny fallback albo czytelny błąd. Koszt odczytu trzeba zmierzyć; to nie jest koszt dekodowania całego filmu.
+
+11. **[WAŻNE] A/F: trzeba domknąć granice modelu ruchu i istniejące wejścia eksportu.**
+
+    **Dowód:** początkowy `rect` musi obecnie mieścić się w kadrze (`src/manimcue/slides/config.py:192–195`), podczas gdy plan oczekuje wjazdu warstwy (`PLAN.md:378–379`). Eksport buduje komunikat, pobierając `scene_name` każdej warstwy (`src/manimcue/slides/config.py:375–379`); render bezwarunkowo wywołuje generator miniatur live (`src/manimcue/slides/slide/base.py:680–681`).
+
+    **Konsekwencja:** pozostawione walidatory zablokują wjazd spoza ekranu. Dodanie klipu może też zamienić zamierzony błąd eksportu w `AttributeError`.
+
+    **Poprawka planu:** rozdzielić poprawność wymiarów od ograniczenia pozycji do kadru; walidować skończone, nieujemne i ściśle rosnące czasy. Miniatury i diagnostykę rozgałęzić według rodzaju. Liniowe `(t, rect)` wystarcza na automatyczne przesuwanie i skalowanie. Easing jest opcjonalnym rozszerzeniem; uruchamianie ruchu klawiszem wymaga osobnego modelu wyzwalania i nie wynika z tej listy.
+
+12. **[WAŻNE] F: kryteria potwierdzają wydanie poleceń, ale jeszcze nie jakość odtwarzania; 6 h jest budżetem optymistycznym.**
+
+    **Dowód:** kryterium startu mierzy jedną iterację zdarzeń, nie rozjazd widocznych klatek (`PLAN.md:372–373`). Podgląd bazy uruchamia dodatkowy player (`src/manimcue/slides/present/player.py:563–566`). Ochrona ostatniej klatki jest podłączona tylko do sinka bazy (`:284`, `:685–690`).
+
+    **Konsekwencja:** zielone testy modeli i wywołań metod nie wykryją czarnej warstwy po końcu, opóźnionego startu dekodera ani przeciążenia. Nie ma uczciwej stałej „N dekoderów 1080p60 na Windows” bez wskazania kodeka, GPU, sterownika i pomiaru z live oraz preview.
+
+    **Poprawka planu:** rozdzielić testy deterministyczne od integracyjnych. Offscreen sprawdzać model, interpolację, routing i stan bariery; rzeczywiste wideo zaliczać dopiero po odebraniu poprawnych klatek i sprawdzeniu pikseli z timeoutem. Dodać końce klipów, anulowanie przygotowania i opóźnione sygnały poprzedniego slajdu. Na komputerze prelegenta zmierzyć bazę + 1/2/3 klipy 1080p60, z Info i live, oraz ustalić dopuszczalny rozjazd startu. **6 h traktowałbym jako cel prototypu**, a limit 12 h jako punkt raportu; pełnego ukończenia nie da się obecnie wiarygodnie obiecać.
+
+**Werdykt: F5 można implementować po poprawkach**, przede wszystkim po ustaleniu zegara, transportu grupowego, indeksowania mieszanych warstw i końcowego obrazu reverse. Najpierw krótki PoC kilku rzeczywistych playerów na Windows; jego wynik powinien doprecyzować kryterium wspólnego startu i budżet.
+
+---
+
+## Runda 12 — codex, 2026-10-22: przegląd kodu F5
+
+Pytania: `codex-round12-prompt` (poprawność `ClipGroup`, kompozycja i live w ruchu, model
+i render, jakość testów). Przegląd read-only z próbami Qt w pamięci.
+
+**Co weszło:**
+- Bariera bazy przyjmuje tylko nową klatkę dekodera: odrzuca klatkę przywróconą przez
+  `frame_changed` (porównanie z `Player.frame`) i klatki w `NoMedia`/`LoadingMedia`; regresja
+  sprawdzona w obie strony (p. 1).
+- Replay w trakcie przygotowania pomijany; replay w pauzie wznawia grupę dla obu rodzajów bazy
+  (p. 2). `next` nad bazą statyczną: wznowienie albo następny slajd, bez logiki pętli (p. 3).
+- Awaria klipu: player odłączony i usunięty, w miejsce elementu wideo miniatura (p. 4).
+- Obwódka live jedzie z warstwą (`SlideComposition.layer_moved`) (p. 5).
+- Testy: liczniki klatek od konstrukcji (przygotowanie ≤ 2 klatki na klip), moment zwolnienia
+  bariery, pauza w trakcie przygotowania sprawdzana na wszystkich playerach i braku klatek,
+  reverse z rzeczywistymi klatkami cofanej bazy (p. 6-7). Pomiar rozjazdu w teście to
+  dostarczenie do wątku GUI — widoczny start mierzy PoC.
+- Połączenia sygnałów grupy rozłączane w `clear()` (p. 8); metadane klipów w pamięci
+  podręcznej po ścieżce, rozmiarze i mtime, błędy sondowania z etykietą slajdu (p. 9).
+
+**Odpowiedź codex (bez zmian):**
+
+1. **[KRYTYCZNE] Bariera bazy może zaakceptować klatkę poprzedniego slajdu.**
+
+   **Dowód:** grupa zostaje przygotowana przed `setSource()` bazy (`src/manimcue/slides/present/player.py:465–469`). `on_base_frame()` akceptuje każdą poprawną klatkę, bez identyfikatora wejścia ani źródła (`src/manimcue/clip_layers.py:103–107`). Tymczasem `frame_changed()` wstrzykuje zapamiętaną klatkę po otrzymaniu niepoprawnej (`src/manimcue/slides/present/player.py:715–720`), a `self.frame` nie jest zerowane przy ładowaniu (`src/manimcue/slides/present/player.py:447–493`).
+
+   **Konsekwencja:** opróżnienie sinka podczas zmiany źródła może zwolnić barierę obrazem poprzedniej bazy. Nowa baza rozpocznie właściwe dekodowanie już po wspólnym starcie. Próba w pamięci potwierdziła, że wstrzyknięta poprawna klatka zwalnia tę barierę.
+
+   **Poprawka:** oddzielić klatki dekodera od klatek przywracanych do wyświetlenia; przygotowanie bazy przypisać do konkretnego wejścia i nowego źródła. Dodać regresję: stara klatka → zmiana źródła → niepoprawna klatka → przywrócenie starej.
+
+2. **[WAŻNE] Replay podczas przygotowania uruchamia samą bazę; replay w pauzie ma różną semantykę zależnie od rodzaju bazy.**
+
+   **Dowód:** `Player.replay()` bezwarunkowo wykonuje `base.play()` (`src/manimcue/slides/present/player.py:655–661`). Grupa podczas przygotowania ignoruje replay (`src/manimcue/clip_layers.py:191–194`) i ignoruje zmiany stanu bazy (`src/manimcue/clip_layers.py:168–171`). Przy bazie statycznej replay grupy zachowuje pauzę, ponieważ uruchamia klipy tylko przy `self.running` (`src/manimcue/clip_layers.py:195–200`).
+
+   **Konsekwencja:** jeżeli baza już przygotowała klatkę, a pozostałe klipy jeszcze czekają, replay puści bazę poza barierą. W pauzie baza wideo wznowi grupę, natomiast baza statyczna pozostawi ją zatrzymaną.
+
+   **Poprawka:** rozstrzygać replay grupowy przed wywołaniem metod bazy; podczas przygotowania aktualizować wyłącznie stan żądany. Przetestować replay podczas przygotowania i w pauzie dla obu rodzajów bazy.
+
+3. **[WAŻNE] `next` może utkwić na zapętlonym slajdzie z bazą statyczną.**
+
+   **Dowód:** slajd z `loop=True` ustawia nieskończoną pętlę playera bazy (`src/manimcue/slides/present/player.py:502–505`), lecz obraz zatrzymuje ten player (`src/manimcue/slides/present/player.py:490–493`). Przy działającej grupie statycznej `next()` dochodzi do obsługi `next_terminates_loop` i ustawia żądanie zakończenia (`src/manimcue/slides/present/player.py:627–640`). Realizacja żądania wymaga cofnięcia pozycji bazy (`src/manimcue/slides/present/player.py:332–340`).
+
+   **Konsekwencja:** przy `next_terminates_loop=True` kolejne naciśnięcia mogą stale zamawiać zakończenie pętli zatrzymanego playera, zamiast przejść dalej.
+
+   **Poprawka:** obsłużyć `static_active` w całości: wznowić zatrzymaną grupę albo przejść do następnego slajdu, bez logiki pętli bazy.
+
+4. **[WAŻNE] Awaria klipu nie pozostawia miniatury i zatrzymany player wypada ze sprzątania.**
+
+   **Dowód:** normalna warstwa wideo powstaje jako sam `QGraphicsVideoItem`, bez miniatury (`src/manimcue/composition.py:98–102`). `drop()` usuwa player ze słownika i wyłącznie go zatrzymuje (`src/manimcue/clip_layers.py:128–133`). `deleteLater()` wykonywane jest tylko dla playerów pozostających w słowniku (`src/manimcue/clip_layers.py:224–230`); utworzone playery mają grupę jako rodzica (`src/manimcue/clip_layers.py:79`).
+
+   **Konsekwencja:** błędny plik bez pierwszej klatki pozostawia pustą warstwę. Jego obiekt playera pozostaje dzieckiem długowiecznej grupy również po zmianie slajdu.
+
+   **Poprawka:** po awarii odłączyć wyjście, zaplanować usunięcie playera i pokazać miniaturę lub jawny placeholder. Obecny test sprawdza jedynie zawartość słownika, więc obu problemów nie wykrywa (`tests/test_clip_layers.py:337–346`).
+
+5. **[WAŻNE] Obwódka aktywnego lub błędnego live nie podąża za ruchem warstwy.**
+
+   **Dowód:** ruch aktualizuje prostokąt i element warstwy (`src/manimcue/composition.py:138–147`), natomiast obwódka kopiuje prostokąt dopiero podczas `frame_layer()` (`src/manimcue/live_layers.py:186–193`). Wywołują ją aktywacja i błąd (`src/manimcue/live_layers.py:136–153`), nie zegar ruchu (`src/manimcue/clip_layers.py:218–222`).
+
+   **Konsekwencja:** obraz odjedzie, a oznaczenie aktywacji lub błędu pozostanie w poprzednim miejscu. Trafianie kliknięciem korzysta z aktualnych elementów sceny, więc dodatkowo rozjedzie się z widoczną obwódką (`src/manimcue/composition.py:194–204`).
+
+   **Poprawka:** aktualizować geometrię obwódki przy zmianie prostokąta oznaczonej warstwy albo powiązać ją z elementem warstwy.
+
+6. **[WAŻNE] Test wspólnego startu nie wykrywa przedwczesnego odtwarzania, a pomiar 50 ms nie potwierdza widocznego startu.**
+
+   **Dowód:** `started_early` zapisuje zdarzenie tylko przy jednoczesnym `preparing=True` i pustym `pending` (`tests/test_clip_layers.py:307–311`). `start()` zeruje `preparing` przed uruchomieniem playerów (`src/manimcue/clip_layers.py:147–151`). Monitor jest ponadto podłączany już po utworzeniu playera, który rozpoczął przygotowanie (`tests/test_clip_layers.py:302–309`; `src/manimcue/clip_layers.py:91–94`).
+
+   Pomiar klatek podłączany jest dopiero po zakończeniu bariery i zapisuje czas wykonania callbacków (`tests/test_clip_layers.py:312–323`). Pętla obsługuje zdarzenia porcjami przez `processEvents()` (`tests/test_clip_layers.py:197–203`).
+
+   **Konsekwencja:** wadliwa implementacja może przejść test: asercja `started_early` nie obserwuje właściwego naruszenia, a blisko dostarczone callbacki nie dowodzą bliskiego czasu wyświetlenia klatek.
+
+   **Poprawka:** obserwować transport przed rozpoczęciem przygotowania; zarejestrować moment gotowości każdego źródła i wspólnego zwolnienia bariery. Po nim identyfikować pierwsze nowe klatki, a pomiar dostarczenia sygnałów opisywać osobno od pomiaru obrazu.
+
+7. **[WAŻNE] Testy pauzy i reverse pozostawiają istotne części kryteriów bez sprawdzenia.**
+
+   **Dowód:** test pauzy podczas przygotowania sprawdza wyłącznie bazę i zegar, bez stanów playerów warstw (`tests/test_clip_layers.py:349–360`). Test reverse odczytuje ręcznie dostarczoną zieloną pixmapę i prostokąt; nie czeka na klatki cofanej bazy (`tests/test_clip_layers.py:363–384`). Test ruchu wykonuje replay tylko podczas odtwarzania (`tests/test_clip_layers.py:282–285`).
+
+   **Konsekwencja:** zielony wynik tych testów nie wykryje grającego klipu po zamówionej pauzie, błędnego transportu cofanej bazy ani problemów replay z punktu 2.
+
+   **Poprawka:** przed próbą prelegenta dodać deterministyczne regresje punktów 1–5 oraz scenariusze `next` podczas przygotowania, `start_paused`, zakończenia pętli, `skip_all` i wyjścia po ostatnim slajdzie. Dla reverse sprawdzać rzeczywiste klatki bazy; dla pauzy — wszystkie playery i nieruchomy obraz po przepompowaniu zdarzeń.
+
+8. **[DROBNE] Zachowany sink zbiera połączenia z kolejnych wejść.**
+
+   **Dowód:** `set_layers()` zachowuje elementy dla tej samej listy i trybu (`src/manimcue/composition.py:81–83`). Każde `enter()` dokłada nową lambdę do sinka (`src/manimcue/clip_layers.py:80–83`), a `clear()` nie rozłącza tych połączeń (`src/manimcue/clip_layers.py:224–237`).
+
+   **Konsekwencja:** ponowne ładowanie zachowanego układu zwiększa liczbę callbacków każdej klatki. Próba trzech wejść wykazała wzrost liczby odbiorców: 2 → 3 → 4. Sprawdzanie `entry` zapobiega aktualizacji przez stare callbacki, ale ich nie usuwa (`src/manimcue/clip_layers.py:109–111`). Nie jest to dowód wycieku sinków elementów zniszczonych podczas przebudowy.
+
+   **Poprawka:** przechowywać i rozłączać własne połączenia albo podłączyć jeden odbiornik na czas życia elementu.
+
+9. **[DROBNE] Walidacja przed prezentacją ponownie sonduje te same pliki i nie zawsze podaje kontekst błędu.**
+
+   **Dowód:** każde `video_info()` otwiera kontener od nowa (`src/manimcue/media.py:15–22`); walidator wywołuje je dla każdej bazy i warstwy (`src/manimcue/media.py:51–54`), przechodząc po wszystkich slajdach (`src/manimcue/media.py:65–68`). Etykieta slajdu trafia do błędu różnicy długości, ale nie do błędu metadanych (`src/manimcue/media.py:20–21`, `:58–61`).
+
+   **Konsekwencja:** wielokrotne użycie jednego renderu mnoży operacje otwarcia pliku; nieznana długość lub fps daje słabszy komunikat niż niezgodność długości.
+
+   **Poprawka:** buforować metadane według rozwiązanej ścieżki, rozmiaru i `mtime_ns`; błędy sondowania opakować nazwą prezentacji, slajdu i roli pliku.
+
+Nie wykazałem dodatkowego błędu skalowania pixmap: kod zastępuje transformację, zachowując źródłową pixmapę (`src/manimcue/composition.py:147`, `:156–163`). Podgląd klipu korzysta z miniatury, bez playera warstwy (`src/manimcue/slides/present/player.py:575`; `src/manimcue/composition.py:114–125`). Stary timeout po `clear()` jest odcinany numerem wejścia (`src/manimcue/clip_layers.py:135–137`, `:226`).
+
+**Werdykt: F5 można zamknąć po poprawkach i próbie, ale obecnie nie.** Najpierw naprawić punkty 1–7 i potwierdzić je regresjami; obecny test startu nie stanowi wystarczającego dowodu synchronizacji (`tests/test_clip_layers.py:307–324`).
+
+Przegląd był read-only, z małymi próbami Qt w pamięci. Nie uruchamiałem pełnego pytesta, renderu ani prezentacji na dwóch ekranach.

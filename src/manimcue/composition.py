@@ -4,6 +4,7 @@ Okno główne i bieżący widok Info to dwa `SlideView` tej samej `SlideComposit
 pokazuje ten sam obraz z konstrukcji. Podgląd następnego slajdu ma własną kompozycję.
 """
 
+import math
 from pathlib import Path
 
 from qtpy.QtCore import QPointF, QRectF, QSizeF, Qt, Signal
@@ -11,14 +12,17 @@ from qtpy.QtGui import QColor, QImage, QPainter, QPixmap, QTransform
 from qtpy.QtMultimediaWidgets import QGraphicsVideoItem
 from qtpy.QtWidgets import QFrame, QGraphicsPixmapItem, QGraphicsScene, QGraphicsView
 
-from manimcue.slides.config import LiveLayer
+from manimcue.slides.config import ClipLayer, Layer, LiveLayer, Rect
 
 PLACEHOLDER = QColor(40, 40, 40)
-"""Wypełnienie warstwy live bez miniatury (np. JSON sprzed renderu miniatur)."""
+"""Wypełnienie warstwy bez miniatury (np. JSON sprzed renderu miniatur)."""
 
 
 class SlideComposition(QGraphicsScene):
-    """Kadr slajdu w pikselach prezentacji: wideo albo obraz bazowy, nad nim warstwy live."""
+    """Kadr slajdu w pikselach prezentacji: wideo albo obraz bazowy, nad nim warstwy."""
+
+    layer_moved = Signal(int)
+    """Nowy prostokąt warstwy (ruch, D30) — np. dla obwódki aktywnej warstwy live."""
 
     def __init__(
         self,
@@ -36,9 +40,10 @@ class SlideComposition(QGraphicsScene):
         self.image_item.setTransformationMode(Qt.TransformationMode.SmoothTransformation)
         self.image_item.hide()
         self.addItem(self.image_item)
-        self.layer_items: list[QGraphicsPixmapItem] = []
+        self.layer_items: list[QGraphicsPixmapItem | QGraphicsVideoItem] = []
         self.layer_rects: list[QRectF] = []
-        self.layers: list[LiveLayer] | None = None
+        self.layers: list[Layer] | None = None
+        self.mode: tuple[bool, bool] = (False, False)
 
     def set_resolution(self, resolution: tuple[int, int]) -> None:
         """Kadr innej prezentacji (`present A B` z różnymi rozdzielczościami)."""
@@ -66,48 +71,101 @@ class SlideComposition(QGraphicsScene):
         self.video_item.hide()
         self.image_item.show()
 
-    def set_layers(self, layers: list[LiveLayer]) -> None:
-        """Warstwy live w ich prostokątach, z miniaturą; kolejność listy to z-order.
+    def set_layers(self, layers: list[Layer], video: bool = False, at_end: bool = False) -> None:
+        """Warstwy w ich prostokątach; kolejność listy to z-order dla wszystkich rodzajów.
 
-        Ta sama lista (replay, reverse, pętla slajdu) zostaje: przebudowa wstawiłaby miniaturę
-        nad obraz live, a scena w bezczynności nie publikuje nowej klatki (F4).
+        ``video`` — klipy wideo jako `QGraphicsVideoItem` dla playerów grupy (okno główne);
+        bez niego, w podglądzie, klip to jego miniatura. ``at_end`` — reverse (F5): klipy
+        pokazują ostatnią klatkę, a wszystkie warstwy stoją w prostokącie końcowym.
+        Ten sam układ (replay, pętla) zostaje: przebudowa wstawiłaby miniaturę nad obraz live,
+        a scena w bezczynności nie publikuje nowej klatki (F4); przy zmianie trybu tego samego
+        slajdu obraz live przechodzi do nowego elementu.
         """
-        if layers is self.layers:
+        mode = (video, at_end)
+        if layers is self.layers and mode == self.mode:
             return
-        self.layers = layers
+        kept = {}
+        if layers is self.layers:
+            kept = {
+                index: item.pixmap()
+                for index, (layer, item) in enumerate(zip(layers, self.layer_items, strict=True))
+                if isinstance(layer, LiveLayer)
+            }
+        self.layers, self.mode = layers, mode
         for item in self.layer_items:
             self.removeItem(item)
         self.layer_items = []
         self.layer_rects = []
-        for z, layer in enumerate(layers, start=1):
-            rect = self.layer_rect(layer)
-            self.layer_rects.append(rect)
-            if layer.thumbnail is not None:
-                pixmap = QPixmap(str(layer.thumbnail))
+        for index, layer in enumerate(layers):
+            rect = self.scene_rect(layer.rect_at(math.inf if at_end else 0))
+            if isinstance(layer, ClipLayer) and layer.is_video and video and not at_end:
+                item = QGraphicsVideoItem()
+                item.setAspectRatioMode(Qt.AspectRatioMode.IgnoreAspectRatio)
+                item.setPos(rect.topLeft())
+                item.setSize(rect.size())
             else:
-                pixmap = QPixmap(rect.size().toSize())
-                pixmap.fill(PLACEHOLDER)
-            item = QGraphicsPixmapItem()
-            item.setTransformationMode(Qt.TransformationMode.SmoothTransformation)
-            self.set_layer_pixmap(item, pixmap, rect)
-            item.setZValue(z)
+                item = QGraphicsPixmapItem()
+                item.setTransformationMode(Qt.TransformationMode.SmoothTransformation)
+                pixmap = kept[index] if index in kept else self.layer_pixmap(layer, rect, at_end)
+                self.set_layer_pixmap(item, pixmap, rect)
+            item.setZValue(index + 1)
             self.addItem(item)
             self.layer_items.append(item)
+            self.layer_rects.append(rect)
+
+    @staticmethod
+    def layer_pixmap(layer: Layer, rect: QRectF, at_end: bool) -> QPixmap:
+        """Obraz warstwy bez procesu i playera: miniatura (live, klip), plik (obraz)."""
+        if isinstance(layer, ClipLayer):
+            source = layer.end_thumbnail if at_end else layer.thumbnail
+            source = source or (None if layer.is_video else layer.file)
+        else:
+            source = layer.thumbnail
+        if source is not None:
+            return QPixmap(str(source))
+        pixmap = QPixmap(rect.size().toSize())
+        pixmap.fill(PLACEHOLDER)
+        return pixmap
 
     def set_layer_image(self, index: int, image: QImage) -> None:
         """Nowy obraz warstwy w jej prostokącie (miniatura → klatki live w F4).
 
-        Prostokąt z `set_layers`, nie z obrysu elementu: obrys po transformacji (F5) nie jest
-        pierwotnym prostokątem (runda 9, p. 10). Wywołujący trzyma bajty obrazu do powrotu.
+        Prostokąt z `set_layers`/`set_layer_rect`, nie z obrysu elementu: obrys po
+        transformacji nie jest pierwotnym prostokątem (runda 9, p. 10). Wywołujący trzyma bajty
+        obrazu do powrotu.
         """
         self.set_layer_pixmap(
             self.layer_items[index], QPixmap.fromImage(image), self.layer_rects[index]
         )
 
-    def layer_rect(self, layer: LiveLayer) -> QRectF:
-        """Prostokąt warstwy we współrzędnych sceny (piksele prezentacji)."""
+    def freeze_layer(self, index: int) -> None:
+        """Warstwa-klip bez playera (awaria): miniatura albo zastępnik w miejsce elementu wideo."""
+        old = self.layer_items[index]
+        rect = self.layer_rects[index]
+        item = QGraphicsPixmapItem()
+        item.setTransformationMode(Qt.TransformationMode.SmoothTransformation)
+        self.set_layer_pixmap(item, self.layer_pixmap(self.layers[index], rect, False), rect)
+        item.setZValue(old.zValue())
+        self.removeItem(old)
+        self.addItem(item)
+        self.layer_items[index] = item
+
+    def set_layer_rect(self, index: int, rect: Rect) -> None:
+        """Ruch warstwy (F5, D30): nowy prostokąt bez zmiany obrazu ani z-order."""
+        scene_rect = self.scene_rect(rect)
+        self.layer_rects[index] = scene_rect
+        item = self.layer_items[index]
+        if isinstance(item, QGraphicsVideoItem):
+            item.setPos(scene_rect.topLeft())
+            item.setSize(scene_rect.size())
+        else:
+            self.set_layer_pixmap(item, item.pixmap(), scene_rect)
+        self.layer_moved.emit(index)
+
+    def scene_rect(self, rect: Rect) -> QRectF:
+        """Prostokąt w ułamkach kadru → współrzędne sceny (piksele prezentacji)."""
         scene = self.sceneRect()
-        x, y, w, h = layer.rect
+        x, y, w, h = rect
         return QRectF(x * scene.width(), y * scene.height(), w * scene.width(), h * scene.height())
 
     @staticmethod

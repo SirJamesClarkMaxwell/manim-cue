@@ -5,6 +5,7 @@ import shutil
 from collections.abc import Callable
 from enum import Enum
 from functools import wraps
+from itertools import pairwise
 from inspect import Parameter, signature
 from pathlib import Path
 from textwrap import dedent
@@ -165,41 +166,137 @@ class Config(BaseModel):
         return self
 
 
-FORMAT_VERSION = 2
-"""Wersja formatu JSON (F3, D24): 1 to upstream 5.7.0 bez pola, 2 dodaje warstwy live."""
+FORMAT_VERSION = 3
+"""Wersja formatu JSON: 1 — upstream 5.7.0 bez pola, 2 — warstwy live (F3, D24),
+3 — warstwy z plików, `kind` i klatki kluczowe (F5, D29)."""
+
+Rect = tuple[float, float, float, float]
+"""(x, y, szerokość, wysokość) jako ułamki kadru slajdu, (0, 0) w lewym górnym rogu."""
 
 
-class LiveLayer(BaseModel):
+def check_rect(rect: Rect, inside: bool) -> Rect:
+    """Skończony prostokąt o dodatnich wymiarach; ``inside`` — dodatkowo cały w kadrze."""
+    x, y, w, h = rect
+    eps = 1e-9
+    if not all(map(math.isfinite, rect)) or w <= 0 or h <= 0:
+        raise ValueError(f"rect {rect} musi mieć skończone liczby i dodatnie wymiary")
+    if inside and (x < 0 or y < 0 or x + w > 1 + eps or y + h > 1 + eps):
+        raise ValueError(f"rect {rect} musi leżeć w kadrze (ułamki 0..1)")
+    return rect
+
+
+class Keyframe(BaseModel):
+    """Prostokąt warstwy w chwili ``t`` aktywnego czasu slajdu (F5, D30); poza kadrem wolno."""
+
+    t: float
+    rect: Rect
+
+    @field_validator("t")
+    @classmethod
+    def t_is_time(cls, t: float) -> float:
+        if not math.isfinite(t) or t < 0:
+            raise ValueError(f"t={t} musi być skończone i nieujemne")
+        return t
+
+    @field_validator("rect")
+    @classmethod
+    def rect_is_valid(cls, rect: Rect) -> Rect:
+        return check_rect(rect, inside=False)
+
+
+class LayerBase(BaseModel):
+    """Wspólne dla warstw: klatki kluczowe ruchu (D30), ściśle rosnące w czasie."""
+
+    keyframes: list[Keyframe] = []
+
+    @field_validator("keyframes")
+    @classmethod
+    def keyframes_increase(cls, keyframes: list[Keyframe]) -> list[Keyframe]:
+        if any(b.t <= a.t for a, b in pairwise(keyframes)):
+            raise ValueError("czasy klatek kluczowych muszą ściśle rosnąć")
+        return keyframes
+
+    def rect_at(self, t: float) -> Rect:
+        """Prostokąt w chwili ``t``: liniowo między klatkami kluczowymi, poza nimi — stały."""
+        frames = [Keyframe(t=0, rect=self.rect)] if not self.keyframes else self.keyframes
+        if t <= frames[0].t:
+            return frames[0].rect
+        for a, b in pairwise(frames):
+            if t <= b.t:
+                k = (t - a.t) / (b.t - a.t)
+                return tuple(p + k * (q - p) for p, q in zip(a.rect, b.rect, strict=True))
+        return frames[-1].rect
+
+    def describe(self) -> str:
+        raise NotImplementedError
+
+
+class LiveLayer(LayerBase):
     """Warstwa live slajdu (F3, D24): scena `LiveScene` w prostokącie kadru.
 
-    ``rect`` to (x, y, szerokość, wysokość) jako ułamki kadru, (0, 0) w lewym górnym rogu.
-    ``thumbnail`` wypełnia render: pierwsza klatka sceny, widoczna przed startem procesu.
+    ``rect`` wyznacza rozdzielczość renderu, więc leży w kadrze; ruch (``keyframes``) tylko
+    skaluje obraz. ``thumbnail`` wypełnia render: pierwsza klatka sceny.
     """
 
+    kind: Literal["live"] = "live"
     scene_file: FilePath
     scene_name: str
-    rect: tuple[float, float, float, float] = (0.0, 0.0, 1.0, 1.0)
+    rect: Rect = (0.0, 0.0, 1.0, 1.0)
     fps: PositiveInt = 60
     thumbnail: FilePath | None = None
 
     @field_validator("rect")
     @classmethod
-    def rect_inside_frame(
-        cls, rect: tuple[float, float, float, float]
-    ) -> tuple[float, float, float, float]:
-        x, y, w, h = rect
-        eps = 1e-9
-        # Całość w kadrze to ograniczenie początkowego układu F3; ruch poza kadr to sprawa F5.
-        if not all(map(math.isfinite, rect)) or w <= 0 or h <= 0 or x < 0 or y < 0 or x + w > 1 + eps or y + h > 1 + eps:
-            raise ValueError(
-                f"rect {rect} musi leżeć w kadrze (ułamki 0..1) i mieć dodatnie wymiary"
-            )
-        return rect
+    def rect_inside_frame(cls, rect: Rect) -> Rect:
+        return check_rect(rect, inside=True)
 
     def size(self, resolution: tuple[int, int]) -> tuple[int, int]:
         """Rozdzielczość procesu live: prostokąt warstwy w pikselach prezentacji."""
         width, height = resolution
         return max(1, round(self.rect[2] * width)), max(1, round(self.rect[3] * height))
+
+    def describe(self) -> str:
+        return self.scene_name
+
+
+class ClipLayer(LayerBase):
+    """Warstwa z pliku (F5, D29): klip wideo albo obraz, np. render innej sceny.
+
+    Prostokąt może wychodzić poza kadr (wjazd). ``thumbnail`` i ``end_thumbnail`` — pierwsza
+    i ostatnia klatka z renderu (podgląd, reverse); dla obrazu to sam plik.
+    """
+
+    kind: Literal["clip"] = "clip"
+    file: FilePath
+    rect: Rect = (0.0, 0.0, 1.0, 1.0)
+    loop: bool = False
+    playback_rate: float = 1.0
+    thumbnail: FilePath | None = None
+    end_thumbnail: FilePath | None = None
+
+    @field_validator("rect")
+    @classmethod
+    def rect_is_valid(cls, rect: Rect) -> Rect:
+        return check_rect(rect, inside=False)
+
+    @field_validator("playback_rate")
+    @classmethod
+    def rate_is_positive(cls, rate: float) -> float:
+        if not math.isfinite(rate) or rate <= 0:
+            raise ValueError(f"playback_rate={rate} musi być skończone i dodatnie")
+        return rate
+
+    @property
+    def is_video(self) -> bool:
+        """Wideo grające w grupie; GIF i obrazy są statyczne (GIF — pierwsza klatka)."""
+        guessed = mimetypes.guess_type(self.file)[0] or ""
+        return guessed.startswith("video")
+
+    def describe(self) -> str:
+        return Path(self.file).name
+
+
+Layer = Annotated[LiveLayer | ClipLayer, Field(discriminator="kind")]
 
 
 class BaseSlideConfig(BaseModel):
@@ -217,7 +314,7 @@ class BaseSlideConfig(BaseModel):
     direction: Literal["horizontal", "vertical"] = "horizontal"
     # Zwykła wartość domyślna, nie default_factory: wrapper wpisuje `default` do sygnatury
     # next_slide, a pydantic i tak kopiuje listę dla każdej instancji.
-    layers: list[LiveLayer] = []
+    layers: list[Layer] = []
 
     @model_validator(mode="after")
     def determine_slide_type(self) -> "BaseSlideConfig":
@@ -365,19 +462,28 @@ class SlideConfig(BaseSlideConfig):
         return cls(file=file, rev_file=rev_file, **pre_slide_config.model_dump())
 
 
-def check_no_live_layers(presentation_configs: list["PresentationConfig"]) -> None:
-    """D23: warstwa live nie ma odpowiednika w plikach wyjściowych — błąd zamiast cichej utraty.
+def check_no_layers(presentation_configs: list["PresentationConfig"]) -> None:
+    """D23: warstwy (live i z plików) nie mają odpowiednika w eksporcie — błąd, nie cicha utrata.
 
     Prezentację wskazuje numer: ``convert`` bez nazw scen wybiera je z promptu.
     """
     for number, presentation_config in enumerate(presentation_configs, start=1):
         for index, slide_config in enumerate(presentation_config.slides, start=1):
             if slide_config.layers:
-                names = ", ".join(layer.scene_name for layer in slide_config.layers)
+                names = ", ".join(layer.describe() for layer in slide_config.layers)
                 raise ValueError(
-                    f"Prezentacja {number}, slajd {index}: warstwa live ({names}); "
-                    "eksport do plików nie obsługuje warstw live"
+                    f"Prezentacja {number}, slajd {index}: warstwy ({names}); "
+                    "eksport do plików nie obsługuje warstw"
                 )
+
+
+def slide_file(json_path: Path | str, index: int) -> Path:
+    """Plik bazowy slajdu ``index`` (od 0) innego, wcześniej wyrenderowanego decku (D29).
+
+    Nazwy klipów to hashe, więc warstwa-render innej sceny wskazuje je przez JSON; bez warstw
+    tamtego slajdu. Ponowny render źródłowego decku może zmienić wynik.
+    """
+    return PresentationConfig.from_file(Path(json_path)).slides[index].file.resolve()
 
 
 class PresentationConfig(BaseModel):
@@ -413,9 +519,11 @@ class PresentationConfig(BaseModel):
                 if rev_file := slide.get("rev_file", None):
                     slide["rev_file"] = parent / rev_file
 
-                # F3: ścieżki warstw live względem tego samego katalogu co klipy.
+                # F3: ścieżki warstw względem tego samego katalogu co klipy. F5: plik v2 nie
+                # ma `kind`, a unia dyskryminowana go wymaga — warstwy v2 to zawsze live.
                 for layer in slide.get("layers", []):
-                    for key in ("scene_file", "thumbnail"):
+                    layer.setdefault("kind", "live")
+                    for key in ("scene_file", "thumbnail", "file", "end_thumbnail"):
                         if value := layer.get(key):
                             layer[key] = parent / value
 
@@ -423,8 +531,9 @@ class PresentationConfig(BaseModel):
 
     def to_file(self, path: Path) -> None:
         """Dump the presentation configuration to a file."""
+        # F5: zawsze bieżąca wersja — dokument v2 rozszerzony o klip nie może zostać „v2”.
         with open(path, "w", encoding="utf-8") as f:
-            f.write(self.model_dump_json(indent=2))
+            f.write(self.model_copy(update={"version": FORMAT_VERSION}).model_dump_json(indent=2))
 
     def copy_to(
         self,
@@ -435,7 +544,7 @@ class PresentationConfig(BaseModel):
     ) -> None:
         """Copy the files to a given directory."""
         # Runda 8: kopia samych klipów zgubiłaby scenę i miniaturę warstwy.
-        check_no_live_layers([self])
+        check_no_layers([self])
         for slide_config in self.slides:
             file = slide_config.file
             rev_file = slide_config.rev_file

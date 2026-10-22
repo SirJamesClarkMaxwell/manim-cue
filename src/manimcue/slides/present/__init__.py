@@ -276,6 +276,15 @@ def present(  # noqa: C901
 
     presentation_configs = get_scenes_presentation_config(scenes, folder)
 
+    # F5 (D29): długości warstw raz przed prezentacją, nie w from_file (sonda multimediów).
+    from manimcue.media import check_presentation_durations
+
+    for number, presentation_config in enumerate(presentation_configs, start=1):
+        try:
+            check_presentation_durations(presentation_config, f"Prezentacja {number},")
+        except ValueError as e:
+            raise click.UsageError(str(e)) from None
+
     if config_path.exists():
         try:
             config = Config.from_file(config_path)

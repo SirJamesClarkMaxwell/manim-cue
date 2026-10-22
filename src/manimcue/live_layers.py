@@ -15,7 +15,7 @@ from qtpy.QtWidgets import QGraphicsRectItem
 
 from manimcue.composition import SlideComposition
 from manimcue.live_session import LiveSession, LiveSpec
-from manimcue.slides.config import Keys, SlideConfig
+from manimcue.slides.config import Keys, LiveLayer, SlideConfig
 from manimcue.slides.logger import logger
 
 POLL_MS = 4
@@ -40,13 +40,16 @@ class LiveLayerController(QObject):
         super().__init__()
         self.composition = composition
         self.key: object = None
-        self.sessions: list[LiveSession] = []
-        self.started: list[float] = []
+        # Klucz to indeks warstwy w kompozycji, nie pozycja wśród warstw live (runda 11, p. 3).
+        self.sessions: dict[int, LiveSession] = {}
+        self.started: dict[int, float] = {}
         self.stopping: list[LiveSession] = []
         self.active: int | None = None
         self.failed: set[int] = set()
         self.closing = False
         self.drag_from: QPointF | None = None
+        self.framed: int | None = None
+        composition.layer_moved.connect(self.follow_layer)
         self.border = QGraphicsRectItem()
         self.border.setZValue(BORDER_Z)
         self.border.hide()
@@ -71,7 +74,9 @@ class LiveLayerController(QObject):
         self.border.hide()
         self.retire()
         self.key = key
-        for layer in slide.layers:
+        for index, layer in enumerate(slide.layers):
+            if not isinstance(layer, LiveLayer):
+                continue
             width, height = layer.size(resolution)
             session = LiveSession()
             session.start(
@@ -83,29 +88,29 @@ class LiveLayerController(QObject):
                     layer.fps,
                 )
             )
-            self.sessions.append(session)
-            self.started.append(time.monotonic())
+            self.sessions[index] = session
+            self.started[index] = time.monotonic()
         self.update_timer()
 
     def retire(self) -> None:
         """Sesje bieżącego slajdu przechodzą do odbioru; od tej chwili nie dotykają kompozycji."""
-        for session in self.sessions:
+        for session in self.sessions.values():
             session.request_stop()
-        self.stopping += self.sessions
-        self.sessions = []
-        self.started = []
+        self.stopping += self.sessions.values()
+        self.sessions = {}
+        self.started = {}
 
     def tick(self) -> None:
         now = time.monotonic()
         # Najpierw statusy wszystkich sesji, potem kosztowne obrazy (runda 9, p. 9).
-        for index, session in enumerate(self.sessions):
+        for index, session in self.sessions.items():
             for event in session.poll():
                 if event.startswith("ERROR"):
                     self.fail(index, event)
             if session.state == "starting" and now - self.started[index] > START_TIMEOUT:
                 self.fail(index, f"ERROR start: brak READY po {START_TIMEOUT:.0f} s")
                 session.request_stop()
-        for index, session in enumerate(self.sessions):
+        for index, session in self.sessions.items():
             frame = session.try_read_frame()
             if frame is not None:
                 # Bajty żyją w `frame` do powrotu z set_layer_image (QPixmap.fromImage).
@@ -124,7 +129,7 @@ class LiveLayerController(QObject):
         self.update_timer()
 
     def update_timer(self) -> None:
-        busy = self.stopping or any(session.running for session in self.sessions)
+        busy = self.stopping or any(session.running for session in self.sessions.values())
         if busy and not self.timer.isActive():
             self.timer.start(POLL_MS)
         elif not busy and self.timer.isActive():
@@ -143,7 +148,7 @@ class LiveLayerController(QObject):
     def click(self, index: int) -> None:
         """Klik w widoku głównym: warstwa (indeks) dostaje klawisze, -1 je zwalnia."""
         self.drag_from = None
-        if index < 0 or index >= len(self.sessions) or index in self.failed:
+        if index not in self.sessions or index in self.failed:
             self.release()
             return
         self.active = index
@@ -180,7 +185,13 @@ class LiveLayerController(QObject):
         if self.failed:
             self.frame_layer(min(self.failed), ERROR_COLOR)
 
+    def follow_layer(self, index: int) -> None:
+        """Obwódka jedzie z warstwą w ruchu (runda 12, p. 5)."""
+        if index == self.framed and self.border.isVisible():
+            self.frame_layer(index, self.border.pen().color())
+
     def frame_layer(self, index: int, color: QColor) -> None:
+        self.framed = index
         pen = QPen(color, BORDER_WIDTH)
         pen.setJoinStyle(Qt.PenJoinStyle.MiterJoin)
         self.border.setPen(pen)

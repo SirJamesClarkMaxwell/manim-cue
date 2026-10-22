@@ -16,8 +16,11 @@ from typing import (
 import numpy as np
 from tqdm import tqdm
 
+from manimcue.media import check_layer_durations, edge_frames
+
 from ..config import (
     BaseSlideConfig,
+    ClipLayer,
     LiveLayer,
     PresentationConfig,
     PreSlideConfig,
@@ -676,9 +679,16 @@ class BaseSlide:
             slide_config = SlideConfig.from_pre_slide_config_and_files(
                 pre_slide_config, dst_file, rev_file
             )
-            # F3 (D24): każda warstwa live dostaje miniaturę — pierwszą klatkę swojej sceny.
+            # F3 (D24): warstwa live dostaje miniaturę — pierwszą klatkę swojej sceny.
+            # F5 (D29): klip — pierwszą i ostatnią klatkę (podgląd, reverse); obraz — sam plik.
             for layer in slide_config.layers:
-                layer.thumbnail = self._live_thumbnail(layer, scene_files_folder, use_cache)
+                if isinstance(layer, LiveLayer):
+                    layer.thumbnail = self._live_thumbnail(layer, scene_files_folder, use_cache)
+                else:
+                    layer.thumbnail, layer.end_thumbnail = self._clip_thumbnails(
+                        layer, scene_files_folder, use_cache
+                    )
+            check_layer_durations(slide_config, f"Slajd {len(slides) + 1}: ")
             slides.append(slide_config)
 
         logger.info(
@@ -718,6 +728,23 @@ class BaseSlide:
             )
             Image.frombytes("RGBA", (width, height), frame.pixels).save(path)
         return path
+
+    def _clip_thumbnails(
+        self, layer: ClipLayer, folder: Path, use_cache: bool
+    ) -> tuple[Path, Path]:
+        """Pierwsza i ostatnia klatka klipu jako PNG; klucz cache: ścieżka, rozmiar, mtime."""
+        file = Path(layer.file).resolve()
+        if not layer.is_video:
+            return file, file
+        stat = file.stat()
+        key = hashlib.sha256(f"{file}|{stat.st_size}|{stat.st_mtime_ns}|edges-v1".encode())
+        first = folder / f"clip_{key.hexdigest()[:16]}_first.png"
+        last = folder / f"clip_{key.hexdigest()[:16]}_last.png"
+        if not use_cache or not (first.exists() and last.exists()):
+            first_image, last_image = edge_frames(file)
+            first_image.save(first)
+            last_image.save(last)
+        return first, last
 
     def start_skip_animations(self) -> None:
         """

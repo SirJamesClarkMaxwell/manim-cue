@@ -68,7 +68,10 @@ def _render(tmp_path: Path, renderer_args: list[str], scene_file: Path, scene: s
         ],
         cwd=tmp_path,
         capture_output=True,
-        text=True,
+        # Rich drukuje traceback ze źródłem (polskie komentarze, ramki) — kodowanie systemowe
+        # Windows (cp1252) gubiłoby całe wyjście, a test szuka w nim treści błędu.
+        encoding="utf-8",
+        errors="replace",
         timeout=600,
         check=False,
     )
