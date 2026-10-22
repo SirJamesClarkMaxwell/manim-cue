@@ -453,10 +453,58 @@ slajd 1 → 2, dwa widoki jednego klipu w CE i GL, cache CE po nowym renderze ź
 w obie strony). Kryterium 8: demo deck, slajd 6 — czeka na próbę. Po drodze: przypięcie
 `pillow<13` (CE 0.21 nie renderował żadnego `ImageMobject`). Czas: ~1 h zegarowo.
 
-## Faza 6b — PoC krokowania sceny podrzędnej
+## Faza 6b — PoC krokowania sceny podrzędnej (PoC wykonany, czeka na decyzję prelegenta)
 
 Gospodarz i dziecko postępują równolegle bez rekurencyjnego `play()` (synchroniczny w obu
 silnikach). Wynik może zamknąć ten kierunek.
+
+**Ocena dróg (przed PoC):**
+- *Dziecko jako generator* (`yield from self.play(...)`) — zmienia API autora; sprzeczne
+  z zasadą „`Scene` jak każda inna”. Odrzucone.
+- *Wątek albo greenlet dla dziecka* — wątek łamie „jeden wątek kodu aplikacji na proces”,
+  greenlet to nowa zależność i współbieżność tylnymi drzwiami. Odrzucone.
+- **Nagranie stanów (PoC):** `construct()` dziecka wykonuje się raz, przy budowaniu gospodarza,
+  w trybie nagrywania: jego `play()`/`wait()` krokują animacje w czasie wirtualnym (fps
+  gospodarza), **bez renderu**, i zapisują kopie mobjectów dziecka co klatkę. Kod dziecka po
+  `play()` widzi stan końcowy jak zwykle. W gospodarzu `SceneRecording` odtwarza zapisane stany
+  wektorowo w ramce (prostokąt w jednostkach gospodarza), którą gospodarz animuje jak każdy
+  mobject; czas z zegara gospodarza jak w D32. Wynik tożsamy z „równoległym postępem” dla dzieci
+  niezależnych od gospodarza; dziecko reagujące na stan gospodarza — poza zakresem (wymagałoby
+  współbieżności z odrzuconych dróg).
+- Zysk względem F6a: treść wektorowa (ostra przy powiększeniu), bez tła klipu (nakłada się na
+  gospodarza), animowalna geometria pojedynczych mobjectów dziecka po stronie gospodarza — nie
+  w PoC.
+
+**PoC — kryteria (CE, Cairo; GL dopiero po pozytywnym wyniku):**
+1. Dziecko z dwoma `play()` i `wait()` nagrane bez plików filmu i bez renderu; liczba stanów
+   = fps × czas dziecka (± 1).
+2. Gospodarz: w trakcie własnej animacji innego obiektu stany dziecka postępują — piksele
+   w klatkach wyjścia zgodne z pozycją obiektu dziecka w danej chwili.
+3. Ramka animowana przez gospodarza (przesunięcie, skala) przenosi treść dziecka; tło
+   gospodarza pod ramką widoczne (brak nieprzezroczystego prostokąta).
+4. Pomiar: czas nagrania i pamięć stanów dla dziecka z ~20 mobjectami przez 5 s przy 60 fps.
+5. Raport: kontynuować (API, GL, testy) albo zamknąć kierunek z powodem.
+
+**Budżet:** ~2 h na PoC.
+
+**Wynik PoC (2026-10-22, po rundzie 14) — kierunek wykonalny:**
+- Runda 14 wykazała, że „nagranie stanów” odpowiada tylko na pytanie o wektorowe F6a, a greenlet
+  daje jednowątkową drogę do prawdziwego krokowania **bez zmiany API autora**. PoC zrobiony na
+  greenlecie (`experiments/f6b_stepping/`, `uv run --with greenlet`, bez zależności projektu).
+- Dziecko to zwykła `Scene` CE. Jej `play()` krokuje animacje bez renderu i po każdej próbce
+  oddaje sterowanie gospodarzowi (`greenlet.switch`); gospodarz wznawia je raz na swoją klatkę.
+  Dziecko **reaguje na gospodarza**: `wait_until(lambda: self.host.dot.get_x() > 0)` kończy się
+  w klatce przejścia kropki gospodarza (4,067 s przy 15 fps).
+- Treść dziecka rysuje jego kamera Cairo w rozdzielczości ramki, z przezroczystym tłem, do jednego
+  `ImageMobject`; gospodarz animuje ramkę (przesunięcie i skala w trakcie kroków dziecka), pod
+  pustą częścią ramki widać tło gospodarza. Piksele w klatkach wyjścia zgodne z osią czasu.
+- Koszt (720p30, 5 s, dziecko z 20 mobjectami): render samego dziecka 2,0 s, gospodarz z
+  krokowanym dzieckiem 4,4 s (~21 ms na klatkę razem z renderem dziecka). RNG gospodarza zachowany.
+- Ograniczenia: kod dziecka między `play()` blokuje gospodarza (współbieżność kooperacyjna);
+  bez kamery ruchomej dziecka, dźwięku i sekcji; tylko CE (GL — po decyzji).
+- **Do decyzji prelegenta:** zależność `greenlet` (C, szeroko używana: gevent, SQLAlchemy) jako
+  mechanizm współbieżności kooperacyjnej w jednym wątku. Tak → F6b jako API (`ChildView`), testy,
+  potem GL. Nie → kierunek zamknięty, „scena w scenie” to F6a (render) i warstwy F5.
 
 ## Faza 7 — live w CE
 

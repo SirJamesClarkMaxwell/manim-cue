@@ -6,7 +6,7 @@
    trzy pułapki, na których szkic już padł, kryteria akceptacji fazy 0 i decyzje D1-D19.
    Fazy 0 dotyczyło pięć rund adwersaryjnej recenzji; **nie wyprowadzaj tych faktów od nowa i nie
    zmieniaj decyzji bez powodu.**
-2. **`PLAN.md`** — fazy. Fazy 4, 5 i 6a czekają na próbę prelegenta; aktywna jest faza 6b (PoC krokowania).
+2. **`PLAN.md`** — fazy. Fazy 4, 5 i 6a czekają na próbę prelegenta, 6b (PoC na greenlecie) — na decyzję o zależności; aktywna jest faza 7 (live w CE).
 3. **`REVIEW-LOG.md`** — rundy recenzji codex; runda 7 zawiera kontrakt fazy 2.
 
 ## Zasady

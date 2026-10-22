@@ -1175,3 +1175,132 @@ API i kryteria). Przegląd read-only.
 **Werdykt:** tak, F6a można implementować po poprawkach — przede wszystkim po rozstrzygnięciu animacji CE, zegara oraz własności kopii i tekstur. Obecny kontrakt nie wystarcza do obietnicy „jak każdy obraz” (`PLAN.md:408`).
 
 Przegląd był read-only; nie wykonywałem renderów ani pomiarów wydajności.
+
+---
+
+## Runda 14 — codex, 2026-10-22: PoC F6b (krokowanie sceny podrzędnej)
+
+Pytania: `codex-round14-prompt` (nagrywanie CE bez renderu, odtwarzanie w gospodarzu, wartość
+PoC „nagrania stanów” i ocena dróg). Przegląd read-only.
+
+**Co weszło:**
+- p. 1-2 zmieniły kierunek PoC: „nagranie stanów” odpowiadało tylko na „wektorowe F6a”, a
+  odrzucenie greenleta było preferencją, nie dowodem. PoC wykonany **na greenlecie**: dziecko
+  to zwykła `Scene` CE, adapter krokuje jedną próbkę na klatkę gospodarza, dziecko może czytać
+  stan gospodarza (`wait_until`). Wynik w `PLAN.md` (faza 6b) i `experiments/f6b_stepping/`.
+- p. 3-5: dziecko tworzone w `tempconfig(dry_run=True)`, `setup → construct → tear_down`;
+  `play()` przez `compile_animation_data` → `begin_animations` → `update_to_time` →
+  `finish` + `clean_up_from_scene`; `stop_condition` z `Wait` (CE `wait_until` bez zmian).
+- p. 6, 8-10 rozwiązane inaczej, niż proponował codex: zamiast kopii mobjectów dziecka treść
+  rysuje **kamera Cairo dziecka** w rozdzielczości ramki gospodarza (przezroczyste tło) do
+  jednego `ImageMobject` o stałej tożsamości. Bez kopii znikają `always_redraw`/`ValueTracker`
+  w migawkach i skalowanie obrysu; ramka (stała rodzina) jest animowalna. Odkryte przy tym:
+  CE ustala rodziny ruchomych mobjectów raz na `play()` — kopie podmieniane w trakcie były
+  niewidoczne, a stare rysowały się dalej.
+- p. 11: stan RNG gospodarza zapisywany i przywracany wokół konstrukcji i kroków dziecka.
+- p. 7, 12: ograniczenia (kamera ruchoma dziecka, dźwięk, sekcje) i pomiar — w wyniku F6b.
+
+**Odpowiedź codex (bez zmian):**
+
+1. **[KRYTYCZNE] PoC zmienia pytanie fazy: mierzy odtwarzanie, nie krokowanie żywego dziecka.**
+
+   **Dowód:** cel wymaga równoległego postępu (`PLAN.md:458`), ale całe `construct()` ma wykonać się przed odtwarzaniem, a reakcje na gospodarza są wyłączone (`PLAN.md:466–473`). Kryteria sprawdzają potem wyłącznie postęp zapisanych stanów (`PLAN.md:479–484`).
+
+   **Konsekwencja:** pozytywny wynik potwierdzi wektorowy odpowiednik F6a. Nie odpowie, czy można wznawiać wykonanie dziecka podczas pracy gospodarza. To nowa rozbieżność między obecną metodą eksperymentu a celem fazy.
+
+   **Poprawka planu:** nazwać eksperyment „nagranie wektorowe sceny”. Oddzielić decyzję „czy warto rozwijać nagrania” od decyzji „czy zamykamy żywe krokowanie”. Pierwsza nie rozstrzyga drugiej.
+
+2. **[WAŻNE] Odrzucenie greenlet jest decyzją projektową, nie dowodem braku jednowątkowej drogi.**
+
+   **Dowód:** plan odrzuca greenlet jako zależność i „współbieżność tylnymi drzwiami” (`PLAN.md:464–465`). Tymczasem miejscem oddawania sterowania może być pętla próbek CE (`.venv/Lib/site-packages/manim/scene/scene.py:1381–1387`), analogicznie GL (`.venv/Lib/site-packages/manimlib/scene/scene.py:549–559`). Greenlet zachowuje stos wywołań i pozwala przełączać wykonanie wewnątrz jednego wątku — mechanizm opisuje [oficjalna dokumentacja](https://greenlet.readthedocs.io/en/stable/switching.html).
+
+   **Konsekwencja:** technicznie istnieje droga: dziecko wykonuje zwykłe `self.play()`, adapter oddaje sterowanie po próbce, gospodarz postępuje, adapter wznawia dziecko. Dziecko może wtedy odczytać aktualny stan gospodarza. To współbieżność kooperatywna, bez równoczesnego wykonywania instrukcji. Długi fragment kodu bez oddania sterowania nadal blokuje gospodarza.
+
+   **Poprawka planu:** pozostawić odrzucenie, jeśli taka jest preferencja projektu, ale zapisać uczciwie: „droga możliwa; nie akceptujemy zależności i utrzymywania zawieszonego stosu”. Generator wymagający `yield from` rzeczywiście zmienia API autora (`PLAN.md:462`); greenlet nie musi.
+
+3. **[WAŻNE] „Bez renderu i plików” wymaga adaptera wykonania, nie zestawu flag.**
+
+   **Dowód:** `Scene(renderer=None)` tworzy renderer i zawsze wywołuje `init_scene()` (`.venv/Lib/site-packages/manim/scene/scene.py:208–217`). Cairo tworzy kamerę, a następnie `SceneFileWriter` (`.venv/Lib/site-packages/manim/renderer/cairo_renderer.py:48–60`). Writer inicjalizuje katalogi już w konstruktorze; bez `dry_run` tworzy katalog obrazów także przed sprawdzeniem zapisu filmu (`.venv/Lib/site-packages/manim/scene/scene_file_writer.py:238`, `:260–282`). `dry_run` wyłącza wyjścia, ale zwykłe wykonanie renderera nadal przechodzi przez `update_frame()` (`.venv/Lib/site-packages/manim/_config/utils.py:1371–1377`; `.venv/Lib/site-packages/manim/renderer/cairo_renderer.py:167–168`).
+
+   **Konsekwencja:** `write_to_movie=False` nie gwarantuje nawet braku katalogów; `dry_run` nie oznacza braku rasteryzacji. `skip_animations` zmienia wykonanie i czas (`.venv/Lib/site-packages/manim/renderer/cairo_renderer.py:75–78`), więc nie nadaje się do zbierania wszystkich próbek.
+
+   **Poprawka planu:** najprostszy wariant PoC to podklasa/mixin nagrywający `play()`, z normalną inicjalizacją CE w lokalnym `tempconfig(dry_run=True)`, bez wywoływania renderera dla próbek. Wykonać `setup() → construct() → tear_down()`; zwykłe `render()` dodaje finalizację renderera (`.venv/Lib/site-packages/manim/scene/scene.py:257–282`). „Bez plików” ograniczyć do wyjścia sceny: np. `MathTex` niezależnie tworzy katalog i plik `.tex` (`.venv/Lib/site-packages/manim/utils/tex_file_writing.py:105–114`).
+
+4. **[KRYTYCZNE] Recorder potrzebuje pełnego cyklu animacji, a nie samego `interpolate(alpha)`.**
+
+   **Dowód:** CE kompiluje `_AnimationBuilder` przez `prepare_animation()` i nakłada argumenty `play()` (`.venv/Lib/site-packages/manim/scene/scene.py:989–1008`). Następnie dodaje zwykłe animowane obiekty, pomijając introducery (`:535–545`), a przed `begin()` wywołuje `_setup_scene()` (`:1343–1345`). Próbka wykonuje kolejno `animation.update_mobjects(dt)`, interpolację, aktualizację mobjectów, meshy i sceny (`:1700–1710`). Koniec obejmuje `finish()` i `clean_up_from_scene()` (`:1389–1393`); cleanup usuwa removers (`.venv/Lib/site-packages/manim/animation/animation.py:240–242`).
+
+   **Konsekwencja:** uproszczona pętla może przejść test przesuwania kwadratu, ale zgubić `.animate`, `FadeIn`, usunięcie po `FadeOut`, aktualizacje pomocniczych obiektów animacji lub updatery sceny.
+
+   **Poprawka planu:** wykorzystać `compile_animation_data()`, `begin_animations()` i `update_to_time()`, zastępując pętlę renderującą własną pętlą zapisu. Jawnie odtworzyć zakończenie. Zegar dziecka ustawiać osobno: `Scene.time` pochodzi z `renderer.time`, a normalnie zwiększa go emisja klatek (`.venv/Lib/site-packages/manim/scene/scene.py:231–233`; `.venv/Lib/site-packages/manim/renderer/cairo_renderer.py:191–195`).
+
+5. **[WAŻNE] `Wait` i granice wywołań wymagają kontraktu nagrania.**
+
+   **Dowód:** pojedynczy `Wait` ma osobną ścieżkę wykrywającą zamrożenie i `stop_condition` (`.venv/Lib/site-packages/manim/scene/scene.py:1329–1336`). Warunek zakończenia jest sprawdzany po wykonaniu próbki (`:1382–1387`). Sam `Wait` ma puste metody interpolacji i aktualizacji (`.venv/Lib/site-packages/manim/animation/animation.py:625–638`). Kryterium liczby stanów mówi tylko „fps × czas ±1” (`PLAN.md:479–480`).
+
+   **Konsekwencja:** recorder traktujący wszystkie animacje jednakowo może wykonywać updatery podczas `frozen_frame=True`, ignorować wcześniejsze zakończenie albo zapisać stan sprzed usunięcia obiektu jako stan końcowy. Sama liczba próbek tego nie wykryje.
+
+   **Poprawka planu:** określić osobno próbki obrazu i końcowy stan wykonania. Po cleanupie kod następujący po `play()` musi widzieć poprawną listę obiektów. Dodać przypadki: zamrożony wait, wait z updaterem sceny, `wait_until`, `FadeOut` oraz natychmiastowa zmiana między dwoma `play()`.
+
+6. **[KRYTYCZNE] `copy()` daje kopię obiektów, ale nie bezpieczne, samodzielne środowisko odtwarzania.**
+
+   **Dowód:** `Mobject.copy()` wykonuje `deepcopy`, a kopiowanie obejmuje atrybuty (`.venv/Lib/site-packages/manim/mobject/mobject.py:444–449`, `:895–908`). Updatery kopii zostaną ponownie wykonane przy `update()` (`:944–955`). Szczególnie `always_redraw` przechowuje funkcję zamykającą oryginalny `mob`: `lambda _: mob.become(func())` (`.venv/Lib/site-packages/manim/animation/updaters/mobject_update_utils.py:107–108`). `ValueTracker` przechowuje wartość w `points` (`.venv/Lib/site-packages/manim/mobject/value_tracker.py:78–90`).
+
+   **Konsekwencja:** uruchomienie updatera migawki `always_redraw` może zmodyfikować oryginał. Ponadto afiniczne przekształcenie całej rodziny zmieni wartość skopiowanego `ValueTracker`, choć tracker nie jest treścią rysunku.
+
+   **Poprawka planu:** kopiować korzenie jednym wspólnym `deepcopy`, zachowując wspólne referencje; z kopii usuwać updatery rekurencyjnie. Przechowywać niezmienne migawki i osobne kopie do wyświetlania. Transformować wyłącznie reprezentację wizualną; PoC ograniczyć do jawnie wspieranych `VMobject`, zamiast obiecywać dowolną rodzinę.
+
+7. **[WAŻNE] Lista mobjectów nie obejmuje stanu kamery, sekcji ani dźwięku.**
+
+   **Dowód:** `next_section()` deleguje bezpośrednio do writera (`.venv/Lib/site-packages/manim/scene/scene.py:352–362`), podobnie `add_sound()` (`:1802–1805`). Kamera jest własnością renderera (`:226–228`). W `MovingCamera` jej ramka określa szerokość, wysokość i środek kadru (`.venv/Lib/site-packages/manim/camera/moving_camera.py:62–114`). Kolor tła jest osobnym stanem kamery (`.venv/Lib/site-packages/manim/camera/camera.py:134–143`).
+
+   **Konsekwencja:** nagranie mobjectów nie zachowa zoomu kamery, zmian tła, granic sekcji ani ścieżki audio. Animowanie `self.camera.frame` nie zastępuje zastosowania jej projekcji do treści.
+
+   **Poprawka planu:** dla PoC jawnie wyłączyć ruchomą kamerę i audio; sekcje traktować jako metadane bez wpływu na nagrywanie albo odrzucać. Tło kamery pomijać świadomie jako element kontraktu przezroczystego nagrania. Nie przemilczać tych ograniczeń pod hasłem „Scene jak każda inna”.
+
+8. **[KRYTYCZNE] Osobna treść dodawana przy pierwszym odświeżeniu nie ma cyklu życia ramki.**
+
+   **Dowód:** `Scene.remove()` usuwa wskazane obiekty i ich rodzinę, nie niezależnych sąsiadów (`.venv/Lib/site-packages/manim/scene/scene.py:547–582`). Cleanup removera usuwa jego `mobject` (`.venv/Lib/site-packages/manim/animation/animation.py:240–242`). `Scene.add()` dopisuje obiekt na koniec listy (`.venv/Lib/site-packages/manim/scene/scene.py:521–532`).
+
+   **Konsekwencja:** po `self.remove(frame)` albo `FadeOut(frame)` osobna treść pozostanie. `FadeIn(frame)` nie nada jej automatycznie krycia. Leniwe dodanie może też przenieść treść nad wcześniej dodany podpis.
+
+   **Poprawka planu:** publicznym obiektem uczynić kontener obejmujący geometrię ramki i treść; ramka widoczna/niewidoczna powinna być jego częścią. Jeśli zostaje wariant dwóch niezależnych obiektów, trzeba jawnie ograniczyć API usuwania i animowania — nie da się wtedy obiecać zachowania zwykłego mobjectu.
+
+9. **[WAŻNE] Odtwarzanie wektorów potrzebuje osobnej polityki krycia, zawieszenia i warstw.**
+
+   **Dowód:** zwykłe `Mobject.update()` wraca przed aktualizacją dzieci, gdy kontener jest zawieszony (`.venv/Lib/site-packages/manim/mobject/mobject.py:944–955`). Istniejący `SceneView` odświeża przed `super().update()`, ale dotyczy to podmiany pikseli i osobnego `view_opacity` (`src/manimcue/scene_view.py:129–153`). Kamera sortuje globalnie spłaszczoną rodzinę według `z_index` (`.venv/Lib/site-packages/manim/utils/family.py:38–42`).
+
+   **Konsekwencja:** bezpośrednie wstawienie świeżej migawki może przywrócić pełne krycie podczas fade. Wewnętrzny `z_index=100` dziecka może natomiast przebić nakładkę gospodarza mimo umieszczenia dziecka w grupie.
+
+   **Poprawka planu:** odświeżenie wykonywać również przy zawieszeniu kontenera, ale wynik składać z aktualnym kryciem gospodarza i pierwotnym kryciem migawki. Ustalić mapowanie wewnętrznej kolejności dziecka na warstwę gospodarza. Sprawdzić fade przy zmieniającej się liczbie obiektów dziecka, nie tylko przy stałym kwadracie.
+
+10. **[WAŻNE] Afiniczne mapowanie punktów nie wystarcza do odwzorowania kadru.**
+
+    **Dowód:** rozmiar kadru pochodzi z konfiguracji kamery (`.venv/Lib/site-packages/manim/camera/camera.py:126–128`), więc nie należy kodować przybliżenia 14,2×8. `VMobject.scale()` domyślnie nie skaluje obrysu; robi to dopiero `scale_stroke=True` (`.venv/Lib/site-packages/manim/mobject/types/vectorized_mobject.py:484–487`, `:542–550`). Cairo ustawia szerokość linii osobno od punktów, a następnie używa macierzy kamera→piksele (`.venv/Lib/site-packages/manim/camera/camera.py:849–853`, `:610–628`).
+
+    **Konsekwencja:** miniatura zachowa nadmiernie grube linie. Ściśle: `stroke_width` nie jest po prostu surową liczbą pikseli; wynik zależy także od kamery. Samo przekształcenie geometrii go jednak nie skaluje.
+
+    **Poprawka planu:** pobierać rzeczywiste wymiary kadru. Dla zachowanych narożników \(p_{LL},p_{LR},p_{UL}\) użyć:
+    \[
+    p=p_{LL}+\frac{x+W/2}{W}(p_{LR}-p_{LL})
+      +\frac{y+H/2}{H}(p_{UL}-p_{LL}).
+    \]
+    PoC ograniczyć do skali jednorodnej i skalować oba obrysy — zwykły i tła — względem niezmiennej migawki. Anizotropia oraz przycinanie do ramki wymagają odrębnej decyzji; transformacja współrzędnych nie jest przycinaniem (`PLAN.md:483–484`).
+
+11. **[WAŻNE] Nowa pułapka inicjalizacji: dziecko zmienia losowość gospodarza.**
+
+    **Dowód:** konstruktor każdej sceny wywołuje globalne `random.seed()` i `np.random.seed()` (`.venv/Lib/site-packages/manim/scene/scene.py:223–224`). Plan tworzy i wykonuje dziecko podczas budowania gospodarza (`PLAN.md:466`).
+
+    **Konsekwencja:** dodanie nagrania może zmienić późniejsze losowania gospodarza, nawet gdy dziecko niczego nie rysuje.
+
+    **Poprawka planu:** zachować i przywrócić oba globalne stany RNG wokół inicjalizacji oraz wykonania dziecka, również przy wyjątku. Dodać mały test porównujący dalszą sekwencję losowań gospodarza z nagraniem i bez niego.
+
+12. **[WAŻNE] Kryteria i budżet nie wystarczają do decyzji o kontynuowaniu.**
+
+    **Dowód:** plan mierzy „~20 mobjectów”, czas i pamięć, ale nie podaje progów (`PLAN.md:485–488`). `copy()` obejmuje wszystkie atrybuty (`.venv/Lib/site-packages/manim/mobject/mobject.py:444–449`), więc liczba korzeni nie opisuje rozmiaru geometrii. Istniejący identyfikator odtwarzania pochodzi z klucza pliku (`src/manimcue/scene_view.py:71–75`); nagranie wektorowe takiego źródła nie ma.
+
+    **Konsekwencja:** 20 prostych figur i 20 rozbudowanych grup daje nieporównywalne wyniki. Przeniesienie stanów poza `__dict__` bez tożsamości całego nagrania może też pozostawić cache gospodarza niewrażliwy na zmianę późniejszych migawek.
+
+    **Poprawka planu:** mierzyć liczbę elementów rodziny, punktów, przyrost pamięci procesu, czas nagrania i koszt odświeżania. Przed eksperymentem ustalić progi zaliczenia. Nadać nagraniu deterministyczny klucz obejmujący całą zawartość i parametry próbkowania. Dodać przypadek identycznego początku i zmienionej dalszej części nagrania. **~2 h traktować jako limit eksperymentu na wąskim podzbiorze**, nie estymację poprawnej obsługi powyższych mechanizmów.
+
+**Werdykt:** tak, PoC można wykonać po poprawkach — jako eksperyment nagrania wektorowego o jawnym, ograniczonym zakresie. Jego sukces nie będzie podstawą do uznania żywego krokowania za rozwiązane ani niemożliwe (`PLAN.md:458`, `:466–486`). Przegląd był read-only; nie wykonywałem renderów ani pomiarów.
