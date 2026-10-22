@@ -42,6 +42,7 @@ class SlideComposition(QGraphicsScene):
         self.addItem(self.image_item)
         self.layer_items: list[QGraphicsPixmapItem | QGraphicsVideoItem] = []
         self.layer_rects: list[QRectF] = []
+        self.placeholders: dict[int, QGraphicsPixmapItem] = {}
         self.layers: list[Layer] | None = None
         self.mode: tuple[bool, bool] = (False, False)
 
@@ -94,24 +95,29 @@ class SlideComposition(QGraphicsScene):
         self.layers, self.mode = layers, mode
         for item in self.layer_items:
             self.removeItem(item)
+        for placeholder in self.placeholders.values():
+            self.removeItem(placeholder)
+        self.placeholders = {}
         self.layer_items = []
         self.layer_rects = []
         for index, layer in enumerate(layers):
             rect = self.scene_rect(layer.rect_at(math.inf if at_end else 0))
             if isinstance(layer, ClipLayer) and layer.is_video and video and not at_end:
                 item = QGraphicsVideoItem()
-                item.setAspectRatioMode(Qt.AspectRatioMode.IgnoreAspectRatio)
+                item.setAspectRatioMode(Qt.AspectRatioMode.KeepAspectRatio)
                 item.setPos(rect.topLeft())
                 item.setSize(rect.size())
             else:
                 item = QGraphicsPixmapItem()
                 item.setTransformationMode(Qt.TransformationMode.SmoothTransformation)
                 pixmap = kept[index] if index in kept else self.layer_pixmap(layer, rect, at_end)
-                self.set_layer_pixmap(item, pixmap, rect)
+                self.set_layer_pixmap(item, pixmap, rect, isinstance(layer, ClipLayer))
             item.setZValue(index + 1)
             self.addItem(item)
             self.layer_items.append(item)
             self.layer_rects.append(rect)
+            if isinstance(item, QGraphicsVideoItem):
+                self.show_placeholder(index)
 
     @staticmethod
     def layer_pixmap(layer: Layer, rect: QRectF, at_end: bool) -> QPixmap:
@@ -144,7 +150,8 @@ class SlideComposition(QGraphicsScene):
         rect = self.layer_rects[index]
         item = QGraphicsPixmapItem()
         item.setTransformationMode(Qt.TransformationMode.SmoothTransformation)
-        self.set_layer_pixmap(item, self.layer_pixmap(self.layers[index], rect, False), rect)
+        self.clear_placeholder(index)
+        self.set_layer_pixmap(item, self.layer_pixmap(self.layers[index], rect, False), rect, True)
         item.setZValue(old.zValue())
         self.removeItem(old)
         self.addItem(item)
@@ -159,7 +166,12 @@ class SlideComposition(QGraphicsScene):
             item.setPos(scene_rect.topLeft())
             item.setSize(scene_rect.size())
         else:
-            self.set_layer_pixmap(item, item.pixmap(), scene_rect)
+            self.set_layer_pixmap(
+                item, item.pixmap(), scene_rect, isinstance(self.layers[index], ClipLayer)
+            )
+        if index in self.placeholders:
+            placeholder = self.placeholders[index]
+            self.set_layer_pixmap(placeholder, placeholder.pixmap(), scene_rect, True)
         self.layer_moved.emit(index)
 
     def scene_rect(self, rect: Rect) -> QRectF:
@@ -168,14 +180,38 @@ class SlideComposition(QGraphicsScene):
         x, y, w, h = rect
         return QRectF(x * scene.width(), y * scene.height(), w * scene.width(), h * scene.height())
 
+    def show_placeholder(self, index: int) -> None:
+        """Zastępnik nowego wejścia, również przy zachowaniu elementu wideo."""
+        if index in self.placeholders:
+            return
+        rect = self.layer_rects[index]
+        item = QGraphicsPixmapItem()
+        item.setTransformationMode(Qt.TransformationMode.SmoothTransformation)
+        self.set_layer_pixmap(item, self.layer_pixmap(self.layers[index], rect, False), rect, True)
+        item.setZValue(index + 1.5)
+        self.addItem(item)
+        self.placeholders[index] = item
+
+    def clear_placeholder(self, index: int) -> None:
+        """Pierwsza nowa klatka zastępuje miniaturę, ale nie zmienia bariery."""
+        if item := self.placeholders.pop(index, None):
+            self.removeItem(item)
+
     @staticmethod
-    def set_layer_pixmap(item: QGraphicsPixmapItem, pixmap: QPixmap, rect: QRectF) -> None:
-        """Pixmapa rozciągnięta na prostokąt warstwy — miniatura i (od F4) klatki live."""
+    def set_layer_pixmap(
+        item: QGraphicsPixmapItem, pixmap: QPixmap, rect: QRectF, keep_aspect: bool = False
+    ) -> None:
+        """Dopasowanie klipu z marginesami albo klatki live do pełnego kontenera."""
         item.setPixmap(pixmap)
         item.setPos(rect.topLeft())
         if pixmap.width() and pixmap.height():
-            item.setTransform(
-                QTransform.fromScale(rect.width() / pixmap.width(), rect.height() / pixmap.height())
+            sx, sy = rect.width() / pixmap.width(), rect.height() / pixmap.height()
+            if keep_aspect:
+                sx = sy = min(sx, sy)
+            item.setTransform(QTransform.fromScale(sx, sy))
+            item.setPos(
+                rect.x() + (rect.width() - pixmap.width() * sx) / 2,
+                rect.y() + (rect.height() - pixmap.height() * sy) / 2,
             )
 
 
@@ -208,15 +244,11 @@ class SlideView(QGraphicsView):
         self.setFocusPolicy(Qt.FocusPolicy.NoFocus)
 
     def layer_at(self, point) -> int:
-        """Indeks warstwy live pod punktem viewportu albo -1.
-
-        items(), nie itemAt(): obwódka aktywnej warstwy leży wyżej i przesłoniłaby warstwę.
-        """
-        layer_items = self.scene().layer_items
-        for item in self.items(point):
-            for index, layer_item in enumerate(layer_items):
-                if layer_item is item:
-                    return index
+        """Najwyższy kontener pod punktem; margines klipu blokuje klik do live poniżej."""
+        scene_point = self.mapToScene(point)
+        for index in reversed(range(len(self.scene().layer_rects))):
+            if self.scene().layer_rects[index].contains(scene_point):
+                return index
         return -1
 
     def mousePressEvent(self, event) -> None:

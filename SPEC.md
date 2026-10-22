@@ -620,6 +620,19 @@ przy każdym slajdzie (D27) to też największy zmierzony koszt zmiany slajdu: ~
 
 ---
 
+## Decyzje F5c (2026-10-22, runda 17)
+
+**D34. Izotropowy obraz live i dopasowanie klipów.** Live renderuje cały domyślny kadr
+16:9 w rozdzielczości dopasowanej do panelu; publikacja dodaje czarne pasy do wymiarów bufora.
+Miniatura korzysta z tego samego workera. Worker ustawia domyślny `frame_config.frame_shape`
+przed konstrukcją sceny. Samo rozszerzenie frame_shape nie wystarcza: test rzeczywistego GL
+wykazał deformację, bo `Camera.refresh_uniforms` nadal używa stałych FRAME_WIDTH/HEIGHT.
+Letterbox zachowuje treść bez łatania Manima. Wszystkie reprezentacje klipów zachowują
+proporcje, wyśrodkowane w kontenerze D30; przezroczysty margines blokuje klik do warstw pod nim.
+Bez zmian D17/D20/D27/D31/D33.
+
+---
+
 ## Zakres, którego nie wolno rozszerzyć bez decyzji
 
 **Synchronizacja co do klatki.** Warstwy startują i pauzują razem (D17) — i na tym koniec.

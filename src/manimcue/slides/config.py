@@ -106,6 +106,20 @@ class Keys(BaseModel):
         default_factory=lambda: Key(ids=[key_id("H")], name="HIDE / SHOW MOUSE")
     )
 
+    PRESENTER_STATE: Key = Field(
+        default_factory=lambda: Key(ids=[key_id("S")], name="PRESENTER STATE")
+    )
+
+    @model_validator(mode="after")
+    def effective_ids_are_unique(self):
+        """Sprawdza także domyślne klawisze pominięte w pliku użytkownika."""
+        seen = set()
+        for _, key in self:
+            if seen.intersection(key.ids):
+                raise ValueError("Two or more keys share a common key code")
+            seen.update(key.ids)
+        return self
+
     @model_validator(mode="before")
     @classmethod
     def ids_are_unique_across_keys(
@@ -125,11 +139,16 @@ class Keys(BaseModel):
         return values
 
     def merge_with(self, other: "Keys") -> "Keys":
-        for key_name, key in self:
+        merged = self.model_copy(deep=True)
+        for key_name, key in merged:
             other_key = getattr(other, key_name)
             key.ids = list(set(key.ids).union(other_key.ids))
             key.name = other_key.name or key.name
 
+        merged.effective_ids_are_unique()
+        for key_name, key in merged:
+            getattr(self, key_name).ids = set(key.ids)
+            getattr(self, key_name).name = key.name
         return self
 
     def dispatch_key_function(self) -> Callable[[PositiveInt], None]:

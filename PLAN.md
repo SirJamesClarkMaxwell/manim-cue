@@ -613,38 +613,67 @@ wykona przy ← / →, czy operacja się udała i w którym momencie prezentacji
 6. Cienka biała pozioma linia przez cały kadr okna głównego w oknie o proporcjach innych niż 16:9
    (zrzut prelegenta) — nie odtworzona w oknie 16:9; do zdiagnozowania.
 
-**Projekt:**
-- Live: kadr sceny o proporcjach prostokąta — wysokość kadru domyślna manimgl, szerokość
-  `wysokość · w/h`; ta sama zasada dla miniatury (`capture_first_frame`).
-- Klipy: `KeepAspectRatio` wewnątrz prostokąta warstwy, wyśrodkowane, pusty margines
-  przezroczysty; obwódka i klik dalej po prostokącie warstwy.
-- Bez mignięcia: do pierwszej klatki nowego wejścia klip pokazuje miniaturę / ostatnią klatkę.
-- Demo 7-8: wszystkie trzy animacje po 2 s, liniowe; cue wejścia **ustawia stan** (idempotentne:
-  ten sam wynik przy każdym wejściu), np. kolor i kąt bezwzględne; czarne tło sceny live.
-- **Stan dla prelegenta:** jeden wiersz w Info i nakładka w oknie głównym przełączana klawiszem
-  (domyślnie wyłączona — widzi ją publiczność), z tego samego źródła: `slajd 7/8 · gra / pauza /
-  koniec / przygotowanie / reverse · live: start / gotowe / błąd · fokus: slajdy / live` oraz
-  wynik ostatniego klawisza przez ~2 s (np. `→ slajd 8`, `→ brak następnego slajdu`,
-  `V reverse slajdu 7 — → odtworzy go do przodu`, `spacja: slajd skończony`).
-- Linia: diagnoza na oknie o proporcjach z zrzutu (1614×956) i poprawka, jeśli to nasz element.
+**Projekt (domknięty po rundzie 17):**
+- Live: render 16:9 dopasowany do panelu, czarne pasy, bez obcinania całej dotychczasowej
+  treści. Worker przekazuje domyślny `frame_config.frame_shape` przed konstrukcją sceny;
+  publikacja uzupełnia klatkę do wymiaru bufora. Miniatura używa tej samej ścieżki.
+  Dowód wykonawczy: samo rozszerzenie frame_shape nie działa — `Camera.refresh_uniforms`
+  używa stałych FRAME_WIDTH/HEIGHT. Bez łatania Manima i bez zmian czułości D28.
+- Klipy: wszystkie reprezentacje (wideo, obraz, miniatura, end_thumbnail, fallback i ruch)
+  zachowują proporcje: skala `min(rw/sw,rh/sh)`, wyśrodkowanie, przezroczyste marginesy.
+  Pełny kontener D30 blokuje klik do niższych warstw. Obwódka aktywności dotyczy tylko live.
+- Placeholder miniatury (bez niej szary zastępnik) od utworzenia kompozycji do pierwszej
+  poprawnej klatki nowego wejścia. Tylko nowa klatka zalicza READY. Błąd/timeout pozostawia
+  fallback; numer wejścia odcina stare callbacki także przy A→B→A; replay zachowuje obraz.
+- Demo: czarne live, deterministyczny początek i koniec każdego cue, rzeczywista animacja
+  przez nominalne 2 s liniowo. Identyczny koniec po zatwierdzonym wejściu do przodu;
+  cofanie/reverse/replay według D33. Rozrzut czasów raportowany, bez frame-lock.
+- Stan: wspólny snapshot pól kontrolerów w Info i nakładce głównego viewportu (bez fokusu,
+  przezroczysta dla myszy, domyślnie ukryta). Przełącznik `Config.keys`: S.
+  Identyfikator prezentacji/lokalny slajd, transport i reverse osobno, live i fokus.
+  Krótki wynik akcji na ~2 s; małe powiadomienia dozwolone, bez zmiany nawigacji upstreamu.
+
+| Zdarzenie | Informacja dla prelegenta |
+|---|---|
+| → | wznowienie / zamówiony start / wyjście z pętli / nowy slajd / reverse→normal |
+| ←, V, R | zatwierdzona akcja albo granica; live bez cofania/replay (D33) |
+| Spacja | transport grupy, zamiar podczas przygotowania albo koniec |
+| Pętla, auto_next, skip_all | aktualny transport, lokalny indeks po automatycznym przejściu |
+| Koniec decku | brak następnego slajdu albo zamknięcie według istniejącej opcji |
+| D31 | przygotowanie z zamiarem gra/pauza, transport po barierze; błąd/timeout |
+| Live | start / gotowe / błąd; pominięte cue po timeout nie jest wykonaniem |
+| Fokus | slajdy albo numer live; klik/Esc, zmiana slajdu, dezaktywacja i błąd |
+| Klawisz live | wysłano (nie wykonano), przed READY zignorowano, autorepeat pominięty |
+
+Historia każdej iteracji pętli i potwierdzenia wykonania cue poza zakresem: wymagałyby
+rozszerzenia protokołu, nie są potrzebne do odczytu bieżącego stanu.
 
 **Kryteria akceptacji:**
-1. Live: w prostokącie 0,28×0,6 kwadrat sceny ma równe boki w pikselach (±2 px) także w trakcie
-   obrotu; miniatura tak samo; warstwy 16:9 bez zmian (istniejące testy pikseli).
-2. Klip 16:9 w prostokącie 0,28×0,6: koło Orbit okrągłe (±2 px), margines pokazuje to, co pod
-   warstwą.
-3. Wejście na slajd z klipem: w żadnej klatce okna między żądaniem przejścia a startem prostokąt
-   klipu nie jest pusty (test na kolejnych klatkach).
-4. Demo: trzy animacje slajdu 8 kończą się w tym samym czasie (± 1 klatka); stan slajdu 8 po
-   wejściu identyczny przy 1. i 3. wejściu (piksele).
-5. Stan: wiersz Info i nakładka zmieniają się zgodnie z tabelą zdarzeń (`→`, `←`, `V`, `R`,
-   spacja, klik/Esc, brak slajdu, błąd live, przygotowanie) — test offscreen na tekście; nakładka
-   domyślnie ukryta, przełącznik w `Config.keys` (nowy klawisz, domyślny bez konfliktu).
-6. Linia: przyczyna ustalona; brak linii w oknie 1614×956 (zrzut) albo raport, że to nie nasz kod.
-7. Testy F0-F5b i upstreamu zielone.
-8. **Próba prelegenta:** slajdy 7-8 i nawigacja — wiadomo, gdzie jesteś i co zrobił klawisz.
+1. Live w panelu 0,28×0,6: izotropowy obraz z pasami i cały stary kadr; kontrolowana figura
+   2D, miniatura i reset zachowują proporcje. Regresje 16:9, D22/D28 i F2 bez obniżania progów.
+2. Klip: proporcje wszystkich reprezentacji i ruchu, przezroczyste marginesy, hit-test kontenera.
+   Geometria i raster po kompozycji 320×180, viewport 640×360, DPR=1; koło/kwadrat 2D,
+   maska jednolitego koloru, tolerancja rasteryzacji 2 px.
+3. Ciągłość deterministycznie: opóźniona pierwsza, pusta i spóźniona klatka, anulowanie,
+   błąd/timeout; placeholder nie zwalnia bariery, znika po poprawnej klatce.
+4. Demo: nominalnie 2 s liniowo, deterministyczny początek/koniec ponownych cue;
+   zmierzony rozrzut, bez wymagania końca ±1 klatka.
+5. Wspólny tekst Info/nakładki według tabeli; nakładka tylko głównego viewportu,
+   domyślnie ukryta; konfiguracja i konflikty skrótów sprawdzone także przy merge.
+6. Linia: diagnoza z limitem 45 min: viewport/DPR, scena vs viewport, baza/warstwy/fokus/
+   błąd/nakładka, różne rozdzielczości prezentacji. Jeśli nieodtworzona, raport z dowodami
+   i ograniczeniem; bez nieudowodnionej deklaracji „nie nasz kod”. Prawdziwe okno w próbie człowieka.
+7. Pełne testy F0–F5b i upstreamu zielone.
+8. **Próba prelegenta:** rzeczywiste okno 1614×956, slajdy 7–8; wygląd, ciągłość i czytelność stanu.
 
-**Budżet:** ~4 h, stop i raport przy 8 h. Wykonawca: codex w worktree; przegląd i próba — Claude.
+**Budżet:** ~8 h implementacja i regresje + 45 min diagnoza linii; stop i raport przy 17,5 h.
+Próba człowieka poza budżetem wykonawcy. Wykonawca: codex w worktree; bez commita.
+
+**Wynik wykonawcy (2026-10-22):** implementacja i testy F5c w drzewie roboczym, bez commita.
+Pełny zestaw: **418 passed, 2 skipped**, 312,86 s. F2: 1799 różnych klatek / ~30 s w obu
+rozdzielczościach, wszystkie dotychczasowe progi spełnione. Kryteria 1–5 i 7 sprawdzone;
+kryterium 6 częściowo otwarte (linia nieodtworzona offscreen, przyczyna nieustalona),
+kryterium 8 czeka na człowieka. Szczegóły i komendy: `REPORT-5c.md`.
 
 ## Faza 7 — live w CE
 

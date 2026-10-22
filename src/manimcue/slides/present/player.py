@@ -150,6 +150,9 @@ class Info(QWidget):
 
         main_layout = QVBoxLayout()
         main_layout.addWidget(widget, alignment=Qt.AlignmentFlag.AlignCenter)
+        self.presenter_state = QLabel()
+        self.presenter_state.setWordWrap(True)
+        main_layout.addWidget(self.presenter_state)
 
         self.setLayout(main_layout)
 
@@ -255,6 +258,12 @@ class Player(QMainWindow):
         # widok Info jest tylko podglądem.
         self.live = LiveLayerController(self.composition)
         self.view.layer_clicked.connect(self.live.click)
+        # Klik nie przechodzi przez keyPressEvent — komunikat fokusu osobno, po live.click.
+        self.view.layer_clicked.connect(
+            lambda *_: self.show_state_message(
+                "fokus: slajdy" if self.live.active is None else f"fokus: live {self.live.active + 1}"
+            )
+        )
         self.view.layer_double_clicked.connect(self.live.double_click)
         self.view.pointer_dragged.connect(self.live.drag)
         self.view.pointer_released.connect(self.live.end_drag)
@@ -289,6 +298,22 @@ class Player(QMainWindow):
         self.video_sink.videoFrameChanged.connect(self.frame_changed)
         self.hide_info_window = hide_info_window
 
+        self.state_message = ""
+        self.state_revision = 0
+        self.state_overlay = QLabel(self.view.viewport())
+        self.state_overlay.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
+        self.state_overlay.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        self.state_overlay.setStyleSheet("color: white; background-color: rgba(0, 0, 0, 210); padding: 6px")
+        self.state_overlay.setWordWrap(True)
+        self.state_overlay.move(8, 8)
+        self.state_overlay.hide()
+        self.live.changed.connect(self.update_presenter_state)
+        self.clips.changed.connect(self.update_presenter_state)
+        self.media_player.playbackStateChanged.connect(lambda *_: self.update_presenter_state())
+        self.media_player.mediaStatusChanged.connect(lambda *_: self.update_presenter_state())
+        self.live.error.connect(self.show_state_message)
+        self.live.observed.connect(self.show_state_message)
+        self.media_player.errorOccurred.connect(lambda *_: self.show_state_message("błąd bazy: " + self.media_player.errorString()))
         self.clips.live = self.live
         self.live.changed.connect(self.clips.maybe_start)
 
@@ -302,6 +327,7 @@ class Player(QMainWindow):
         self.config.keys.REPLAY.connect(self.replay)
         self.config.keys.FULL_SCREEN.connect(self.full_screen)
         self.config.keys.HIDE_MOUSE.connect(self.hide_mouse)
+        self.config.keys.PRESENTER_STATE.connect(self.toggle_presenter_state)
 
         self.dispatch = self.config.keys.dispatch_key_function()
 
@@ -354,6 +380,7 @@ class Player(QMainWindow):
 
         self.presentation_changed.emit()
         self.slide_changed.emit()
+        self.update_presenter_state()
 
     """
     Properties
@@ -515,6 +542,13 @@ class Player(QMainWindow):
         self.__termination_achieved = False
 
         self.load_current_media(reason=reason)
+        action = {
+            "next": "przejście do przodu", "previous": "poprzedni slajd",
+            "reverse": "odtwarzanie wstecz", "reverse_to_normal": "odtwarzanie do przodu",
+            "auto_next": "przejście automatyczne", "skip_all": "przejście automatyczne",
+        }.get(reason, "wejście")
+        self.show_state_message(f"{action}: slajd {self.current_slide_index + 1}" +
+                                (" · live pozostaje w bieżącym stanie" if reason in ("previous", "reverse") else ""))
 
     def load_previous_slide(self, reason: str = "previous") -> None:
         if self.current_slide_index > 0:
@@ -523,6 +557,7 @@ class Player(QMainWindow):
             self.current_presentation_index -= 1
             self.current_slide_index = self.current_slides_count - 1
         else:
+            self.show_state_message("brak poprzedniego slajdu")
             logger.info("No previous slide.")
             return
 
@@ -542,6 +577,7 @@ class Player(QMainWindow):
             self.close()
             return
         else:
+            self.show_state_message("brak następnego slajdu")
             logger.info("No more slide to play.")
             return
 
@@ -743,11 +779,126 @@ class Player(QMainWindow):
     def keyPressEvent(self, event: QKeyEvent) -> None:  # noqa: N802
         key = event.key()
         # F4 (D20): router przed dispatch — tędy idą też klawisze przekazane z okna Info.
-        if not self.live.handle_key(event, self.config.keys):
+        before = self.presenter_snapshot()
+        revision = self.state_revision
+        active = self.live.active
+        ready = active is not None and self.live.sessions[active].state == "ready"
+        if self.live.handle_key(event, self.config.keys):
+            message = "fokus: slajdy" if key == Qt.Key.Key_Escape else (
+                "live: autorepeat pominięty" if event.isAutoRepeat() else
+                "live: wysłano cue" if ready else "live: zignorowano przed READY")
+            self.show_state_message(message)
+        else:
             self.dispatch(key)
+            if self.state_revision == revision:
+                after = self.presenter_snapshot()
+                if key in self.config.keys.REPLAY.ids:
+                    message = "powtórzenie slajdu · live bez powtórzenia" if not self.clips.preparing else "przygotowanie: powtórzenie pominięte"
+                elif self.__termination_requested and not self.__termination_achieved:
+                    message = "zamówiono wyjście z pętli"
+                elif before == after:
+                    # Pierwszy wiersz i tak pokazuje stan; tu tylko skutek klawisza.
+                    message = (
+                        "slajd skończony — → dalej, R powtórzy"
+                        if key in self.config.keys.PLAY_PAUSE.ids and " · koniec" in after
+                        else "bez zmiany"
+                    )
+                else:
+                    message = after
+                self.show_state_message(message)
+        self.update_presenter_state()
         event.accept()
+
+    def presenter_snapshot(self) -> str:
+        """Stan z istniejących kontrolerów; gotowość live nie oznacza końca cue."""
+        if self.clips.preparing:
+            transport = (
+                "przygotowanie ("
+                + ("start zamówiony" if self.clips.requested_playing else "start w pauzie")
+                + ")"
+            )
+        elif self.clips.static_active:
+            transport = "gra" if self.clips.running else "pauza"
+        elif (
+            self.media_player.mediaStatus() == QMediaPlayer.MediaStatus.EndOfMedia
+            or self.__termination_achieved
+        ):
+            transport = "koniec"
+        elif self.media_player.playbackState() == QMediaPlayer.PlaybackState.PlayingState:
+            transport = "gra"
+        elif self.current_slide_config.type == SlideType.Image:
+            transport = "obraz"
+        else:
+            transport = "pauza"
+        live = (
+            ", ".join(
+                f"{i + 1}: "
+                + (
+                    "błąd"
+                    if i in self.live.failed
+                    else {"starting": "start", "ready": "gotowe", "error": "błąd"}.get(
+                        session.state, session.state
+                    )
+                )
+                for i, session in self.live.sessions.items()
+            )
+            or "brak"
+        )
+        focus = "slajdy" if self.live.active is None else f"live {self.live.active + 1}"
+        direction = "reverse · → odtworzy do przodu" if self.playing_reversed_slide else "do przodu"
+        loop = (
+            " · wyjście z pętli zamówione"
+            if self.__termination_requested
+            else " · pętla"
+            if self.current_slide_config.loop
+            else ""
+        )
+        problems = " · " + "; ".join(self.clips.problems) if self.clips.problems else ""
+        return (
+            f"prezentacja {self.current_presentation_index + 1}/{self.presentations_count} · "
+            f"slajd {self.current_slide_index + 1}/{self.current_slides_count} · "
+            f"{transport}{loop} · {direction} · live: {live} · fokus: {focus}{problems}"
+        )
+
+    def update_presenter_state(self) -> None:
+        if not hasattr(self, "state_overlay"):
+            return
+        text = self.presenter_snapshot()
+        if self.state_message:
+            text += "\n" + self.state_message
+        width = max(100, self.view.viewport().width() - 16)
+        if self.state_overlay.text() == text and self.state_overlay.width() == width:
+            return
+        self.info.presenter_state.setText(text)
+        self.state_overlay.setText(text)
+        self.state_overlay.setFixedWidth(width)
+        self.state_overlay.adjustSize()
+
+    def show_state_message(self, message: str) -> None:
+        self.state_revision += 1
+        revision = self.state_revision
+        self.state_message = message
+        self.update_presenter_state()
+
+        def expire():
+            if self.state_revision == revision:
+                self.state_message = ""
+                self.update_presenter_state()
+
+        QTimer.singleShot(2000, expire)
+
+    def resizeEvent(self, event) -> None:
+        super().resizeEvent(event)
+        self.update_presenter_state()
+
+    def toggle_presenter_state(self) -> None:
+        self.state_overlay.setVisible(self.state_overlay.isHidden())
+        self.show_state_message(
+            "nakładka stanu: " + ("widoczna" if self.state_overlay.isVisible() else "ukryta")
+        )
 
     def application_state_changed(self, state: Qt.ApplicationState) -> None:
         # D20: przejście do innej aplikacji oddaje klawiaturę playerowi.
         if state != Qt.ApplicationState.ApplicationActive:
             self.live.release()
+        self.update_presenter_state()

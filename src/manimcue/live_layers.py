@@ -34,6 +34,7 @@ class LiveLayerController(QObject):
     """Właściciel sesji warstw live bieżącego slajdu i stanu aktywnej warstwy."""
 
     changed = Signal()
+    observed = Signal(str)
     frame_received = Signal(int, object, float)
     cue_sent = Signal(int, str, float)
     error = Signal(str)
@@ -173,6 +174,12 @@ class LiveLayerController(QObject):
         # Najpierw statusy wszystkich sesji, potem kosztowne obrazy (runda 9, p. 9).
         for index, session in self.sessions.items():
             for event in session.poll():
+                if event.startswith("CUE_START "):
+                    self.observed.emit(f"live {index + 1}: start cue {event[10:]}")
+                elif event.startswith("CUE_DONE "):
+                    self.observed.emit(f"live {index + 1}: koniec cue {event[9:]}")
+                elif event == "SEQUENCE_END":
+                    self.observed.emit(f"live {index + 1}: koniec sekwencji")
                 if event.startswith("ERROR"):
                     self.fail(index, event)
             if session.state == "starting" and now - self.started[index] > START_TIMEOUT:
@@ -226,6 +233,7 @@ class LiveLayerController(QObject):
             return
         self.active = index
         self.frame_layer(index, ACTIVE_COLOR)
+        self.changed.emit()
 
     def drag(self, point: QPointF, shift: bool) -> None:
         """Przeciąganie po aktywnej warstwie (D28): obrót kamery, z Shiftem przesunięcie."""
@@ -257,6 +265,7 @@ class LiveLayerController(QObject):
         # Obwódka jest jedna; po zwolnieniu wraca na pierwszą warstwę z błędem, jeśli jest.
         if self.failed:
             self.frame_layer(min(self.failed), ERROR_COLOR)
+        self.changed.emit()
 
     def follow_layer(self, index: int) -> None:
         """Obwódka jedzie z warstwą w ruchu (runda 12, p. 5)."""

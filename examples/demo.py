@@ -162,7 +162,8 @@ class Demo(Slide):
             self.next_slide(
                 notes=f"**{number}/8** — jedno →: baza CE, trwały live i klip Orbit. "
                 "Trzy stałe prostokąty i kamery; poruszają się obiekty. Esc oddaje strzałki. "
-                "Spacja pauzuje bazę i klip. Info pokazuje statyczną miniaturę live. "
+                "Spacja pauzuje bazę i klip; live działa dalej. S pokazuje stan na ekranie. "
+                "Podgląd następnego slajdu pokazuje miniaturę live. "
                 "Cofanie i replay nie cofają ani nie powtarzają cue live.",
                 layers=[persistent.model_copy(), other.model_copy()],
             )

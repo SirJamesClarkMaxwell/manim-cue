@@ -12,6 +12,8 @@ def run_worker(spec, shm_name, frame_lock, bootstrap_sender) -> None:
     shm = None
     scene = None
     try:
+        from manimlib.constants import FRAME_HEIGHT, FRAME_WIDTH
+
         from manimcue.frame_buffer import FrameBuffer
         from manimcue.live_scene import LiveScene
 
@@ -25,12 +27,15 @@ def run_worker(spec, shm_name, frame_lock, bootstrap_sender) -> None:
         if not issubclass(scene_type, LiveScene):
             raise TypeError("Klasa sceny musi dziedziczyć po LiveScene")
         shm = SharedMemory(name=shm_name)
+        scale = min(spec.width / FRAME_WIDTH, spec.height / FRAME_HEIGHT)
+        render_size = (round(FRAME_WIDTH * scale), round(FRAME_HEIGHT * scale))
         scene = scene_type(
             window=None,
             skip_animations=False,
             presenter_mode=False,
             camera_config={
-                "resolution": (spec.width, spec.height),
+                "resolution": render_size,
+                "frame_config": {"frame_shape": (FRAME_WIDTH, FRAME_HEIGHT)},
                 "fps": spec.fps,
                 "background_opacity": 1.0,
             },

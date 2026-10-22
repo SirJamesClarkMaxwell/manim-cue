@@ -11,7 +11,7 @@ import time
 from collections.abc import Callable
 from pathlib import Path
 
-from qtpy.QtCore import QElapsedTimer, QObject, Qt, QTimer, QUrl
+from qtpy.QtCore import QElapsedTimer, QObject, Qt, QTimer, QUrl, Signal
 from qtpy.QtMultimedia import QMediaPlayer, QVideoFrame
 
 from manimcue.composition import SlideComposition
@@ -30,6 +30,8 @@ BASE = "base"
 class ClipGroup(QObject):
     """Playery warstw-klipów bieżącego slajdu, bariera pierwszych klatek i zegar ruchu."""
 
+    changed = Signal()
+
     def __init__(
         self,
         composition: SlideComposition,
@@ -43,6 +45,7 @@ class ClipGroup(QObject):
         self.restored = restored
         self.live = None
         self.connections: list = []
+        self.problems: list[str] = []
         self.released_at: float | None = None
         self.layers: list = []
         self.players: dict[int, QMediaPlayer] = {}
@@ -88,6 +91,7 @@ class ClipGroup(QObject):
         for index, layer in enumerate(slide.layers):
             if not (isinstance(layer, ClipLayer) and layer.is_video):
                 continue
+            self.composition.show_placeholder(index)
             item = self.composition.layer_items[index]
             player = QMediaPlayer(self)
             # Sygnały przed setSource (runda 11, p. 6); entry odcina sygnały poprzedniego slajdu,
@@ -148,6 +152,7 @@ class ClipGroup(QObject):
                         self.frames[index]
                     )
                 return
+            self.composition.clear_placeholder(index)
             self.frames[index] = frame
             if self.preparing and index in self.pending:
                 self.players[index].pause()
@@ -165,6 +170,8 @@ class ClipGroup(QObject):
         """
         if entry != self.entry or index not in self.players:
             return
+        self.problems.append(f"klip {index + 1}: {reason}")
+        self.changed.emit()
         logger.error(f"Warstwa {index + 1} ({self.layers[index].describe()}): {reason}")
         player = self.players.pop(index)
         player.stop()
@@ -180,6 +187,10 @@ class ClipGroup(QObject):
             return
         for index in [key for key in self.pending if key not in (BASE, "live")]:
             self.drop(entry, index, f"brak pierwszej klatki po {PRIME_TIMEOUT_MS} ms")
+        if BASE in self.pending:
+            self.problems.append("baza: timeout pierwszej klatki")
+        if "live" in self.pending:
+            self.problems.append("live: timeout, cue pominięte")
         if self.live:
             self.live.cancel_unready_entries()
         self.pending.clear()
@@ -197,6 +208,7 @@ class ClipGroup(QObject):
         self.released_at = time.perf_counter()
         if self.requested_playing:
             self.play_all()
+        self.changed.emit()
 
     def play_all(self) -> None:
         if not self.static_base:
@@ -235,6 +247,7 @@ class ClipGroup(QObject):
         """`PLAY_PAUSE` nad bazą statyczną albo w trakcie przygotowania (żądany stan)."""
         if self.preparing:
             self.requested_playing = not self.requested_playing
+            self.changed.emit()
         elif self.running:
             self.pause_all()
         else:
@@ -269,6 +282,7 @@ class ClipGroup(QObject):
             self.motion.stop()
         self.running = running
         self.move()
+        self.changed.emit()
 
     def seconds(self) -> float:
         """Aktywny czas slajdu: od wspólnego startu, bez pauz (D30)."""
@@ -282,6 +296,7 @@ class ClipGroup(QObject):
 
     def clear(self) -> None:
         """Wyjście ze slajdu: playery zatrzymane, sygnały starego wejścia odcięte."""
+        self.problems = []
         self.entry += 1
         for signal, slot in self.connections:
             try:

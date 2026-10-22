@@ -1540,3 +1540,141 @@ klucz sesji, wymóg `rect`, mierzalność ≤ 50 ms, diagnoza uwag z próby, bud
     **Poprawka planu:** rozdzielić zakres. Minimalny etap realizujący pokaz: trwała sesja w sąsiednich slajdach, zachowany obraz, jedno cue wejścia, wspólny start i pomiar w oknie. Odroczyć animowane cofanie live i deterministyczny replay — **jawnie wyłączając je z kryteriów tego etapu**. Zachować poprawną izolację procesów, błędy i anulowanie szybkich przejść. Jeśli cofanie i replay pozostają wymagane, zwiększyć budżet po zaprojektowaniu protokołu.
 
 **Werdykt:** 5b można implementować po poprawkach, ale obecny D33 nie jest gotowym kontraktem. Najpierw trzeba rozstrzygnąć zdarzenia nawigacji, checkpointy cofania, gotowość do startu i przenoszenie obrazu. Przegląd był statyczny i read-only; nie uruchamiałem testów ani pomiarów.
+
+## Runda 17 — codex, 2026-10-22: kontrakt F5c (druga próba)
+
+**Pytania:** Czy proporcje, ciągłość, demo i stan są sprawdzalne i zgodne z D17/D20/D27/D31/D33? Czy zakres i budżet są zamknięte?
+
+**Co weszło:**
+
+1. Przyjęto jawny frame_config przed konstrukcją i wspólną ścieżkę miniatur; odrzucono wystarczalność samego frame_shape, ponieważ test GL wykazał stałe FRAME_WIDTH/HEIGHT w Camera.refresh_uniforms.
+2. Przyjęto alternatywę letterbox z recenzji: render 16:9 i czarne pasy zachowują całą treść bez łatania Manima.
+3. Przyjęto regresje wąskiego kadru, resetu i F2 bez zmiany czułości D28.
+4. Przyjęto dopasowanie wszystkich reprezentacji klipu i ruchu.
+5. Przyjęto obwódkę tylko live i hit-test pełnego kontenera klipu.
+6. Przyjęto placeholder do nowej poprawnej klatki oraz izolację wejść.
+7. Przyjęto snapshot istniejących pól, małe powiadomienia, bez nowego zegara.
+8. Przyjęto tabelę stanu; odrzucono historię każdej iteracji pętli i potwierdzenia wykonania cue, bo rozszerzają protokół poza cel czytelności bieżącego stanu.
+9. Przyjęto nakładkę viewportu, wspólny tekst Info oraz S z kontrolą konfliktów.
+10. Przyjęto deterministyczny początek i koniec cue, nominalne 2 s i D33; odrzucono ±1 klatkę jako sprzeczne z D17.
+11. Przyjęto macierz diagnostyczną i limit 45 min; brak reprodukcji nie dowodzi winy backendu, prawdziwy ekran pozostaje próbą człowieka.
+12. Przyjęto geometrię i raster po kompozycji, deterministyczną ciągłość i budżet 8 h + 45 min; odrzucono rozbudowany dziennik komunikatów jako rozszerzenie celu.
+
+**Odpowiedź codex (bez zmian):**
+
+1. **[KRYTYCZNE] Poprawka live wymaga `frame_config.frame_shape`; sama rozdzielczość nie wystarcza.**
+
+   **Dowód:** `src/manimcue/live_worker.py:28–36` przekazuje tylko rozdzielczość. W manimgl: `.venv/Lib/site-packages/manimlib/camera/camera.py:30–32,64–70` konstruktor przyjmuje `frame_config`, a `CameraFrame` przyjmuje `frame_shape` (`camera/camera_frame.py:26,46–48`). `Scene` scala konfigurację przed utworzeniem kamery (`scene/scene.py:88–110`). Komentarz przy `resolution` sugeruje automatyczne dopasowanie, ale konstruktor go nie wykonuje.
+
+   **Konsekwencja:** diagnoza 5c jest trafna, lecz kontrakt nie wskazuje właściwego API ani momentu zmiany. Dopasowanie po `build_objects` byłoby za późne dla scen rozmieszczających treść według kamery.
+
+   **Poprawka planu:** jawnie zapisać:
+   `camera_config={"resolution": (w,h), "frame_config": {"frame_shape": (H*w/h,H)}, ...}` — przed budową sceny. Alternatywą jest `camera.resize_frame_shape(fixed_dimension=True)` (`camera.py:207–222`), również przed budową obiektów. `frame_shape` nie jest bezpośrednim argumentem `Camera`. `capture_first_frame` uruchamia ten sam worker (`live_session.py:200–206`), więc nie potrzebuje osobnej implementacji geometrii.
+
+2. **[KRYTYCZNE] Stała wysokość usuwa deformację, ale może wyciąć istniejącą treść 16:9.**
+
+   **Dowód:** `PLAN.md:617–618` wybiera stałą wysokość. Panel 7–8 ma `rect=(0.36,0.15,0.28,0.6)` (`examples/demo.py:153–158`). Przy bazie 16:9 jego proporcja pikselowa wynosi około **0,83**, więc dla wysokości kadru 8 szerokość spada z około 14,22 do **6,64**. Tymczasem `Panel` dziedziczy obiekty umieszczone przy `x=±3`, o promieniu/półboku 1 (`live_scene.py:609–611`), oraz sweep do prawej strony (`live_scene.py:629–630`).
+
+   **Konsekwencja:** okrągły obiekt może być poprawny geometrycznie, ale częściowo niewidoczny. Uniwersalna zmiana workerów obejmie też inne sceny, nie tylko `ThreePanel`.
+
+   **Poprawka planu:** wybrać i uzasadnić politykę kadrowania. Dla treści zaprojektowanej pod 16:9 bezpieczniejsze jest zachowanie całego kadru: rozszerzanie jednej osi albo letterbox. Stała wysokość jest rozsądna dla świadomie projektowanych wąskich paneli, nie jako automatyczna gwarancja zgodności. Dopisać kontrolę widoczności całej treści istniejących paneli.
+
+3. **[WAŻNE] Brakuje regresji D22, D28 i pomiarów F2 po zmianie kadru.**
+
+   **Dowód:** korpus ma stałe `FRAME_WIDTH/HEIGHT` oraz narożniki obliczane z 16:9 (`tests/scenes/live_gl.py:27–28,65–78`). Test `corner()` także zakłada te proporcje (`tests/test_live_layers.py:100–104`). Nawigacja używa stałych wymiarów (`live_scene.py:504–512`), zgodnie z mechanizmem upstreamu `window.py:129–137`. Reset przywraca kopię kadru granicznego (`live_scene.py:516–517,543–544`), natomiast upstreamowe `CameraFrame.to_default_state()` przywraca globalne `FRAME_SHAPE` (`camera_frame.py:62–65`). Progi wydajności określa D26 (`SPEC.md:525–529`).
+
+   **Konsekwencja:** testy 16:9 nie sprawdzą nowego przypadku. Nie należy też mechanicznie zamieniać stałych D28 na aktualne wymiary kamery: pan przechodzi jeszcze przez transformację kadru, a orbit ma własną czułość. Scena wywołująca upstreamowy reset może ponownie wprowadzić deformację.
+
+   **Poprawka planu:** zachować dotychczasowy korpus 16:9 i dodać wariant wąski: orbit, pan w obu osiach, zoom, reset po READY, po cue i po `back`. Zweryfikować miniaturę po ponownym renderze. Ponowić pomiary F2 przy dotychczasowych rozdzielczościach i progach; nie obniżać progów ani nie przesuwać próbników pikseli tylko po to, aby testy przeszły.
+
+4. **[KRYTYCZNE] `KeepAspectRatio` tylko w elemencie wideo da niespójne obrazy zależnie od trybu.**
+
+   **Dowód:** wideo ma osobną gałąź (`composition.py:101–105`), ale obrazy, miniatury, reverse i zastępnik po awarii korzystają z pixmap (`composition.py:107–110,116–128,141–151`). `set_layer_pixmap` rozciąga niezależnie obie osie (`composition.py:172–179`). Ruch ponownie wywołuje tę funkcję (`composition.py:153–163`).
+
+   **Konsekwencja:** koło będzie okrągłe podczas odtwarzania, a eliptyczne w miniaturze, reverse lub po błędzie. Zmiana proporcji prostokąta przez D30 może ponownie rozciągać pixmapę. Podgląd następnego slajdu w Info używa właśnie miniatur (`player.py:581–582`).
+
+   **Poprawka planu:** objąć jedną regułą dopasowania wszystkie reprezentacje **klipu**: wideo, obraz, miniaturę, `end_thumbnail`, zastępnik i ruch. Dla źródła `sw×sh` użyć skali `min(rw/sw,rh/sh)` oraz wyśrodkowania. Zachować pełny prostokąt D30 jako kontener; nie zmieniać interpolacji ani zegara. Nie przenosić tej reguły bezwarunkowo na klatki live.
+
+5. **[WAŻNE] Kontrakt kliknięcia i obwódki nie odpowiada obecnej implementacji.**
+
+   **Dowód:** `PLAN.md:620` mówi o kliku i obwódce prostokąta klipu. Obwódka należy jednak do `LiveLayerController` i dotyczy sesji live (`live_layers.py:221–228,266–274`). Trafienie warstwy opiera się na elementach pod kursorem, nie na `layer_rects` (`composition.py:210–220`); klik w klip zwalnia live, bo klip nie ma sesji (`live_layers.py:224–226`).
+
+   **Konsekwencja:** przesunięta, dopasowana pixmapa nie będzie zajmowała całego kontenera. Klik w przezroczysty margines może trafić do niższego live i aktywować go. Sama zmiana skalowania nie zachowa deklarowanego zachowania.
+
+   **Poprawka planu:** wyjaśnić, że obwódka aktywności dotyczy live. Osobno zdecydować, czy margines klipu blokuje klik do niższych warstw. Jeśli tak, hit-test musi uwzględniać prostokąt kontenera i kolejność warstw. Dodać test kliknięcia środka, marginesu i obszaru poza kontenerem.
+
+6. **[KRYTYCZNE] Mignięcie wynika z pustego elementu przed pierwszą klatką, nie z samego oczekiwania bariery.**
+
+   **Dowód:** `composition.py:101–105` tworzy od razu pusty `QGraphicsVideoItem`, zamiast miniatury. `ClipGroup.enter()` podpina nowe źródło i uruchamia dekoder (`clip_layers.py:91–108`). Ochrona pustej klatki działa dopiero, gdy istnieje `self.frames[index]` (`clip_layers.py:141–158`), a `clear()` usuwa ten cache (`clip_layers.py:295–296`). Osobno istnieje już przypięcie pierwszej klatki na czas asynchronicznej pauzy (`clip_layers.py:145–155`), sprawdzane w `test_persistent_live.py:297–318`.
+
+   **Konsekwencja:** „miniatura/ostatnia klatka” to właściwy kierunek, ale ogólne zdanie nie zamyka błędu. Użycie starej klatki jako nowej gotowości może przedwcześnie zwolnić barierę. Nakładka miniatury pozostawiona nad wideo może później ukrywać odtwarzanie.
+
+   **Poprawka planu:** placeholder widoczny od utworzenia nowej kompozycji do **pierwszej poprawnej klatki nowego wejścia**; dopiero ta klatka uczestniczy w barierze. Określić zachowanie dla braku miniatury, błędu, timeoutu, zmiany indeksu, szybkiego A→B→A i replay. Stara klatka wyłącznie jako świadomy fallback właściwego klipu; bez zaliczania jej do READY i bez naruszania obecnego przypięcia klatek.
+
+7. **[KRYTYCZNE] „Jedno źródło stanu” jest wykonalne, ale same istniejące sygnały nie opisują wszystkich wyników.**
+
+   **Dowód:** `slide_changed` emituje setter indeksu (`player.py:394–404`), jeszcze przed `load_current_slide()` (`player.py:536–548`). Przygotowanie i żądany stan są w `ClipGroup` (`clip_layers.py:51–54,194–199,234–241`), stan grupy statycznej w `running`. Live udostępnia `changed/error`, ale `tick()` nie przekazuje dalej wszystkich zdarzeń cue (`live_layers.py:171–201`). `LiveSession.state=="ready"` nie oznacza, że cue nie trwa.
+
+   **Konsekwencja:** obserwowanie tylko `playbackStateChanged` pokaże „gra” podczas przygotowania dekoderów, a potem „pauza”, mimo że użytkownik oczekuje startu. Nie wyjaśni też klawisza, który niczego nie zmienił.
+
+   **Poprawka planu:** budować wspólny snapshot z istniejących pól i sygnałów, odświeżany także po zakończeniu callbacków nawigacji i zmianach bariery. Dopuszczalne są małe powiadomienia obserwacyjne; bez zmiany reguł upstreamu. Rozdzielić transport bazy/grupy, kierunek reverse, gotowość live i fokus. Nowy zegar odtwarzania jest zbędny; komunikat ~2 s może wygaszać `QTimer.singleShot` z ochroną przed wygaszeniem nowszego komunikatu.
+
+8. **[WAŻNE] Zapowiedziana tabela zdarzeń nie istnieje, a lista klawiszy nie wystarcza.**
+
+   **Dowód:** `PLAN.md:640–642` odwołuje się do tabeli, ale sekcja jej nie zawiera. Rzeczywiste rozgałęzienia to m.in. przygotowanie, wznowienie, oczekiwanie na koniec pętli i przejście (`player.py:625–653`), `auto_next/skip_all` (`player.py:317–345`), granice prezentacji (`player.py:519–548`) oraz timeout bariery live (`clip_layers.py:178–186`, `live_layers.py:145–149`).
+
+   **Konsekwencja:** komunikat „→ slajd 8” może być fałszywy, gdy strzałka tylko wznawia, zamawia wyjście z pętli albo jest konsumowana przez live. Po 5 s baza może ruszyć bez cue, choć live nadal startuje.
+
+   **Poprawka planu:** tabela musi obejmować:
+
+   | Zdarzenie | Wymagane rozróżnienie |
+   |---|---|
+   | `→` | wznowienie, zamówienie startu, wyjście z pętli, przejście, reverse→normal |
+   | `←`, `V`, `R` | zatwierdzone działanie, granica/no-op, brak cofania/replay live |
+   | Spacja | pauza/wznowienie grupy, zmiana zamiaru podczas przygotowania, koniec |
+   | Pętla | kolejny obrót, żądanie zakończenia, osiągnięcie końca |
+   | `auto_next`, `skip_all` | przejście automatyczne bez klawisza |
+   | Koniec decku | pozostanie albo zamknięcie przez `exit_after_last_slide` |
+   | Wiele prezentacji | identyfikator prezentacji oraz lokalny numer slajdu |
+   | D31 | przygotowanie, gotowość, start w pauzie, błąd/timeout klipu lub bazy |
+   | Live | start, READY, pominięte cue po timeout, późniejsze READY, błąd |
+   | Fokus | klik, Esc, zmiana slajdu, utrata aktywności aplikacji, błąd |
+   | Klawisz live | wysłano cue, zignorowano przed READY, autorepeat, koniec sekwencji |
+
+   „Wysłano” nie może oznaczać „wykonano”; potwierdzenie wykonania wymaga zdarzenia protokołu.
+
+9. **[WAŻNE] Nakładka musi należeć do widoku, a skrót wymaga konkretnej decyzji.**
+
+   **Dowód:** okno główne i bieżące Info współdzielą scenę (`composition.py:1–4`, `player.py:253–266`). Domyślne skróty zajmują Q, Space, strzałki, V, R, F, H (`slides/config.py:91–107`), a aktywne live dodatkowo konsumuje Esc i skonfigurowane NEXT/PREVIOUS (`live_layers.py:276–293`).
+
+   **Konsekwencja:** tekst dodany do `SlideComposition` pojawi się również w obrazie Info. Skrót Esc lub strzałka będzie zależał od fokusu. Kombinacja z modyfikatorem nie zapewnia odrębności, bo obecny dispatch operuje kodem klawisza.
+
+   **Poprawka planu:** nakładka jako dziecko viewportu głównego widoku, przezroczysta dla myszy i bez przejmowania fokusu; osobny wiersz Info korzysta z tego samego tekstu. Wybrać np. **S**, wolne w domyślnym zestawie i routerze live. Sprawdzić również konfiguracje użytkownika oraz łączenie klawiszy (`config.py:109–144`), nie tylko `Config()`.
+
+10. **[WAŻNE] Idempotencja demo nie naprawia nawigacji wstecz, a ±1 klatka przeczy przyjętej synchronizacji.**
+
+   **Dowód:** `flip` przełącza kolor i obraca względnie (`examples/live_three.py:21–24`). D33 celowo nie wysyła cue przy `←`, reverse ani replay (`SPEC.md:603–617`). Już zmierzony rozrzut ciepłej sesji wynosił medianowo 48 ms, maksymalnie 51 ms (`PLAN.md:588–595`), podczas gdy 5c żąda końca ±1 klatka (`PLAN.md:638–639`).
+
+   **Konsekwencja:** ustawienie absolutnego kąta końcowego nie gwarantuje powtarzalnej animacji: kolejne wejście może animować od celu do tego samego celu. Idempotentny cue nie przywróci też stanu przy wejściu od tyłu. Równe nominalne długości nie gwarantują wspólnego końca trzech niezależnych rendererów.
+
+   **Poprawka planu:** zdefiniować deterministyczny stan początkowy i końcowy cue oraz sprawdzić, że każde wejście rzeczywiście animuje. Kryterium identycznych pikseli ograniczyć do ustalonego momentu po zatwierdzonym wejściu do przodu. Pozostawić D33 dla cofania i jasno pokazać to w stanie. Wymagać nominalnie 2 s i raportować zmierzony rozrzut; nie obiecywać frame-lock.
+
+11. **[WAŻNE] Diagnoza linii wymaga macierzy prób; sam rozmiar okna jest niejednoznaczny.**
+
+   **Dowód:** `SlideView` wyłącza ramkę, ustawia czarne tło i wykonuje `fitInView` przy show/resize (`composition.py:201–205,245–251`). Scena ma jawny `sceneRect`, baza własny rozmiar, a aktywna obwódka jest elementem tej sceny (`composition.py:32–38`, `live_layers.py:266–274`). Zmiana rozdzielczości prezentacji modyfikuje scenę (`composition.py:48–53`).
+
+   **Konsekwencja:** z kodu nie wynika dowód, że linię tworzy letterbox lub `fitInView`. Możliwe są krawędź obwódki, piksele źródła, szew skalowania albo artefakt backendu. „1614×956” może oznaczać ramkę okna, obszar klienta lub viewport.
+
+   **Poprawka planu:** ustalić rozmiar viewportu i DPR; porównać obraz bazowy/wideo, brak warstw, warstwy bez fokusu, fokus, błąd, nakładkę wyłączoną/włączoną. Porównać render samej sceny, `viewport().grab()` i zrzut prawdziwego okna, zapisać pozycję linii względem `mapFromScene(sceneRect())`. Sprawdzić także przejście między prezentacjami o innych rozdzielczościach. Raport „nie nasz kod” wymaga zawężającego reproduktora.
+
+12. **[WAŻNE] Kryteria pikselowe i budżet nie odpowiadają zakresowi.**
+
+   **Dowód:** `PLAN.md:632–643` nie określa rozdzielczości pomiaru, DPR, maski obiektu, próbkowania ani fps. `tests/test_live_layers.py:87–104` bada surową pixmapę, co nie wykrywa deformacji wprowadzonej transformacją widoku. `test_reverse_shows_clip_end_frame_in_final_rect` sprawdza prostokąt i piksel źródła (`tests/test_clip_layers.py:461–481`), nie proporcje wyświetlonego obrazu. Plan sam odróżnia Qt offscreen od próby ekranowej (`PLAN.md:159–160`).
+
+   **Konsekwencja:** „kwadrat ma równe boki podczas obrotu” nie definiuje pomiaru; dla projekcji 3D może być wręcz nieprawdziwe. Okresowe zrzuty nie dowodzą „w żadnej klatce okna”. Zmiana dopasowania obrazów może świadomie zmienić istniejące oczekiwania testów pikseli, m.in. `test_clip_layers.py:214–237`.
+
+   **Poprawka planu:** określić scenę 2D, kolory/maski, kąty, rozdzielczość renderu, viewport i DPR; mierzyć obraz po kompozycji. Osobno testować transformację geometryczną i wynik rasteryzacji. Ciągłość sprawdzać deterministycznie przy opóźnionej pierwszej klatce, pustych i spóźnionych klatkach, timeoutach oraz błędach; rzeczywisty ekran zostawić próbie prelegenta. Zaktualizować testy wyrażające dawną semantykę rozciągania, zachowując testy z-order.
+
+   **Budżet:** ~4 h jest wiarygodne dla ograniczonego zestawu poprawek, nie dla całego kontraktu wraz z regresjami, stanem, diagnostyką i próbą. Najmniejszy zakres zachowujący cel: poprawne proporcje we wszystkich reprezentacjach, placeholder klipu, deterministyczne demo oraz prosty stan „prezentacja/slajd, transport, live, fokus” w Info i nakładce. Odłożyć bogate komunikaty po każdym klawiszu oraz gwarancję końca ±1 klatka; diagnozę linii prowadzić z osobnym limitem czasu.
+
+**Werdykt:** kontrakt 5c wymaga poprawy przed implementacją. Najpierw zamknąć politykę kadrowania, wszystkie ścieżki dopasowania klipów, cykl placeholdera i tabelę stanu; usunąć gwarancję synchronizacji ±1 klatka. Przegląd był statyczny, read-only — bez uruchamiania GUI i testów.

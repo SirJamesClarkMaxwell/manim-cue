@@ -536,6 +536,19 @@ class LiveScene(Scene):
         self.update_frame(dt, force_draw=True)
         rendered = time.monotonic()
         pixels = self.camera.get_raw_fbo_data(dtype="f1")
+        width, height = self.camera.get_pixel_shape()
+        target = self.live_buffer
+        if (width, height) != (target.width, target.height):
+            # Shader manimgl używa stałego 16:9; pasy zachowują proporcje bez łatania backendu.
+            import numpy as np
+
+            canvas = np.zeros((target.height, target.width, 4), dtype=np.uint8)
+            canvas[:, :, 3] = 255
+            x, y = (target.width - width) // 2, (target.height - height) // 2
+            canvas[y : y + height, x : x + width] = np.frombuffer(pixels, dtype=np.uint8).reshape(
+                height, width, 4
+            )
+            pixels = canvas.tobytes()
         read = time.monotonic()
         self.live_frame_id += 1
         self.live_buffer.publish(pixels, self.live_frame_id, boundary)
