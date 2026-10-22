@@ -11,6 +11,7 @@ from typing import Any
 from .__version__ import __version__
 
 __all__ = (
+    "BorderStyle",
     "ClipLayer",
     "Keyframe",
     "LiveLayer",
@@ -27,7 +28,7 @@ def __getattr__(name: str) -> Any:
         from . import slide
 
         return getattr(slide, name)
-    if name in ("ClipLayer", "Keyframe", "LiveLayer", "slide_file"):
+    if name in ("BorderStyle", "ClipLayer", "Keyframe", "LiveLayer", "slide_file"):
         from . import config
 
         return getattr(config, name)

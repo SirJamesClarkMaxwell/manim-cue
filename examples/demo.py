@@ -10,7 +10,7 @@ slajd 2 zapętlony do naciśnięcia `→`, cofanie (`←`).
 Faza 6a: slajd 6 osadza ten sam render w samej scenie (`SceneView`) — wideo gra, a animacja
 gospodarza je przesuwa i skaluje; wynik to zwykły klip slajdu.
 
-Faza 5: slajd 5 osadza render innej sceny (`examples/orbit.py`), który wjeżdża i rośnie obok
+Faza 5: slajd 5 osadza render innej sceny (`examples/orbit.py`), który rośnie obok
 panelu live. Najpierw `uv run manim-cue render examples/orbit.py Orbit`.
 
 Faza 3/4: slajd 3 ma warstwę live `Panel` w prawym górnym rogu, slajd 4 — scenę 3D `Panel3D`.
@@ -21,7 +21,7 @@ daje jej strzałki (żółta obwódka), Esc oddaje je slajdom. Na `Panel3D` mysz
 from pathlib import Path
 
 from manimcue.scene_view import SceneView
-from manimcue.slides import ClipLayer, Keyframe, LiveLayer, Slide, slide_file
+from manimcue.slides import BorderStyle, ClipLayer, Keyframe, LiveLayer, Slide, slide_file
 from manimcue.slides.slide import MANIM
 
 if MANIM:
@@ -77,7 +77,7 @@ PANEL_3D = LiveLayer(
 
 
 class Demo(Slide):
-    """Cztery slajdy: wzrost, pętla, obrót z panelem live, scena 3D."""
+    """Dziewięć slajdów: klipy, sceny live, trwałe cue i przezroczyste tło."""
 
     def construct(self) -> None:
         circle = Circle(radius=2, color=BLUE)
@@ -85,17 +85,15 @@ class Demo(Slide):
         square = Square(side_length=1, color=RED)
 
         # Notatki należą do slajdu, który dane next_slide() otwiera.
-        self.next_slide(notes="**1/3** — okrąg rośnie ze środka. Podgląd obok pokazuje slajd 2.")
+        self.next_slide(notes="**1** — okrąg rośnie ze środka. Podgląd obok pokazuje slajd 2.")
         self.play(GrowFromCenter(circle))
         self.add(dot)
 
-        self.next_slide(
-            notes="**2/3** — pętla: kropka krąży, dopóki nie naciśniesz `→`.", loop=True
-        )
+        self.next_slide(notes="**2** — pętla: kropka krąży, dopóki nie naciśniesz `→`.", loop=True)
         self.play(MoveAlongPath(dot, circle), run_time=2, rate_func=linear)
 
         self.next_slide(
-            notes="**3/3** — kropka wraca do środka, obrót kwadratu. W rogu warstwa live.",
+            notes="**3** — kropka wraca do środka, obrót kwadratu. W rogu warstwa live.",
             layers=[PANEL],
         )
         self.play(dot.animate.move_to(ORIGIN))
@@ -104,7 +102,7 @@ class Demo(Slide):
         self.play(Rotate(square, PI / 2))
 
         self.next_slide(
-            notes="**4/4** — scena 3D live: klik, potem przeciąganie obraca kamerę, Shift "
+            notes="**4** — scena 3D live: klik, potem przeciąganie obraca kamerę, Shift "
             "przesuwa, kółko przybliża, dwuklik wraca; strzałki: spin, lift. Esc — slajdy.",
             layers=[PANEL_3D],
         )
@@ -116,17 +114,17 @@ class Demo(Slide):
                 "Slajd 5 osadza render sceny Orbit: najpierw "
                 "`uv run manim-cue render examples/orbit.py Orbit`"
             )
-        # Render innej sceny jako warstwa: wjeżdża zza prawej krawędzi i rośnie w 1,5 s.
+        # Render innej sceny jako warstwa: rośnie w 1,5 s; początek widoczny także w statycznej geometrii Info.
         orbit = ClipLayer(
             file=slide_file(orbit_json, 0),
             loop=True,
             keyframes=[
-                Keyframe(t=0, rect=(1.0, 0.3, 0.2, 0.2)),
+                Keyframe(t=0, rect=(0.05, 0.1, 0.2, 0.2)),
                 Keyframe(t=1.5, rect=(0.05, 0.1, 0.45, 0.45)),
             ],
         )
         self.next_slide(
-            notes="**5/5** — render sceny Orbit wjeżdża i rośnie obok panelu live; "
+            notes="**5** — render sceny Orbit rośnie obok panelu live; "
             "spacja pauzuje bazę, klip i jego ruch; live działa dalej.",
             layers=[
                 orbit,
@@ -138,7 +136,7 @@ class Demo(Slide):
         self.play(square.animate.move_to(ORIGIN).scale(2), run_time=1.5)
 
         self.next_slide(
-            notes="**6/6** — `SceneView`: render Orbit gra wewnątrz sceny, a animacja "
+            notes="**6** — `SceneView`: render Orbit gra wewnątrz sceny, a animacja "
             "gospodarza zjeżdża nim w róg i zmniejsza."
         )
         view = SceneView(self, slide_file(orbit_json, 0), height=4, loop=True)
@@ -160,7 +158,7 @@ class Demo(Slide):
         other = ClipLayer(file=slide_file(orbit_json, 0), rect=(0.69, 0.15, 0.28, 0.6))
         for number in (7, 8):
             self.next_slide(
-                notes=f"**{number}/8** — jedno →: baza CE, trwały live i klip Orbit. "
+                notes=f"**{number}** — jedno →: baza CE, trwały live i klip Orbit. "
                 "Trzy stałe prostokąty i kamery; poruszają się obiekty. Esc oddaje strzałki. "
                 "Spacja pauzuje bazę i klip; live działa dalej. S pokazuje stan na ekranie. "
                 "Podgląd następnego slajdu pokazuje miniaturę live. "
@@ -168,3 +166,21 @@ class Demo(Slide):
                 layers=[persistent.model_copy(), other.model_copy()],
             )
             self.play(Rotate(marker, PI / 2), run_time=2, rate_func=linear)
+
+        self.clear()
+        marker = Square(side_length=1.5, color=BLUE).move_to((-3, -2.5, 0))
+        self.add(marker)
+        self.next_slide(
+            notes="**9** — przezroczyste tło live i pasy nad jadącym niebieskim kwadratem. "
+            "Klik w live daje turkusową obwódkę; Esc oddaje strzałki slajdom. S pokazuje stan.",
+            layers=[
+                LiveLayer(
+                    scene_file=Path(__file__).with_name("live_panel.py"),
+                    scene_name="Panel",
+                    rect=(0.15, 0.05, 0.7, 0.9),
+                    background_opacity=0,
+                    active_border=BorderStyle(color="cyan", width=10, opacity=0.7),
+                )
+            ],
+        )
+        self.play(marker.animate.move_to((3, 2.5, 0)), run_time=3, rate_func=linear)

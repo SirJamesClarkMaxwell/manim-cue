@@ -316,3 +316,63 @@ class ClipGroup(QObject):
         self.motion.stop()
         self.running = False
         self.elapsed_ms = 0
+
+
+class PreviewClips(QObject):
+    """Niezależne, wyciszone pętle Info; geometria początkowa, bez bariery głównej."""
+
+    def __init__(self, composition: SlideComposition) -> None:
+        super().__init__()
+        self.composition = composition
+        self.players = {}
+        self.connections = []
+        self.entry = 0
+
+    def show(self, layers) -> None:
+        self.clear()
+        entry = self.entry
+        for index, layer in enumerate(layers):
+            self.composition.set_layer_rect(index, layer.rect_at(0))
+            if not isinstance(layer, ClipLayer) or not layer.is_video:
+                continue
+            player = QMediaPlayer(self)
+            item = self.composition.layer_items[index]
+
+            def frame_changed(frame, i=index, e=entry):
+                if e == self.entry and i in self.players and frame.isValid():
+                    self.composition.clear_placeholder(i)
+
+            signal = item.videoSink().videoFrameChanged
+            signal.connect(frame_changed)
+            self.connections.append((signal, frame_changed))
+            player.errorOccurred.connect(lambda *_, i=index, e=entry: self.failed(e, i))
+            player.setVideoOutput(item)
+            player.setLoops(-1)
+            player.setPlaybackRate(layer.playback_rate)
+            player.setSource(QUrl.fromLocalFile(str(Path(layer.file).resolve())))
+            self.players[index] = player
+            player.play()
+
+    def failed(self, entry, index) -> None:
+        if entry == self.entry and index in self.players:
+            player = self.players.pop(index)
+            player.stop()
+            player.setVideoOutput(None)
+            player.setSource(QUrl())
+            player.deleteLater()
+            self.composition.freeze_layer(index)
+
+    def clear(self) -> None:
+        self.entry += 1
+        for signal, slot in self.connections:
+            try:
+                signal.disconnect(slot)
+            except (RuntimeError, TypeError):
+                pass
+        self.connections = []
+        for player in self.players.values():
+            player.stop()
+            player.setVideoOutput(None)
+            player.setSource(QUrl())
+            player.deleteLater()
+        self.players = {}

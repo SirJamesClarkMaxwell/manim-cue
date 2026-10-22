@@ -2,7 +2,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from qtpy.QtCore import Qt, QTimer, QUrl, Signal, Slot
-from qtpy.QtGui import QCloseEvent, QIcon, QKeyEvent, QScreen
+from qtpy.QtGui import QCloseEvent, QIcon, QKeyEvent, QPixmap, QScreen
 from qtpy.QtMultimedia import QAudioOutput, QMediaPlayer, QVideoFrame
 from qtpy.QtWidgets import (
     QApplication,
@@ -13,7 +13,7 @@ from qtpy.QtWidgets import (
     QWidget,
 )
 
-from manimcue.clip_layers import ClipGroup
+from manimcue.clip_layers import ClipGroup, PreviewClips
 from manimcue.composition import SlideComposition, SlideView
 from manimcue.live_layers import LiveLayerController
 
@@ -252,6 +252,7 @@ class Player(QMainWindow):
         resolution = self.current_presentation_config.resolution
         self.composition = SlideComposition(resolution, aspect_ratio_mode)
         self.preview = SlideComposition(resolution, aspect_ratio_mode)
+        self.preview_clips = PreviewClips(self.preview)
         self.video_sink = self.composition.video_item.videoSink()
         self.view = SlideView(self.composition, aspect_ratio_mode)
         # F4 (D20): sesje warstw live bieżącego slajdu; klik w widoku głównym wybiera warstwę,
@@ -602,6 +603,10 @@ class Player(QMainWindow):
         self.preview_next_slide()
 
     def preview_next_slide(self) -> None:
+        self.preview_clips.clear()
+        self.preview.set_layers([])
+        self.info.next_media_player.stop()
+        self.info.next_media_player.setSource(QUrl())
         if slide_config := self.next_slide_config:
             url = QUrl.fromLocalFile(str(slide_config.file.resolve(strict=True)))
             # F3: następny slajd bywa pierwszym slajdem następnej prezentacji (jak w
@@ -615,14 +620,22 @@ class Player(QMainWindow):
                     self.current_presentation_index + 1
                 ]
             self.preview.set_resolution(presentation_config.resolution)
-            self.preview.set_layers(slide_config.layers)
+            self.preview.set_layers(slide_config.layers, video=True)
+            if not self.hide_info_window:
+                self.preview_clips.show(slide_config.layers)
             if slide_config.type == SlideType.Video:
                 self.preview.show_video()
                 self.info.next_media_player.setSource(url)
-                self.info.next_media_player.play()
+                self.info.next_media_player.setPlaybackRate(slide_config.playback_rate)
+                if not self.hide_info_window:
+                    self.info.next_media_player.play()
             else:
                 self.info.next_media_player.stop()
                 self.preview.show_image(slide_config.file)
+        else:
+            self.preview.set_layers([])
+            self.preview.image_item.setPixmap(QPixmap())
+            self.preview.video_item.hide()
 
     def show(  # ty: ignore[invalid-method-override]
         self, screens: list[QScreen]
@@ -654,6 +667,9 @@ class Player(QMainWindow):
         logger.info("Closing gracefully...")
         self.live.begin_shutdown()
         self.clips.clear()
+        self.preview_clips.clear()
+        self.preview.set_layers([])
+        self.info.next_media_player.stop()
         self.info.close()
         super().close()
 

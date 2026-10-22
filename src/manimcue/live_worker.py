@@ -37,7 +37,7 @@ def run_worker(spec, shm_name, frame_lock, bootstrap_sender) -> None:
                 "resolution": render_size,
                 "frame_config": {"frame_shape": (FRAME_WIDTH, FRAME_HEIGHT)},
                 "fps": spec.fps,
-                "background_opacity": 1.0,
+                "background_opacity": spec.background_opacity,
             },
             file_writer_config={
                 "write_to_movie": False,

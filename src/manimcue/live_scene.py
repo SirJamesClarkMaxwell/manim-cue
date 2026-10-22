@@ -543,7 +543,7 @@ class LiveScene(Scene):
             import numpy as np
 
             canvas = np.zeros((target.height, target.width, 4), dtype=np.uint8)
-            canvas[:, :, 3] = 255
+            canvas[:] = np.rint(np.array(self.camera.background_rgba) * 255).astype(np.uint8)
             x, y = (target.width - width) // 2, (target.height - height) // 2
             canvas[y : y + height, x : x + width] = np.frombuffer(pixels, dtype=np.uint8).reshape(
                 height, width, 4

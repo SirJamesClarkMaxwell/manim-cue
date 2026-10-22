@@ -1678,3 +1678,136 @@ klucz sesji, wymóg `rect`, mierzalność ≤ 50 ms, diagnoza uwag z próby, bud
    **Budżet:** ~4 h jest wiarygodne dla ograniczonego zestawu poprawek, nie dla całego kontraktu wraz z regresjami, stanem, diagnostyką i próbą. Najmniejszy zakres zachowujący cel: poprawne proporcje we wszystkich reprezentacjach, placeholder klipu, deterministyczne demo oraz prosty stan „prezentacja/slajd, transport, live, fokus” w Info i nakładce. Odłożyć bogate komunikaty po każdym klawiszu oraz gwarancję końca ±1 klatka; diagnozę linii prowadzić z osobnym limitem czasu.
 
 **Werdykt:** kontrakt 5c wymaga poprawy przed implementacją. Najpierw zamknąć politykę kadrowania, wszystkie ścieżki dopasowania klipów, cykl placeholdera i tabelę stanu; usunąć gwarancję synchronizacji ±1 klatka. Przegląd był statyczny, read-only — bez uruchamiania GUI i testów.
+
+## Runda 18 — codex, 2026-10-22: kontrakt F5d-f
+
+**Pytania:** Czy podgląd, alfa tła, obwódka i demo są wykonalne w zamkniętym zakresie D17/D20/D27-D34?
+
+**Co weszło:**
+
+1. Przyjęto bramkę GL i ograniczenie gwarancji do pustego tła i pasów; odrzucono naprawę mieszania wszystkich shaderów, bo wymagałaby ingerencji w Manima.
+2. Przyjęto pełną ścieżkę krycia przez LiveSpec i capture_first_frame, klucz cache z kryciem i wersją oraz jawny transport prostego RGBA i PNG bez konwersji.
+3. Przyjęto zmianę live_publish: pasy odwzorowują camera.background_rgba, test 0/0.5/1; celowo ujednolicamy ich kolor z kamerą zamiast zachowywać stałą czerń przy kryciu 1.
+4. Przyjęto obie tożsamości i ciągi D33, zmianę krycia po przerwie oraz zachowanie niespłaszczonego obrazu; style nie są tożsamością procesu.
+5. Przyjęto niezależne pętle i szybkości, bez wspólnego restartu; podgląd ma rect_at(0), także nad obrazem.
+6. Przyjęto jawne odroczenie ruchu podglądu; odrzucono dodatkowy zegar i wyjątek pozycji bazy od D30 jako zbędne dla grających klipów.
+7. Przyjęto brak dekodowania ukrytego Info i pomiar wpływu w próbie człowieka; odrzucono automatyczny próg CPU/GPU i benchmark 1/2/3 źródeł jako rozszerzenie bez dostępnego prawdziwego okna.
+8. Przyjęto normalny plik i pierwszą miniaturę w reverse, sprzątanie celu, końca i zamknięcia oraz odcięcie callbacków.
+9. Przyjęto Color Pydantic bez Qt, jego zapis JSON, mnożenie alfy przez opacity, skończone liczby i zgodność starszych decków.
+10. Przyjęto jawny indeks i rolę; aktywna warstwa ma pierwszeństwo nawet z None, release wybiera pierwszy błąd nawet z None; szerokość ograniczona do wymiarów kontenera.
+11. Przyjęto kontrolowane klatki i końcową kompozycję, surową alfę oraz regresje; odrzucono gwarancję dowolnej półprzezroczystej treści GL zgodnie z punktem 1.
+12. Przyjęto kontrastową bazę pod live, pasy, instrukcję klik/Esc, korektę mianowników i test dziewięciu slajdów; render CE i GL oddzielony od próby playera. Przy rect_at(0) klip 5 zaczyna w kadrze (zachowuje powiększanie), aby podgląd pokazywał animację.
+13. Przyjęto większy budżet i ograniczenia zakresu; odrzucono wycięcie walidacji ciągłości, cache i pełnych regresji.
+
+**Odpowiedź codex (bez zmian):**
+
+1. **[KRYTYCZNE] 5e zakłada, że wystarczy rozpoznać jeden format alfy całej klatki. Kod manimgl tego nie gwarantuje.**
+
+   **Dowód:** `.venv/Lib/site-packages/manimlib/camera/camera.py:124` czyści framebuffer surowym `background_rgba`; `:141` odczytuje jego zawartość bez konwersji alfy. `shader_wrapper.py:370` ustawia osobne mieszanie RGB i alfy dla wypełnień, `:392` nakłada teksturę jako premultiplikowaną, a `:397` przywraca `glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA)`. Obecny odbiornik deklaruje prostą alfę: `src/manimcue/live_layers.py:193`.
+
+   **Konsekwencja:** nie można bezwarunkowo zmienić `QImage` na `RGBA8888_Premultiplied`. Zwykłe mieszanie z `SRC_ALPHA` mnoży również składową alfa źródła, natomiast ścieżka wypełnień robi to inaczej. Nieczarne przezroczyste tło dodatkowo może naruszać warunek RGB ≤ alfa wymagany dla premultiplikacji. Jeden piksel pustego tła przy `background_opacity=0.5` nie sprawdzi półprzezroczystej treści ani krawędzi.
+
+   **Poprawka planu:** rozpocząć 5e od bramki wykonalności: rzeczywisty GL, tło czarne i kolorowe, wypełnienie, stroke oraz nakładanie dwóch półprzezroczystych obiektów. Zapisać oczekiwane RGBA przed Qt i wynik nad znanym tłem. Dopiero wtedy ustalić normalizację i format transportu. Jeżeli pełna poprawność wymaga ingerencji w Manima, ograniczyć gwarancję zamiast obiecywać naprawę samym wyborem formatu `QImage`.
+
+2. **[WAŻNE] Miniatura wymaga osobnej konwersji i zmiany klucza cache.**
+
+   **Dowód:** `src/manimcue/slides/slide/base.py:723` buduje klucz bez `background_opacity`; `:727` tworzy `LiveSpec` bez tego parametru; `:729` zapisuje bajty przez `Image.frombytes("RGBA", ...)`. `src/manimcue/live_session.py:18` także nie ma pola krycia.
+
+   **Konsekwencja:** po zmianie krycia można dostać starą, nieprzezroczystą miniaturę. Jeżeli transport zostanie premultiplikowany, zapisanie jego bajtów jako zwykłego RGBA do PNG da błędne kolory przy późniejszym wczytaniu.
+
+   **Poprawka planu:** wymienić pełną ścieżkę parametru: model → `LiveSpec` → worker, również dla `capture_first_frame`. Dodać krycie i wersję interpretacji pikseli do klucza miniatury. Jawnie ustalić konwersję transport → PNG oraz test miniatury po ponownym renderze z innym kryciem bez `--flush-cache`.
+
+3. **[WAŻNE] Pasy D34 powstają poza kamerą; parametr kamery ich nie zmieni.**
+
+   **Dowód:** `src/manimcue/live_scene.py:545` tworzy czarny canvas, a `:546` bezwarunkowo ustawia alfę pasów na 255. `PLAN.md:703` wymaga przepuszczania tła przez pasy.
+
+   **Konsekwencja:** samo zastąpienie stałej w `live_worker.py:40` pozostawi czarne, nieprzezroczyste pasy. Przy kryciu pośrednim mogą też powstać inne kolory pasów i właściwego tła kamery.
+
+   **Poprawka planu:** wskazać `live_publish` jako obowiązkowe miejsce zmiany. Ustalić, czy pasy odwzorowują rzeczywiste `camera.background_rgba`, czy zawsze czarne tło o zadanym kryciu. Sprawdzić środek i oba pasy dla 0, 0.5 i 1, również w miniaturze.
+
+4. **[WAŻNE] Spójność krycia sesji jest właściwa, ale tylko wewnątrz ciągu D33. Brakuje tożsamości wykonawczej i testu zapamiętanego obrazu.**
+
+   **Dowód:** `SPEC.md:593` definiuje ciąg sąsiednich wystąpień; przerwa otwiera nową generację (`:597`). `config.py:524` waliduje właśnie takie ciągi. Kontroler niezależnie buduje tożsamość w `live_layers.py:100`. Ostatni `QImage` i jego bajty są zachowywane w `:200`, a ponownie wstawiane w `:131`. Obecny test przejęcia obrazu: `tests/test_persistent_live.py:132`.
+
+   **Konsekwencja:** globalny zakaz różnych wartości dla tego samego ID byłby nadmiarowy. Dodanie pola tylko do walidatora pozostawi dwie różne definicje tożsamości. Sam test zachowania obrazu nie wykryje wcześniejszego spłaszczenia do starej bazy.
+
+   **Poprawka planu:** dopisać krycie do obu tożsamości; dopuścić inne krycie po przerwie ciągu. Testować A → B ze zmianą indeksu warstwy i koloru bazy, bez nowej publikacji live: zachowany obraz ma ponownie mieszać się z bazą B. Style obwódki mogą zmieniać się między slajdami bez restartu sesji.
+
+5. **[WAŻNE] „Wspólny start pętli” podglądu jest niejednoznaczny dla różnych długości materiałów.**
+
+   **Dowód:** `PLAN.md:688–692` nakazuje zapętlać klipy i obiecuje wspólny start pętli. Dzisiejsza baza podglądu ma własne `setLoops(-1)` (`player.py:127`). Główne klipy zapętlają się niezależnie (`clip_layers.py:106`). Walidacja długości zwalnia klipy z `loop` i bazy statyczne (`PLAN.md:369`).
+
+   **Konsekwencja:** dla bazy 2 s i klipu 3 s nie wiadomo, czy klip restartuje po 2 s, czy kończy własną pętlę. Dla klipu 1 s nie wiadomo, czy drugi obrót zaczyna samodzielnie. Nad obrazem nie istnieje pozycja wideo bazy ani granica jej pętli.
+
+   **Poprawka planu:** wybrać jedno zachowanie. Najmniejszy zakres: wspólny start tylko początkowy, później niezależne pętle; jawnie zaakceptowany dryf. Dla bazy statycznej określić osobno zegar ruchu albo pozostawić geometrię w `rect_at(0)`. Dodać przypadki klip krótszy/dłuższy, różne szybkości i baza-obraz.
+
+6. **[WAŻNE] Ruch podglądu świadomie odbiega od D30, ale plan nie nazywa tej różnicy.**
+
+   **Dowód:** `PLAN.md:690` wybiera pozycję bazy. `SPEC.md:565–568` odrzuca ten zegar z powodu skoków pętli, szybkości i aktualizacji co około 50 ms. Okno główne używa aktywnego czasu (`clip_layers.py:287`).
+
+   **Konsekwencja:** przy szybkości bazy 2× podgląd wykona ruch dwa razy szybciej niż okno główne; przy pętli geometria podglądu wróci do początku, podczas gdy główna pozostanie na końcu. To może być zamierzone, lecz „tym samym `rect_at`” nie oznacza tego samego zachowania.
+
+   **Poprawka planu:** zapisać wyjątek od D30 oraz jednostkę czasu: `position()/1000`, reset przy pętli i zachowanie podczas ładowania. Testować zadane pozycje, szybkość 2× i przejście koniec → początek. Jeżeli celem jest wierny podgląd, użyć osobnego aktywnego zegara podglądu.
+
+7. **[WAŻNE] Niezależność logiczna podglądu nie gwarantuje braku spowolnienia okna głównego.**
+
+   **Dowód:** `composition.py:3` potwierdza wspólną kompozycję okna głównego i bieżącego Info; następny slajd ma osobną. `player.py:127` ma już osobny dekoder bazy podglądu. Kolejny klip oznacza kolejny `QMediaPlayer` i sink (`clip_layers.py:96`). Pomiary w `PLAN.md:336–340` pokazują zauważalny czas przygotowania i zależność rozrzutu od liczby źródeł.
+
+   **Konsekwencja:** dodatkowe dekodery współdzielą CPU, zasoby GPU, pamięć i obsługę GUI. Mały viewport 360×240 nie jest gwarancją dekodowania materiału w tej rozdzielczości. Zielony test bariery nie wykluczy pogorszenia czasu przejścia. Z kodu nie da się wywnioskować faktycznego użycia dekodera sprzętowego Qt FFmpeg.
+
+   **Poprawka planu:** dodać pomiar z podglądem włączonym/wyłączonym: baza + 1/2/3 klipy i live, czas przejścia do zmienionej klatki, czas przygotowania, tempo klatek i obciążenie CPU/GPU. Ustalić próg regresji przed implementacją. Rozważyć start podglądu dopiero po zwolnieniu bariery głównej oraz zatrzymanie dekoderów przy ukrytym Info.
+
+8. **[WAŻNE] Reverse i sprzątanie potrzebują kontraktu dla celu podglądu, a nie flagi okna głównego.**
+
+   **Dowód:** podczas reverse `next_slide_config` zwraca bieżący slajd (`player.py:446–448`), a `preview_next_slide` używa jego normalnego `file` (`:606`). `composition.py:125` wybiera `end_thumbnail` tylko dla `at_end`. `player.py:653` sprząta główny kontroler klipów, lecz nie ma analogicznej ścieżki dla nowych klipów podglądu.
+
+   **Konsekwencja:** skopiowanie konfiguracji głównej może wyświetlić w podglądzie nieruchome `end_thumbnail` zamiast klipu do przodu. Sprzątanie wyłącznie przy zmianie indeksu ominie reverse → normalny, koniec decku i zamknięcie. Spóźniony callback może trafić do przebudowanego elementu.
+
+   **Poprawka planu:** podgląd zawsze normalnego `file`, pierwszej miniatury i geometrii początkowej — również podczas reverse; `end_thumbnail` zachować dla głównego reverse. Sprzątanie powiązać ze zmianą celu/trybu podglądu i zamknięciem. Wymagać odcięcia starych callbacków, zwolnienia sinków, timerów i źródeł. Test A → B → A oraz przejście między prezentacjami o różnych rozdzielczościach.
+
+9. **[WAŻNE] Kontrakt koloru i liczb `BorderStyle` jest zbyt szeroki oraz niedookreślony.**
+
+   **Dowód:** `config.py:25` już używa `pydantic_extra_types.color.Color`; import Qt jest celowo odroczony (`:53–55`). `PLAN.md:710` obiecuje dowolną „nazwę albo hex”, lecz nie określa składni, alfy koloru ani skończoności szerokości.
+
+   **Konsekwencja:** walidacja przez `QColor` wprowadzi zależność modelu/renderowania od Qt. Walidatory Qt i Pydantic nie muszą akceptować tego samego zbioru nazw i formatów hex. Kolor zawierający alfę oraz osobne `opacity` mają dwie możliwe interpretacje. Samo `width > 0` dopuszcza nieskończoność.
+
+   **Poprawka planu:** walidować bez Qt, np. istniejącym `Color`, i określić jego składnię jako publiczny kontrakt. Ustalić kanoniczny zapis JSON oraz mnożenie alfy koloru przez `opacity` albo zakazać alfy w kolorze. Wszystkie liczby muszą być skończone. Brak pól w starym v2/v3 ma dawać dotychczasowe style; jawne `null` wyłączać obwódkę. Dodać test importu/walidacji modelu bez ładowania Qt i round-trip całego decku.
+
+10. **[WAŻNE] Jedna obwódka wymaga jawnego stanu roli, szczególnie przy `None`.**
+
+    **Dowód:** `live_layers.py:225` przenosi obwódkę na błąd; `:235` na aktywną warstwę; `:266` po zwolnieniu wybiera pierwszy błąd. Przy ruchu `:273` przekazuje dalej jedynie aktualny kolor. `frame_layer` używa stałej szerokości (`:277–282`).
+
+    **Konsekwencja:** po dodaniu różnych stylów kolor nie wystarczy do odtworzenia szerokości, krycia i roli. Wyłączenie stylu aktywnej warstwy może zostawić poprzednią obwódkę błędu albo ją ukryć — plan nie rozstrzyga. Nie wiadomo też, czy po `release` pomijać błędy z `error_border=None`.
+
+    **Poprawka planu:** zdefiniować wybór `(indeks, aktywna/błąd)` i dopiero z niego wyliczać cały styl. Określić pierwszeństwo oraz zachowanie niewidocznego stylu. Test: dwie warstwy o różnych stylach, błąd jednej, aktywacja drugiej, ruch, `release`, warianty `None`. Dodać zachowanie szerokości większej niż mały kontener — obecne odsunięcie o połowę szerokości może odwrócić prostokąt.
+
+11. **[WAŻNE] Obecne kryteria obrazu mogą przejść mimo błędnego działania.**
+
+    **Dowód:** `PLAN.md:721` wymaga tylko dwóch różnych klatek po ponad 200 ms. Bazowy generator testowych klipów jest niemal cały jednokolorowy (`tests/test_clip_layers.py:40`), a helper live odczytuje RGB samej pixmapy z tolerancją 50 (`tests/test_live_layers.py:87–97`). D22 wymaga masek i tolerancji (`SPEC.md:491–497`).
+
+    **Konsekwencja:** różnicę w prostokącie klipu może spowodować baza lub ruch miniatury. Działający klip okresowy może dać dwie identyczne próbki. Odczyt samej pixmapy nie dowodzi poprawnego mieszania. Kontrola pióra nie sprawdza widocznego krycia ani grubości obwódki.
+
+    **Poprawka planu:** użyć nieruchomej bazy i klipu z kontrolowanymi zmianami koloru, osobno testować ruch. Dla alfy renderować końcową kompozycję nad nieprzezroczystym znanym tłem, mierzyć również surową alfę przez `pixelColor`. Sprawdzać miniaturę, pierwszą i zachowaną klatkę, pasy, hit-test i widok Info. Zachować testy D22 oraz F2 dla domyślnego krycia i dodać wariant przezroczysty; koszt konwersji mierzyć także w GUI. Offscreen nadaje się do tych testów, ale nie zastępuje pomiaru wydajności i próby w prawdziwym oknie.
+
+12. **[DROBNE] Slajd 9 nie ma jeszcze scenariusza gwarantującego widoczny efekt; „1–8 bez zmian” utrwala błędne notatki.**
+
+    **Dowód:** po slajdzie 8 pozostaje znacznik po lewej stronie (`examples/demo.py:151–170`). Plan nie określa jego położenia względem nowego live (`PLAN.md:717`). Notatki zawierają już mianowniki `/3`, `/4`, `/5`, `/6` i `/8` (`demo.py:88`, `:107`, `:129`, `:141`, `:163`).
+
+    **Konsekwencja:** animacja bazy poza obszarem live nie pokaże różnicy między czarnym i przezroczystym tłem. Sam render CE/GL nie pokaże obwódki aktywowanej dopiero w playerze. Dopisanie slajdu na końcu zachowuje istniejące indeksy, ale zwiększa niespójność opisów.
+
+    **Poprawka planu:** określić kontrastowy obiekt bazy przechodzący przez pustą część live, panel o innych proporcjach dla pokazania pasów oraz instrukcję kliknięcia i Esc. Kryterium rozdzielić na render obu silników i prezentację z procesem live GL. Usunąć mianowniki z notatek albo ujednolicić je do dziewięciu; dopuścić te korekty mimo „bez zmian”. Nie znalazłem podstawy do zakładania istniejącego testu pełnego, dziewięcioslajdowego demo — trzeba go jawnie zaplanować.
+
+13. **[WAŻNE] Budżet 6,5 h pomija rozstrzygnięcia techniczne i walidację wydajności.**
+
+    **Dowód:** `PLAN.md:732` przydziela 2 h na alfę i 3 h na podgląd, mimo nieustalonej semantyki pętli oraz kilku ścieżek reprezentacji obrazu. Poprzednia faza osobno budżetowała regresje i diagnozę (`:669`); samo pełne uruchomienie zestawu trwało ponad pięć minut (`:673`).
+
+    **Konsekwencja:** 6,5 h jest celem prototypu, nie wiarygodnym zobowiązaniem dla obecnych kryteriów. Największą niewiadomą pozostaje poprawność alfy manimgl, której nie należy ukrywać pod kosztem „przekazania parametru”.
+
+    **Poprawka planu:** najpierw krótki PoC alfy z decyzją zakresową. Aby utrzymać budżet: niezależne pętle podglądu bez wspólnego restartu, bez ruchu podglądu w pierwszym przyroście, ograniczony jawny format kolorów. Zachować animowane klipy, przezroczyste puste tło live, własny styl obwódki i czytelne demo. Nie wycinać testów ciągłości sesji, cache miniatur ani pomiaru wpływu podglądu na przejścia.
+
+**Werdykt:** plan wymaga korekty przed implementacją, przede wszystkim ustalenia rzeczywistego kontraktu alfy oraz pętli podglądu. Spójność `background_opacity` w ciągu D33 jest zasadna. Przegląd był read-only; nie wykonywałem nowych pomiarów GPU/CPU ani testów, więc nie przypisuję dodatkowym dekoderom niezmierzonego kosztu liczbowego.
+
+**Walidacja po domknięciu:** wykonano próbę dodatkowej recenzji `codex exec -s read-only`
+zgodnie z CLAUDE.md; połączenie do API zablokowane przez sandbox (socket error 10013,
+fallback HTTPS również bez połączenia). Nowa odpowiedź nie powstała; rozstrzygnięcia powyżej
+opierają się na dostarczonej pełnej rundzie 18 i walidacji kodu/testów.

@@ -92,6 +92,7 @@ class LiveLayerController(QObject):
         self.failed = set()
         self.border.hide()
         self.sessions, self.started, self.identities = {}, {}, {}
+        self.layers = slide.layers
         self.key = key
         for index, layer in enumerate(slide.layers):
             if not isinstance(layer, LiveLayer):
@@ -104,6 +105,7 @@ class LiveLayerController(QObject):
                 layer.fps,
                 width,
                 height,
+                layer.background_opacity,
             )
             reused = next(
                 (
@@ -123,7 +125,14 @@ class LiveLayerController(QObject):
             else:
                 session = LiveSession()
                 session.start(
-                    LiveSpec(str(identity[1]), layer.scene_name, width, height, layer.fps)
+                    LiveSpec(
+                        str(identity[1]),
+                        layer.scene_name,
+                        width,
+                        height,
+                        layer.fps,
+                        layer.background_opacity,
+                    )
                 )
                 self.started[index] = time.monotonic()
             self.sessions[index] = session
@@ -222,7 +231,8 @@ class LiveLayerController(QObject):
         self.failed.add(index)
         if self.active == index:
             self.active = None
-        self.frame_layer(index, ERROR_COLOR)
+        if self.active is None:
+            self.frame_layer(min(self.failed), "error")
         self.error.emit(event)
 
     def click(self, index: int) -> None:
@@ -232,7 +242,7 @@ class LiveLayerController(QObject):
             self.release()
             return
         self.active = index
-        self.frame_layer(index, ACTIVE_COLOR)
+        self.frame_layer(index, "active")
         self.changed.emit()
 
     def drag(self, point: QPointF, shift: bool) -> None:
@@ -264,22 +274,31 @@ class LiveLayerController(QObject):
         self.border.hide()
         # Obwódka jest jedna; po zwolnieniu wraca na pierwszą warstwę z błędem, jeśli jest.
         if self.failed:
-            self.frame_layer(min(self.failed), ERROR_COLOR)
+            self.frame_layer(min(self.failed), "error")
         self.changed.emit()
 
     def follow_layer(self, index: int) -> None:
         """Obwódka jedzie z warstwą w ruchu (runda 12, p. 5)."""
         if index == self.framed and self.border.isVisible():
-            self.frame_layer(index, self.border.pen().color())
+            self.frame_layer(index, self.border_role)
 
-    def frame_layer(self, index: int, color: QColor) -> None:
+    def frame_layer(self, index: int, role: str) -> None:
         self.framed = index
-        pen = QPen(color, BORDER_WIDTH)
+        self.border_role = role
+        style = getattr(self.layers[index], f"{role}_border")
+        self.border.hide()
+        if style is None:
+            return
+        r, g, b, a = style.color.as_rgb_tuple(alpha=True)
+        color = QColor(r, g, b)
+        color.setAlphaF(a * style.opacity)
+        rect = self.composition.layer_rects[index]
+        width = min(style.width, rect.width(), rect.height())
+        pen = QPen(color, width)
         pen.setJoinStyle(Qt.PenJoinStyle.MiterJoin)
         self.border.setPen(pen)
-        # Wewnątrz prostokąta warstwy: przy rect na krawędzi kadru nie wyjdzie poza niego.
-        half = BORDER_WIDTH / 2
-        self.border.setRect(self.composition.layer_rects[index].adjusted(half, half, -half, -half))
+        half = width / 2
+        self.border.setRect(rect.adjusted(half, half, -half, -half))
         self.border.show()
 
     def handle_key(self, event: QKeyEvent, keys: Keys) -> bool:

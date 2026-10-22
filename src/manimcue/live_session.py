@@ -21,6 +21,7 @@ class LiveSpec:
     width: int = 960
     height: int = 540
     fps: int = 60
+    background_opacity: float = 1.0
 
 
 class LiveSession:

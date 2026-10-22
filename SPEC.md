@@ -633,6 +633,21 @@ Bez zmian D17/D20/D27/D31/D33.
 
 ---
 
+## Decyzje F5d-f (2026-10-22, runda 18)
+
+**D35. Podgląd klipów, alfa pustego tła i styl obwódki (runda 18).** Info odtwarza normalne
+klipy do przodu, wyciszone w niezależnych pętlach i przy rect_at(0), bez bariery głównej.
+Ruch podglądu odroczony; D30 w głównym oknie bez zmian. `background_opacity=1` jest
+skończone w [0,1], należy do tożsamości kamery w ciągu D33, ale nie globalnie do session_id.
+Transport pozostaje prostym RGBA. Gwarancja alfy obejmuje puste tło kamery i pasy D34,
+nie dowolną półprzezroczystą treść shaderów manimgl; Manima nie łatamy. Miniatury i klatka
+zachowana utrzymują alfę. BorderStyle używa Color Pydantic, dodatniej skończonej szerokości
+oraz krycia [0,1], mnożonego przez alfę koloru; null wyłącza rysowanie, nie fokus.
+Aktywna rola ma pierwszeństwo, release wraca do pierwszego błędu (także gdy styl null).
+Domyślne style zachowują żółtą/czerwoną obwódkę 6 px. D17/D20/D27–D34 bez innych zmian.
+
+---
+
 ## Zakres, którego nie wolno rozszerzyć bez decyzji
 
 **Synchronizacja co do klatki.** Warstwy startują i pauzują razem (D17) — i na tym koniec.

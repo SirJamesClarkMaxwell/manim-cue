@@ -250,6 +250,14 @@ class LayerBase(BaseModel):
         raise NotImplementedError
 
 
+class BorderStyle(BaseModel):
+    """Styl jednej obwódki; alfa koloru mnoży się przez krycie."""
+
+    color: Color = Color("#ffc800")
+    width: float = Field(default=6.0, gt=0, allow_inf_nan=False)
+    opacity: float = Field(default=1.0, ge=0, le=1, allow_inf_nan=False)
+
+
 class LiveLayer(LayerBase):
     """Warstwa live slajdu (F3, D24): scena `LiveScene` w prostokącie kadru.
 
@@ -263,6 +271,9 @@ class LiveLayer(LayerBase):
     rect: Rect = (0.0, 0.0, 1.0, 1.0)
     fps: PositiveInt = 60
     session_id: str | None = None
+    background_opacity: float = Field(default=1.0, ge=0, le=1, allow_inf_nan=False)
+    active_border: BorderStyle | None = BorderStyle()
+    error_border: BorderStyle | None = BorderStyle(color="#dc2828")
     enter_cue: str | None = None
     thumbnail: FilePath | None = None
 
@@ -533,7 +544,7 @@ class PresentationConfig(BaseModel):
                 if session_id in current:
                     raise ValueError(f"slajd {index}: duplikat session_id={session_id!r}")
                 identity = (layer.scene_file.resolve(), layer.scene_name, layer.fps,
-                            layer.size(self.resolution))
+                            layer.size(self.resolution), layer.background_opacity)
                 if session_id in previous and previous[session_id][1] != identity:
                     raise ValueError(
                         f"slajdy {index - 1}, {index}: niespójna sesja {session_id!r}"

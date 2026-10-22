@@ -680,57 +680,60 @@ ponownego zgłoszenia; wraca, jeśli prelegent przyśle zrzut z rozmiarem okna.
 
 ## Faza 5d-f — uwagi 1-3 z pierwszej próby: podgląd, tło live, obwódka
 
-Źródło: „Uwagi z próby prelegenta F4-F6a”, punkty 1-3. Kolejność po 5b/5c wybrana przez
-prelegenta („najpierw live”). Alfa klipów CE/GL i `SceneView` — poza tą fazą (osobny kontrakt:
-mieszanie Qt i reverse `libx264`).
+Kontrakt domknięty rundą 18 (REVIEW-LOG.md), D35. Cel: grające klipy Info, przezroczyste
+puste tło live, sterowalna obwódka. Bez łatania Manima, alfy klipów CE/GL, frame-lock i seek.
 
-**5d — klipy grają w podglądzie Info.**
-- Podgląd następnego slajdu odtwarza warstwy wideo `ClipLayer` w pętli, wyciszone, z
-  `playback_rate` warstwy, zawsze do przodu; obrazy i GIF statyczne; live — miniatura (drugiej
-  sesji live dla podglądu nie startujemy). Ruch (`keyframes`) według pozycji wideo bazy podglądu,
-  tym samym `rect_at` co w oknie głównym; ponytail: bez synchronizacji klatek klipów z bazą
-  podglądu poza wspólnym startem pętli (D17).
-- Podgląd nie uczestniczy w barierze D31 okna głównego, nie zmienia jego stanu ani stanu
-  prelegenta; błąd dekodera podglądu zostawia miniaturę i nie jest błędem slajdu.
-- Bez następnego slajdu podgląd jest czyszczony (dziś zostaje stary, `player.py:563-585`).
-- Odtwarzacze podglądu sprzątane przy każdej zmianie slajdu: ich liczba nie rośnie.
+**Projekt 5d:** osobne, wyciszone QMediaPlayer warstw wideo podglądu, normalny `file`,
+`playback_rate` warstwy, niezależne nieskończone pętle (również przy różnych długościach).
+Baza ma własną pętlę i szybkość. Brak wspólnego restartu i bariery D31; dryf zaakceptowany.
+Obrazy/GIF i live statyczne; wszystkie warstwy w `rect_at(0)` — ruch podglądu odroczony.
+Reverse nie zmienia kierunku ani miniatury celu Info. Błąd pozostawia pierwszą miniaturę.
+Zmiana celu/trybu, koniec i zamknięcie odcinają callbacki i zwalniają playery/sinki/źródła.
+Ukryte Info nie dekoduje. Podgląd nie zmienia stanu głównego playera ani live.
 
-**5e — `LiveLayer.background_opacity: float = 1.0`.**
-- Zakres [0, 1], skończona; walidacja przy ładowaniu. Worker przekazuje wartość do
-  `camera_config.background_opacity` zamiast stałej (`live_worker.py:40`); transport RGBA już jest.
-- Kompozycja rysuje live z alfą we właściwym formacie (prosta vs premultiplikowana) — wybór
-  udowodniony pomiarem, nie założeniem: półprzezroczysty piksel nad znanym tłem daje oczekiwany
-  kolor ±2/255. Pasy D34 to tło, więc przy `background_opacity < 1` też przepuszczają.
-  Miniatura i ostatnia klatka sesji (5b) zachowują alfę.
-- Warstwy jednej sesji (`session_id`, D33) muszą mieć tę samą wartość — jedna sesja to jedna
-  kamera; błąd w `validate_live_runs`.
-- Hit-test i fokus bez zmian: klik w przezroczysty obszar live trafia w live (kontener D30).
+**Projekt 5e:** `background_opacity: float = 1`, skończone [0,1], model → LiveSpec → worker
+→ camera_config, także capture_first_frame. Transport i PNG: proste RGBA, bez globalnej
+konwersji do premultiplikacji. Gwarancja dotyczy pustego tła kamery i pasów D34, które
+odwzorowują camera.background_rgba (kolor pasów celowo ujednolicony z kamerą zamiast
+stałej czerni, także przy kryciu 1); nie obejmuje półprzezroczystych obiektów i krawędzi
+shaderów GL. Bramka GL sprawdza surowe tło i pasy 0/0.5/1, także kolorowe tło;
+wyniki nad znaną bazą ±2/255. Miniatura ma krycie i wersję interpretacji w kluczu cache.
+Ostatnia klatka zachowuje alfę i miesza się ponownie z nową bazą. Obie tożsamości sesji
+uwzględniają krycie w sąsiednim ciągu D33; przerwa dopuszcza inne krycie. Hit-test bez zmian.
 
-**5f — `BorderStyle` obwódki live.**
-- `BorderStyle`: `color` (nazwa albo hex, walidowany przy ładowaniu), `width` (> 0, piksele
-  kompozycji, jak dziś `BORDER_WIDTH`), `opacity` [0, 1]. `LiveLayer.active_border:
-  BorderStyle | None` i `error_border: BorderStyle | None`; domyślne równe dzisiejszym stałym
-  (`live_layers.py:26-28`), `None` — bez obwódki, fokus i błąd nadal w stanie prelegenta (5c).
-- Obwódka jest jedna (`live_layers.py`): rysuje styl warstwy, na której stoi; ruch z warstwą
-  i powrót na warstwę z błędem po `release` zachowane. Serializacja JSON slajdu w obie strony.
+**Projekt 5f:** `BorderStyle(color=Color("#ffc800"), width=6, opacity=1)`; Color Pydantic
+(nazwy CSS, hex, rgb/hsl), JSON według Color, alfa koloru × opacity. Liczby skończone,
+width > 0, opacity [0,1]. `active_border` domyślnie żółta, `error_border` #dc2828;
+null wyłącza rysowanie bez zmiany fokusu/błędu. Brak pól zachowuje stare decki v2/v3.
+Jedna obwódka wybiera (indeks, rola): aktywna ma pierwszeństwo nawet przy None, po release
+pierwszy błąd nawet przy None. Ruch odtwarza cały styl. Szerokość ograniczona do rozmiaru
+kontenera, aby nie odwracać prostokąta. Style mogą się zmieniać bez restartu sesji.
 
-**Demo:** nowy slajd 9 — live z `background_opacity=0` nad animowaną bazą i własną
-`active_border`; slajdy 1-8 bez zmian. Podgląd Info przed slajdami 5 i 8 pokazuje grający klip.
+**Demo:** slajd 9, kontrastowy obiekt bazy przechodzi pod pustym obszarem live i pasami;
+krycie 0, własna obwódka, instrukcja klik/Esc. Indeksy 1–8 zachowane, mianowniki usunięte. Początek klipu 5 przeniesiony do kadru,
+aby statyczna geometria Info pokazywała grający klip; animacja powiększania zachowana.
 
 **Kryteria akceptacji:**
-1. 5d: w podglądzie dwie klatki w odstępie > 200 ms różnią się w prostokącie klipu wideo;
-   obraz i live statyczne; ruch według bazy podglądu; brak następnego slajdu — podgląd pusty;
-   liczba odtwarzaczy podglądu stała po 20 zmianach slajdu; testy bariery D31 i stanu 5c zielone.
-2. 5e: `background_opacity=0` — piksele tła live pokazują warstwę niżej; `0.5` — mieszanie
-   ±2/255 względem wzoru; `1.0` — obraz identyczny z 5c; walidacja zakresu i spójności sesji;
-   F2 bez obniżania progów.
-3. 5f: własny styl daje pióro o tym kolorze, grubości i kryciu; `None` — brak obwódki, fokus
-   działa; domyślne identyczne z 5c; ruch obwódki z warstwą; round-trip JSON.
-4. Demo slajd 9 renderuje się w CE i GL; pełne testy F0–F5c i upstreamu zielone.
-5. **Próba prelegenta:** podgląd Info przed slajdem 5/8, slajd 9 (przezroczystość, obwódka).
+1. Podgląd dekoduje kontrolowane zmiany klipu nad nieruchomą bazą, niezależne długości i
+   szybkości; obraz/live i rect_at(0) statyczne; reverse do przodu; pusty koniec; A→B→A,
+   różne rozdzielczości i 20 zmian bez wzrostu liczby playerów; regresje D31/5c zielone.
+2. Puste tło i pasy GL 0/0.5/1, surowa alfa i kompozycja ±2/255; miniatura po zmianie krycia
+   bez flush; zachowana klatka nad nową bazą; zakres i ciągi D33; F2 bez obniżania progów.
+3. Pełny styl, None, domyślne, ruch, role aktywna/błąd/release i mały kontener; round-trip
+   JSON i walidacja bez importu Qt; fokus i Info bez regresji.
+4. Dziewięć slajdów Demo renderuje się CE i GL; pełne testy F0–F5c i upstreamu zielone.
+5. **Próba człowieka:** prawdziwe okno, Info przed 5/8, live na 9, klik/Esc, dwa monitory;
+   porównanie czasu przejścia i płynności z Info widocznym/ukrytym, raport bez obietnicy
+   niezmierzonego progu CPU/GPU. Osobno prezentacja z procesem live GL.
 
-**Budżet:** ~6,5 h (5d 3 h, 5e 2 h, 5f 1 h, demo 0,5 h); stop i raport przy 13 h.
-Wykonawca: codex w głównym drzewie (bez worktree, decyzja prelegenta); commit robi Claude.
+**Budżet:** ~10 h (bramka alfy 1 h, podgląd 2 h, tło/cache/sesje 2 h, obwódka 1 h,
+demo i regresje 2 h, dokumentacja/setup 2 h); stop i raport przy 20 h.
+Wykonawca: codex w głównym drzewie bez worktree; zmiany bez commitu.
+
+**Wynik (2026-10-22/23):** kryteria 1–4 wykonane; końcowy pełny przebieg z diagnostyką
+`faulthandler_timeout=60`: **434 passed, 2 skipped**, 334,39 s. Orbit/Demo wyrenderowane
+w CE i GL (Demo: 9 slajdów); setup PowerShell wykonany dwukrotnie offline, Bash — składnia
+poprawna. Kryterium 5, dwa monitory i pomiar wpływu Info pozostają do próby człowieka.
 
 ## Faza 7 — live w CE
 
