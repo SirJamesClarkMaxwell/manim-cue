@@ -675,6 +675,63 @@ rozdzielczościach, wszystkie dotychczasowe progi spełnione. Kryteria 1–5 i 7
 kryterium 6 częściowo otwarte (linia nieodtworzona offscreen, przyczyna nieustalona),
 kryterium 8 czeka na człowieka. Szczegóły i komendy: `REPORT-5c.md`.
 
+**Próba prelegenta (2026-10-22):** kryterium 8 przyjęte — „działa”. Kryterium 6 (linia) bez
+ponownego zgłoszenia; wraca, jeśli prelegent przyśle zrzut z rozmiarem okna.
+
+## Faza 5d-f — uwagi 1-3 z pierwszej próby: podgląd, tło live, obwódka
+
+Źródło: „Uwagi z próby prelegenta F4-F6a”, punkty 1-3. Kolejność po 5b/5c wybrana przez
+prelegenta („najpierw live”). Alfa klipów CE/GL i `SceneView` — poza tą fazą (osobny kontrakt:
+mieszanie Qt i reverse `libx264`).
+
+**5d — klipy grają w podglądzie Info.**
+- Podgląd następnego slajdu odtwarza warstwy wideo `ClipLayer` w pętli, wyciszone, z
+  `playback_rate` warstwy, zawsze do przodu; obrazy i GIF statyczne; live — miniatura (drugiej
+  sesji live dla podglądu nie startujemy). Ruch (`keyframes`) według pozycji wideo bazy podglądu,
+  tym samym `rect_at` co w oknie głównym; ponytail: bez synchronizacji klatek klipów z bazą
+  podglądu poza wspólnym startem pętli (D17).
+- Podgląd nie uczestniczy w barierze D31 okna głównego, nie zmienia jego stanu ani stanu
+  prelegenta; błąd dekodera podglądu zostawia miniaturę i nie jest błędem slajdu.
+- Bez następnego slajdu podgląd jest czyszczony (dziś zostaje stary, `player.py:563-585`).
+- Odtwarzacze podglądu sprzątane przy każdej zmianie slajdu: ich liczba nie rośnie.
+
+**5e — `LiveLayer.background_opacity: float = 1.0`.**
+- Zakres [0, 1], skończona; walidacja przy ładowaniu. Worker przekazuje wartość do
+  `camera_config.background_opacity` zamiast stałej (`live_worker.py:40`); transport RGBA już jest.
+- Kompozycja rysuje live z alfą we właściwym formacie (prosta vs premultiplikowana) — wybór
+  udowodniony pomiarem, nie założeniem: półprzezroczysty piksel nad znanym tłem daje oczekiwany
+  kolor ±2/255. Pasy D34 to tło, więc przy `background_opacity < 1` też przepuszczają.
+  Miniatura i ostatnia klatka sesji (5b) zachowują alfę.
+- Warstwy jednej sesji (`session_id`, D33) muszą mieć tę samą wartość — jedna sesja to jedna
+  kamera; błąd w `validate_live_runs`.
+- Hit-test i fokus bez zmian: klik w przezroczysty obszar live trafia w live (kontener D30).
+
+**5f — `BorderStyle` obwódki live.**
+- `BorderStyle`: `color` (nazwa albo hex, walidowany przy ładowaniu), `width` (> 0, piksele
+  kompozycji, jak dziś `BORDER_WIDTH`), `opacity` [0, 1]. `LiveLayer.active_border:
+  BorderStyle | None` i `error_border: BorderStyle | None`; domyślne równe dzisiejszym stałym
+  (`live_layers.py:26-28`), `None` — bez obwódki, fokus i błąd nadal w stanie prelegenta (5c).
+- Obwódka jest jedna (`live_layers.py`): rysuje styl warstwy, na której stoi; ruch z warstwą
+  i powrót na warstwę z błędem po `release` zachowane. Serializacja JSON slajdu w obie strony.
+
+**Demo:** nowy slajd 9 — live z `background_opacity=0` nad animowaną bazą i własną
+`active_border`; slajdy 1-8 bez zmian. Podgląd Info przed slajdami 5 i 8 pokazuje grający klip.
+
+**Kryteria akceptacji:**
+1. 5d: w podglądzie dwie klatki w odstępie > 200 ms różnią się w prostokącie klipu wideo;
+   obraz i live statyczne; ruch według bazy podglądu; brak następnego slajdu — podgląd pusty;
+   liczba odtwarzaczy podglądu stała po 20 zmianach slajdu; testy bariery D31 i stanu 5c zielone.
+2. 5e: `background_opacity=0` — piksele tła live pokazują warstwę niżej; `0.5` — mieszanie
+   ±2/255 względem wzoru; `1.0` — obraz identyczny z 5c; walidacja zakresu i spójności sesji;
+   F2 bez obniżania progów.
+3. 5f: własny styl daje pióro o tym kolorze, grubości i kryciu; `None` — brak obwódki, fokus
+   działa; domyślne identyczne z 5c; ruch obwódki z warstwą; round-trip JSON.
+4. Demo slajd 9 renderuje się w CE i GL; pełne testy F0–F5c i upstreamu zielone.
+5. **Próba prelegenta:** podgląd Info przed slajdem 5/8, slajd 9 (przezroczystość, obwódka).
+
+**Budżet:** ~6,5 h (5d 3 h, 5e 2 h, 5f 1 h, demo 0,5 h); stop i raport przy 13 h.
+Wykonawca: codex w głównym drzewie (bez worktree, decyzja prelegenta); commit robi Claude.
+
 ## Faza 7 — live w CE
 
 Najpierw adapter Cairo (zegar, publikacja w trakcie `play()`, przerwanie, `wait()`, wyłączony
