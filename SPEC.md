@@ -572,6 +572,17 @@ pierwszej poprawnej klatki i się zatrzymuje; wspólne `play()`, gdy gotowe wszy
 
 ---
 
+## Decyzje fazy 6a (2026-10-22, runda 13)
+
+**D32. `SceneView`: klatki gotowego klipu w scenie-gospodarzu, czas z zegara gospodarza.**
+`SceneView(scene, plik, height, loop, rate)` dla CE (Cairo, `pixel_array`) i manimgl (zapis do
+tekstury). Czas widoku = `scene.time` gospodarza od pierwszego odświeżenia (z pauzą, `seek`
+i szybkością), nie suma `dt`. Kopie widoku dzielą stan i dekoder. Gwarantowane: geometria,
+krycie, animacje gospodarza w trakcie odtwarzania, ciągłość między slajdami. Poza kontraktem:
+VFR, `become`/`Transform` między dwoma widokami, sterowanie przez `.animate`.
+
+---
+
 ## Zakres, którego nie wolno rozszerzyć bez decyzji
 
 **Synchronizacja co do klatki.** Warstwy startują i pauzują razem (D17) — i na tym koniec.

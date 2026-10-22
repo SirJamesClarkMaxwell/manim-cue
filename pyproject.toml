@@ -33,7 +33,9 @@ dependencies = [
     "jinja2>=3.1.2",
     "lxml>=4.9.2",
     "numpy>=1.19",
-    "pillow>=9.5.0",
+    # <13: Manim CE 0.21 woła Image.fromarray(zera float, mode="RGBA") przy każdym ImageMobject
+    # w Cairo (camera.py:1130); Pillow 13 usunął parametr mode → "Invalid mode for data type".
+    "pillow>=9.5.0,<13",
     "platformdirs>=4.0",
     "pydantic>=2.0.1",
     "pydantic-extra-types>=2.0.0",

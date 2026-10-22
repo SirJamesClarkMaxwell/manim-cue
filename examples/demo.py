@@ -7,6 +7,9 @@
 Co sprawdzić w oknie (kryterium 5 fazy 1): notatki w oknie Info, podgląd następnego slajdu,
 slajd 2 zapętlony do naciśnięcia `→`, cofanie (`←`).
 
+Faza 6a: slajd 6 osadza ten sam render w samej scenie (`SceneView`) — wideo gra, a animacja
+gospodarza je przesuwa i skaluje; wynik to zwykły klip slajdu.
+
 Faza 5: slajd 5 osadza render innej sceny (`examples/orbit.py`), który wjeżdża i rośnie obok
 panelu live. Najpierw `uv run manim-cue render examples/orbit.py Orbit`.
 
@@ -17,6 +20,7 @@ daje jej strzałki (żółta obwódka), Esc oddaje je slajdom. Na `Panel3D` mysz
 
 from pathlib import Path
 
+from manimcue.scene_view import SceneView
 from manimcue.slides import ClipLayer, Keyframe, LiveLayer, Slide, slide_file
 from manimcue.slides.slide import MANIM
 
@@ -27,8 +31,11 @@ if MANIM:
         ORIGIN,
         PI,
         RED,
+        UR,
         Circle,
         Dot,
+        FadeIn,
+        FadeOut,
         GrowFromCenter,
         MoveAlongPath,
         Rotate,
@@ -42,8 +49,11 @@ else:
         ORIGIN,
         PI,
         RED,
+        UR,
         Circle,
         Dot,
+        FadeIn,
+        FadeOut,
         GrowFromCenter,
         MoveAlongPath,
         Rotate,
@@ -126,3 +136,12 @@ class Demo(Slide):
             ],
         )
         self.play(square.animate.move_to(ORIGIN).scale(2), run_time=1.5)
+
+        self.next_slide(
+            notes="**6/6** — `SceneView`: render Orbit gra wewnątrz sceny, a animacja "
+            "gospodarza zjeżdża nim w róg i zmniejsza."
+        )
+        view = SceneView(self, slide_file(orbit_json, 0), height=4, loop=True)
+        self.play(FadeOut(square), FadeIn(view), run_time=1)
+        self.play(view.animate.scale(0.5).to_corner(UR), run_time=2)
+        self.play(view.animate.to_corner(DL), run_time=2)

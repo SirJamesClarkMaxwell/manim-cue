@@ -6,7 +6,7 @@
    trzy pułapki, na których szkic już padł, kryteria akceptacji fazy 0 i decyzje D1-D19.
    Fazy 0 dotyczyło pięć rund adwersaryjnej recenzji; **nie wyprowadzaj tych faktów od nowa i nie
    zmieniaj decyzji bez powodu.**
-2. **`PLAN.md`** — fazy. Fazy 4 i 5 czekają na próbę prelegenta; aktywna jest faza 6a (`SceneView`).
+2. **`PLAN.md`** — fazy. Fazy 4, 5 i 6a czekają na próbę prelegenta; aktywna jest faza 6b (PoC krokowania).
 3. **`REVIEW-LOG.md`** — rundy recenzji codex; runda 7 zawiera kontrakt fazy 2.
 
 ## Zasady
@@ -32,13 +32,15 @@
 `uv`, Python ≥3.13. `uv sync` instaluje manimgl, `setuptools<80.10.2` i `audioop-lts`
 (powody obu pinów w komentarzach w `pyproject.toml`).
 
-**Dwie miny środowiskowe, oba już rozwiązane — nie usuwać tych zależności:**
+**Trzy miny środowiskowe, wszystkie już rozwiązane — nie usuwać tych zależności:**
 - `audioop` wypadł ze stdlib w Pythonie 3.13 (PEP 594), a `manimgl` ciągnie `pydub`, który go
   wymaga. Bez `audioop-lts` `import manimlib` pada na `ModuleNotFoundError: No module named
   'audioop'`. W projekcie seminarium manimgl działa przypadkiem, bo tam jest Manim CE, który sam
   deklaruje `audioop-lts` dla 3.13+.
 - `manimgl` importuje `pkg_resources` i sam ostrzega „pin to Setuptools<81". `setuptools<80.10.2`
   to ciaśniejsza granica wzięta z extry `[manimgl]` manim-slides, zweryfikowana w praniu.
+- `pillow<13`: Manim CE 0.21 woła `Image.fromarray(..., mode="RGBA")` przy każdym `ImageMobject`
+  w Cairo, a Pillow 13 usunął parametr `mode` → `Invalid mode for data type`.
 `LiveScene` w trybie zwykłym wymaga **okna** — `manimgl` otwiera je domyślnie, `-p` to tryb
 presentera i nie jest potrzebny. W renderze offline (`-w`, `-o`) scena ma rzucić czytelny
 `RuntimeError`.

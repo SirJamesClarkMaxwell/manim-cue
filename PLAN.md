@@ -400,10 +400,58 @@ poprawnej klatce, wspólne `play()`, gdy wszystkie mają klatkę) — rozjazd 0 
 replay i `next` poza grupą, pustą warstwę po awarii klipu i obwódkę bez ruchu — poprawione,
 regresje sprawdzone w obie strony. Kryterium 8 — czeka na próbę. Czas: ~1,5 h zegarowo.
 
-## Faza 6a — `SceneView` z gotowych klatek
+## Faza 6a — `SceneView` z gotowych klatek (zaimplementowana, czeka na próbę prelegenta)
 
-Mobject w scenie-gospodarzu odtwarzający wcześniej przygotowane klatki innej sceny; transformacje
-gospodarza działają. Nie zależy od live CE.
+**Cel:** „scena jako obiekt w innej scenie” po stronie renderu (D16): mobject w scenie-gospodarzu
+(CE Cairo i manimgl), który pokazuje klatki gotowego renderu innej sceny, np. `slide_file`.
+Czas widoku to czas sceny-gospodarza, więc render jest deterministyczny; transformacje
+i animacje gospodarza działają jak na każdym obrazie. Wynik to jeden klip gospodarza.
+**Bez** wykonywania sceny podrzędnej (to F6b) i bez live.
+
+**API (D32, propozycja):**
+
+```python
+from manimcue.scene_view import SceneView
+
+view = SceneView(slide_file("slides/Orbit.json", 0), height=3, loop=True, rate=1.0)
+self.add(view)                       # gra od dodania: updater liczy czas gospodarza
+self.play(view.animate.scale(0.5).to_corner(UL), run_time=2)   # wideo gra w trakcie
+view.pause(); self.wait(1); view.resume(); view.seek(0.5)
+```
+
+**Projekt:**
+- Czas: updater z `dt` gospodarza; indeks klatki = `floor(t·fps·rate)`, na końcu stop na
+  ostatniej klatce albo pętla. Dekodowanie `av` sekwencyjnie, cofnięcie czasu → ponowne otwarcie;
+  w pamięci tylko bieżąca klatka.
+- CE: podklasa `manim.ImageMobject`, podmiana `pixel_array` (RGBA uint8). Atrybut z kluczem
+  źródła (ścieżka, rozmiar, mtime), żeby hash cache CE zmieniał się z nowym renderem źródła.
+- manimgl: podklasa `manimlib.ImageMobject` na własnym pliku pierwszej klatki (unikalna ścieżka,
+  bo `image_path_to_texture` ma `lru_cache` po ścieżce), klatki zapisywane do tekstury
+  `shader_wrapper.textures[0].write(...)`. PoC (headless, 320×180): zapis i render działają,
+  `shift` po zapisie zachowany, kopia z `.animate` dzieli teksturę.
+- Wybór silnika jak w `Slide` (`manimcue.slides.slide.MANIM`).
+
+**Kryteria akceptacji:**
+1. CE: render gospodarza z `SceneView` syntetycznego klipu (kolor zmienia się co 0,5 s) —
+   piksel środka widoku w klatkach wyjścia ma kolor klipu z właściwej chwili.
+2. To samo w manimgl (`gpu`).
+3. Animacja gospodarza w trakcie odtwarzania: widok w nowym miejscu, stare miejsce — tło.
+4. `pause`/`resume`/`seek`/`loop`/`rate`: mapowanie czasu → klatka (test jednostkowy) i jeden
+   render z pauzą.
+5. `SceneView` w `Slide` przez `manim-cue render` (CE) — slajd z widokiem w klipie.
+6. CE: zmiana źródła zmienia hash cache — drugi render z nowym klipem nie bierze starego.
+7. Testy F0-F5 i upstreamu zielone.
+8. **Próba prelegenta:** demo — slajd z renderem `Orbit` jako `SceneView`, przesuwanym
+   i skalowanym animacją gospodarza.
+
+**Budżet:** ~3 h, raport przy 6 h.
+
+**Wynik (2026-10-22):** runda 13 zmieniła projekt na zegar absolutny gospodarza i wspólny stan
+kopii (D32). Kryteria 1-7 — `tests/test_scene_view.py` (8 testów: czas→klatka 24/60 fps, zegar
+z pauzą i seek, oś czasu CE i GL z FadeIn, `.animate` w trakcie odtwarzania, pauzą i ciągłością
+slajd 1 → 2, dwa widoki jednego klipu w CE i GL, cache CE po nowym renderze źródła — sprawdzony
+w obie strony). Kryterium 8: demo deck, slajd 6 — czeka na próbę. Po drodze: przypięcie
+`pillow<13` (CE 0.21 nie renderował żadnego `ImageMobject`). Czas: ~1 h zegarowo.
 
 ## Faza 6b — PoC krokowania sceny podrzędnej
 

@@ -1063,3 +1063,115 @@ Nie wykazałem dodatkowego błędu skalowania pixmap: kod zastępuje transformac
 **Werdykt: F5 można zamknąć po poprawkach i próbie, ale obecnie nie.** Najpierw naprawić punkty 1–7 i potwierdzić je regresjami; obecny test startu nie stanowi wystarczającego dowodu synchronizacji (`tests/test_clip_layers.py:307–324`).
 
 Przegląd był read-only, z małymi próbami Qt w pamięci. Nie uruchamiałem pełnego pytesta, renderu ani prezentacji na dwóch ekranach.
+
+---
+
+## Runda 13 — codex, 2026-10-22: kontrakt F6a (`SceneView`)
+
+Pytania: `codex-round13-prompt` (updater i cache w CE, tekstury w manimgl, czas i dekodowanie,
+API i kryteria). Przegląd read-only.
+
+**Co weszło** (`src/manimcue/scene_view.py`, `frame_source.py`, D32 w `SPEC.md`):
+- Zegar **absolutny** z `scene.time` gospodarza zamiast sumy `dt` — CE nie domyka przedziałów
+  `play()`, GL zaczyna od 1/fps; z czasem sceny oba dają czas renderowanej klatki (p. 3-4).
+- CE: `update()` odświeża klatkę także przy updaterach zawieszonych przez `.animate`, scena woła
+  go po interpolacji; `interpolate_color` interpoluje tylko krycie, piksele są z dekodera;
+  `set_opacity` bez zapisu w klatce dekodera; updater czasowy, żeby `wait()` nie zamrażał (p. 1-2).
+- Stan odtwarzania i dekoder wspólne dla widoku i kopii (rejestr modułu), w `__dict__`
+  deterministyczny identyfikator z kluczem źródła — hash CE zmienia się z nowym renderem
+  źródła; test zmienia segment osiągany dopiero w trakcie `wait` i pada bez klucza (p. 5, 12).
+- GL: klatka czeka na `init_shader_wrapper` (wrapper leniwy, `copy()` go zeruje); każdy widok
+  ma własny plik pierwszej klatki, kopie dzielą teksturę z cache; test dwóch widoków jednego
+  klipu w różnych chwilach w CE i GL (p. 6-7). `become`/`Transform` między widokami — poza
+  kontraktem, opisane (p. 8). Zwalnianie tekstur i rejestru — `ponytail:` w kodzie (p. 9).
+- Czas → klatka: CFR, ε na granicach, test 24 i 60 fps, koniec, pętla, cofnięcie (p. 10);
+  cofnięcie dekoduje od początku — `ponytail:` z drogą przez `container.seek` (p. 11).
+- Granica slajdu nie resetuje widoku — test ciągłości slajd 1 → 2 (p. 13).
+- Testy w osobnych procesach CE i GL (p. 14). Budżet: PoC zmieścił się w bramce 3 h (p. 15).
+
+**Ustalone przy implementacji (poza recenzją):**
+- Pillow 13 usunął `mode` w `Image.fromarray`, a CE 0.21 używa go przy **każdym**
+  `ImageMobject` w Cairo (`camera.py:1130`) — przypięcie `pillow<13` w `pyproject.toml`.
+- W slajdach manimgl `wait()` to osobny plik częściowy, a fork kroi pliki po liczbie `play()` —
+  slajdy się przesuwają (ostrzeżenie upstreamu). Gospodarz GL w testach używa `play()`.
+
+**Odpowiedź codex (bez zmian):**
+
+1. **[KRYTYCZNE] CE: zwykły updater nie gwarantuje odtwarzania podczas `.animate`.**  
+   **Dowód:** CE domyślnie ustawia `suspend_mobject_updating=True` i zawiesza updater animowanego obiektu (`.venv/Lib/site-packages/manim/animation/animation.py:137`, `:205–214`). Dodatkowo interpolacja `ImageMobject` nadpisuje `pixel_array` interpolacją obrazów kopii (`.venv/Lib/site-packages/manim/mobject/types/image_mobject.py:297–301`). To koliduje bezpośrednio z przykładem `view.animate.scale(...)` (`PLAN.md:418`).  
+   **Konsekwencja:** transformacja geometrii może działać, lecz obraz zatrzymać się albo pochodzić z kopii zamiast aktualnego dekodera. Samo wyłączenie zawieszania nie rozstrzyga własności pikseli podczas interpolacji.  
+   **Poprawka planu:** przed implementacją API zrobić PoC **odtwarzanie + przesunięcie + skalowanie + FadeIn/FadeOut**. Oddzielić aktualizację klatki od interpolacji obrazu i określić, kto aktualizuje odtwarzanie podczas animacji.
+
+2. **[WAŻNE] CE: normalne `wait()` działa, ale tylko z updaterem rozpoznawanym jako czasowy.**  
+   **Dowód:** `should_update_mobjects()` sprawdza `has_time_based_updater()` (`.venv/Lib/site-packages/manim/scene/scene.py:435–445`); `get_moving_mobjects()` uwzględnia updatery rodziny (`:937–945`). Kamera pobiera bieżące piksele przez `get_pixel_array()` (`.venv/Lib/site-packages/manim/camera/camera.py:1046`), a metoda obrazu zwraca aktualny `pixel_array` (`.venv/Lib/site-packages/manim/mobject/types/image_mobject.py:216–218`). Jawnie ustawione `is_static_wait` omija automatyczną decyzję (`.venv/Lib/site-packages/manim/scene/scene.py:435`).  
+   **Konsekwencja:** podmiana RGBA jest poprawną drogą dla nieanimowanego widoku w zwykłym `play()` i `wait()`; „static image” nie jest tu automatyczną przeszkodą. Updater bez argumentu `dt` albo wymuszone zamrożenie nie daje tej gwarancji.  
+   **Poprawka planu:** zapisać wymaganie updatera czasowego oraz wyłączenie obsługi wymuszonego frozen wait. Kryterium 1 rozszerzyć o `wait()` i `play()` animujące **inny** obiekt (`PLAN.md:435–436`).
+
+3. **[KRYTYCZNE] Sumowanie `dt` w CE nie jest równoważne ciągłemu czasowi gospodarza.**  
+   **Dowód:** CE próbkuje `np.arange(0, run_time, 1/fps)`, bez końca przedziału (`.venv/Lib/site-packages/manim/scene/scene.py:1097–1101`). Updater dostaje różnicę kolejnych próbek (`:1700–1708`), a po animacji tylko `update_mobjects(0)` (`:1389–1393`). Przy skippingu próbką jest natomiast całe `run_time` (`:1097–1098`).  
+   **Konsekwencja:** przy 30 fps zwykłe sekundowe `play()` daje updaterowi łącznie około 29/30 s. Kolejne wywołania kumulują brakujące końcówki; trafienie cache/skipping może przesunąć stan inaczej niż pełny render. To nowe ryzyko stanu odtwarzania, niezależne od znanego pomijania renderowania.  
+   **Poprawka planu:** zdefiniować zegar absolutny z domknięciem granic wywołań, zamiast samego `t += dt`. Dodać porównanie `wait(2)` z dwoma `wait(1)` oraz renderu zimnego, ciepłego i częściowo pominiętego.
+
+4. **[WAŻNE] GL ma inną fazę próbkowania czasu niż CE.**  
+   **Dowód:** manimgl rozpoczyna od `1/fps`, bo dodaje ten krok do `np.arange(...)` (`.venv/Lib/site-packages/manimlib/scene/scene.py:471`). W `play()` aktualizuje obiekty przed emisją klatki (`:551–559`), analogicznie w `wait()` (`:607–612`). CE zaczyna od zera (`.venv/Lib/site-packages/manim/scene/scene.py:1101`).  
+   **Konsekwencja:** w renderze GL updater otrzymuje czas wirtualny, nie czas dekodowania; jednak identyczne „pierwsza klatka = t=0” nie wynika z obu adapterów. Zmiana fps zmienia próbki czasu, nie nominalną szybkość odtwarzania; w CE dochodzi błąd z punktu 3.  
+   **Poprawka planu:** określić mapowanie numeru klatki wyjściowej na czas źródła osobno dla obu silników. Testować pierwszą klatkę, granicę koloru i koniec przy dwóch fps gospodarza, zamiast jedynie „to samo w manimgl” (`PLAN.md:437`).
+
+5. **[WAŻNE] Klucz źródła nie zastępuje hashowania obrazu ani kontraktu stanu cache.**  
+   **Dowód:** lokalny CE serializuje `__dict__` (`.venv/Lib/site-packages/manim/utils/hashing.py:292–298`) i jawnie włącza piksele mobjectów do hasha wywołania (`:452–454`). Zwykły ndarray jest tutaj hashowany pełnym SHA-256, bez rozwijania milionów liczb do JSON (`:71–87`, `:285–291`). Plan proponuje tylko ścieżkę, rozmiar i mtime (`PLAN.md:426–427`).  
+   **Konsekwencja:** atrybut źródła uczestniczy w hashu, ale nadal pozostaje liniowy koszt odczytu pikseli. Podmiana materiału z zachowaniem rozmiaru, mtime i bieżącej klatki nie zmieni tego klucza. Dekoder jako zwykły atrybut wprowadza też do serializacji szczegóły wykonawcze.  
+   **Poprawka planu:** oddzielić serializowalny stan od zasobów dekodera; określić tożsamość zawartości źródła i jawne unieważnianie. Kryterium 6 powinno sprawdzać również identyczną pierwszą klatkę przy zmienionej dalszej części filmu oraz poprawność czasu po trafieniu cache (`PLAN.md:442`).
+
+6. **[KRYTYCZNE] GL: `shader_wrapper.textures[0]` nie istnieje przez cały cykl życia mobjectu.**  
+   **Dowód:** wrapper startuje jako `None`, powstaje dopiero przez `get_shader_wrapper(ctx)` (`.venv/Lib/site-packages/manimlib/mobject/mobject.py:108`, `:2023–2026`). `copy()` ponownie ustawia go na `None` (`:689–691`), a `FadeIn` tworzy kopię celu (`.venv/Lib/site-packages/manimlib/animation/fading.py:35–36`). Aktualizacja obiektów poprzedza emisję klatki (`.venv/Lib/site-packages/manimlib/scene/scene.py:558–559`).  
+   **Konsekwencja:** bezwarunkowy zapis z updatera może trafić na `None`, także po kopiowaniu. PoC współdzielenia tekstury z `.animate` nie dowodzi poprawności inicjalizacji kopii (`PLAN.md:430–431`).  
+   **Poprawka planu:** przechowywać oczekującą klatkę i wgrywać ją po uzyskaniu wrappera/kontekstu; przetestować aktualizację przed pierwszym renderem, kopię przed i po renderze oraz FadeIn.
+
+7. **[WAŻNE] GL: współdzielenie tekstury musi zależeć od odtwarzacza, nie od pliku filmu.**  
+   **Dowód:** `image_path_to_texture(path, ctx)` ma `lru_cache` i tworzy teksturę z pliku (`.venv/Lib/site-packages/manimlib/utils/shaders.py:23–30`). `copy()` zachowuje zwykłe atrybuty przez płytką kopię (`.venv/Lib/site-packages/manimlib/mobject/mobject.py:665`), a nowy wrapper ponownie korzysta z loadera tekstur (`.venv/Lib/site-packages/manimlib/shader_wrapper.py:93–97`).  
+   **Konsekwencja:** dwa niezależne widoki korzystające z tej samej ścieżki pierwszego obrazu i kontekstu będą nadpisywały wspólną teksturę. Różne pozycje `seek()` ujawnią konflikt. Nie muszą mieć osobnych ścieżek **filmu**; przy obecnej konstrukcji potrzebują osobnej tożsamości tekstury. Kopie techniczne animacji mogą natomiast potrzebować współdzielenia.  
+   **Poprawka planu:** rozróżnić niezależny `SceneView` i kopię techniczną animacji. Dodać test dwóch widoków tego samego źródła z różnymi czasami.
+
+8. **[WAŻNE] GL: `Transform` i `become()` nie przenoszą automatycznie odtwarzacza ani zawartości tekstury.**  
+   **Dowód:** interpolacja obejmuje `data` i `uniforms`, bez mieszania pikseli tekstur (`.venv/Lib/site-packages/manimlib/mobject/mobject.py:1808–1823`). `become()` przypisuje `texture_paths`, ale pokazany blok nie przenosi zegara/dekodera ani nie odtwarza wrappera (`:726–740`). `set_opacity()` zmienia dane wierzchołków, więc sam upload tekstury nie kasuje opacity (`.venv/Lib/site-packages/manimlib/mobject/types/image_mobject.py:52–58`).  
+   **Konsekwencja:** transformacja geometrii tego samego odtwarzacza i transformacja między dwoma filmami to różne kontrakty. Obietnica „jak na każdym obrazie” jest za szeroka (`PLAN.md:408`).  
+   **Poprawka planu:** zagwarantować geometrię i opacity; transformację między źródłami jawnie wyłączyć albo zdefiniować jako konkretną zmianę źródła/crossfade. Dodać osobną politykę `become()`.
+
+9. **[WAŻNE] Brakuje właściciela i zwalniania tekstur.**  
+   **Dowód:** loader zatrzymuje tekstury w cache (`.venv/Lib/site-packages/manimlib/utils/shaders.py:23–30`); `release_textures()` zwalnia je bezpośrednio (`.venv/Lib/site-packages/manimlib/shader_wrapper.py:212–217`). Plan wprowadza unikalne pliki, ale nie opisuje zamykania zasobów (`PLAN.md:424–431`).  
+   **Konsekwencja:** cache może zatrzymywać tekstury usuniętych widoków; bezwarunkowe `release()` z jednej kopii może uszkodzić pozostałe. To dowód ryzyka retencji i współdzielonego zwalniania, **nie dowód nieograniczonego wycieku**.  
+   **Poprawka planu:** ustalić jednego właściciela tekstury, dekodera i pliku tymczasowego, z idempotentnym zamknięciem. Dodać próbę wielokrotnego tworzenia/usuwania widoków i pomiar pamięci GPU.
+
+10. **[WAŻNE] `floor(t·fps·rate)` wymaga dokładniejszego kontraktu niż test kolorów co pół sekundy.**  
+    **Dowód:** taką formułę narzuca `PLAN.md:423–424`, podczas gdy istniejące metadane używają `average_rate` i osobnego `time_base` (`src/manimcue/media.py:30–33`). Gospodarze próbkują według własnych fps (`.venv/Lib/site-packages/manim/scene/scene.py:1100–1101`; `.venv/Lib/site-packages/manimlib/scene/scene.py:471`).  
+    **Konsekwencja:** średnie fps nie określa chwil prezentacji VFR. Przy CFR błąd reprezentacji liczby na granicy może wybrać poprzednią klatkę; różne fps gospodarza i źródła z definicji powodują powtarzanie lub pomijanie próbek.  
+    **Poprawka planu:** wybierać klatkę według PTS i jawnych przedziałów czasu albo ograniczyć F6a do CFR z racjonalnym fps i ustaloną tolerancją granic. Dodać numerowane klatki, granice ±ε, 24→60 i 60→24 fps, EOF i przejście pętli. Nie powtarzam ogólnej walidacji szybkości z wcześniejszych rund — tutaj chodzi o wybór konkretnej klatki.
+
+11. **[WAŻNE] „Tylko bieżąca klatka” nie opisuje rzeczywistego kosztu dekodowania.**  
+    **Dowód:** plan wymaga sekwencyjnego dekodowania i ponownego otwarcia po cofnięciu (`PLAN.md:424–425`); istniejąca ścieżka PyAV również iteruje po `container.decode(video=0)` (`src/manimcue/media.py:40`).  
+    **Konsekwencja:** seek wstecz w okolice końca długiego klipu wymaga ponownego przejścia wcześniejszych klatek przy dosłownej realizacji planu. Wysoki `rate` nie usuwa kosztu dekodowania pomijanych obrazów. RGBA 1080p to wyliczeniowo około 7,9 MiB na tablicę, ale nie obejmuje buforów dekodera, kopii animacji i tekstury.  
+    **Poprawka planu:** zagwarantować ograniczoną liczbę przechowywanych obrazów aplikacji, nie „jedną klatkę całej pamięci”. Dodać pomiar długiego 1080p, szybkiego odtwarzania, pętli i seeku wstecz; dopuścić seek do wcześniejszej klatki kluczowej z dalszym dekodowaniem.
+
+12. **[WAŻNE] Metody sterowania wymagają jawnego kontraktu kopii; `.animate.pause()` nie wynika z API.**  
+    **Dowód:** CE `copy()` używa `deepcopy` (`.venv/Lib/site-packages/manim/mobject/mobject.py:895–908`), GL tworzy płytką kopię i kopiuje listę updaterów (`.venv/Lib/site-packages/manimlib/mobject/mobject.py:665`, `:689`). Cel GL `.animate` powstaje przez `generate_target()` → `copy()` (`:702–705`).  
+    **Konsekwencja:** bez adaptera CE może próbować kopiować zasób dekodera, a GL współdzielić go między kopiami. Wywołanie `pause/seek` na celu animacji nie gwarantuje zmiany stanu oryginału.  
+    **Poprawka planu:** `pause/resume/seek` na początek traktować jako natychmiastowe komendy, poza `.animate`; zapewnić czytelny błąd dla takiego użycia. Zdefiniować niezależną kopię użytkową i techniczną kopię animacji bez dodatkowego przesuwania wspólnego dekodera.
+
+13. **[WAŻNE] Granica slajdu nie resetuje widoku, a pętla prezentacji nie wykonuje go ponownie.**  
+    **Dowód:** CE `next_slide()` tworzy sekcję i deleguje zapis granicy (`src/manimcue/slides/slide/manim.py:143–152`); baza aktualizuje konfigurację i indeks animacji (`src/manimcue/slides/slide/base.py:577–578`). Wynik powstaje przez sklejenie klipów, a reverse przez odwrócenie gotowego pliku (`:660–672`).  
+    **Konsekwencja:** stan widoku powinien przechodzić ciągle między renderowanymi slajdami, chyba że autor wykona reset. Reverse gospodarza obejmuje już wkomponowany widok — ten kierunek jest poprawny. Powtarzanie gotowego klipu odtwarza jednak ten sam fragment widoku, nie dalszy czas dziecka.  
+    **Poprawka planu:** dopisać tę semantykę i test dwóch kolejnych slajdów, pętli oraz reverse. Kryterium jednego slajdu CE tego nie sprawdza (`PLAN.md:441`). Dodać także test integracyjny GL, skoro obie ścieżki są zakresem F6a (`PLAN.md:406`).
+
+14. **[DROBNE] `-s` oraz wybór silnika wymagają testów kontraktu, nie nowej architektury.**  
+    **Dowód:** `save_last_frame` wyłącza zapis filmu (`.venv/Lib/site-packages/manim/_config/utils.py:807–808`), więc nie zastępuje testu klatek wyjściowych. Wybór `MANIM` jest ustalany przy imporcie na podstawie API (`src/manimcue/slides/slide/__init__.py:30–49`); plan chce go współdzielić (`PLAN.md:432`).  
+    **Konsekwencja:** poprawny ostatni obraz nie dowodzi poprawnego odtwarzania; import `SceneView` musi też dawać tę samą klasę silnika co `Slide`.  
+    **Poprawka planu:** osobne procesy testowe CE/GL, test końcowego stanu przy `-s` i test pominiętej sekcji z późniejszym widocznym odtwarzaniem. Nie traktować `-s` jako równoważnika renderu filmu.
+
+15. **[WAŻNE] ~3 h to budżet eksperymentu, nie wiarygodna estymacja pełnych kryteriów.**  
+    **Dowód:** zakres obejmuje dwa adaptery, dekoder, kontrolę czasu, cache i integrację (`PLAN.md:422–442`), pełne regresje i próbę prelegenta (`:443–445`), przy budżecie ~3 h (`:447`). Powyższe kolizje wynikają z konkretnych mechanizmów kopiowania, interpolacji i próbkowania wskazanych w punktach 1–13.  
+    **Konsekwencja:** osiem obecnych kryteriów może przejść bez wykrycia zatrzymania podczas animacji, dryfu między `play()`, konfliktu dwóch widoków i problemów zasobów.  
+    **Poprawka planu:** zachować 3 h jako bramkę PoC: animowany obraz CE, inicjalizacja/kopie GL, zegar między wywołaniami. Dopiero po wynikach oszacować implementację i rozszerzone testy.
+
+**Werdykt:** tak, F6a można implementować po poprawkach — przede wszystkim po rozstrzygnięciu animacji CE, zegara oraz własności kopii i tekstur. Obecny kontrakt nie wystarcza do obietnicy „jak każdy obraz” (`PLAN.md:408`).
+
+Przegląd był read-only; nie wykonywałem renderów ani pomiarów wydajności.
