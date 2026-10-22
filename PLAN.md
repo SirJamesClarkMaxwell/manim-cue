@@ -577,6 +577,24 @@ live, zegara głównego, ruchu warstw.
 **Budżet:** ~6 h, stop i raport przy 12 h. Wykonawca: codex w osobnym worktree; przegląd diffu
 i pomiar w oknie — Claude.
 
+**Wynik (2026-10-22):** kryteria 2-7 — `tests/test_persistent_live.py` (23 testy: model, nawigacja
+przez rzeczywiste callbacki playera, PID/obraz/zmiana indeksu/fokus, generacje, bariera live nad
+bazą statyczną, timeout, przypięcie pierwszych klatek, 10 przejść trzech scen); pełny zestaw
+410 passed + 2 skip. Przy okazji: spóźniona klatka Qt po `pause()` w przygotowaniu (przypięcie
+pierwszych klatek). Przegląd diffu usunął kopię 5 MB klatki live na każdą klatkę w wątku GUI.
+Kryterium 1 — pomiar w oknie (`examples/measure_player.py`, Windows 11, RTX 4060, 10 prób,
+mediany od żądania przejścia do pierwszej zmienionej klatki odebranej w GUI):
+
+| Tryb | baza / klip / live [ms] | rozrzut mediana / maks. [ms] | zimny READY [s] |
+|---|---|---|---|
+| restart (D27) | 1927 / 1937 / 1932 | 11 / 16 | 2,0 |
+| `session_id` | 61 / 103 / 58 | 48 / 51 | 1,9 |
+
+Ręczne cue: ~10 ms od żądania do zmienionej klatki w GUI. Restart procesu był głównym kosztem
+zmiany slajdu. Rozrzut przy sesji trwałej wyznacza klip (pierwsza zmieniona klatka zależy od
+treści klipu); cel ≤ 50 ms — mediana tak, maksimum o 1 ms ponad. Kryterium 8 czeka na próbę.
+Wykonawca: codex (~25 min), przegląd i pomiar w oknie — Claude.
+
 ## Faza 7 — live w CE
 
 Najpierw adapter Cairo (zegar, publikacja w trakcie `play()`, przerwanie, `wait()`, wyłączony

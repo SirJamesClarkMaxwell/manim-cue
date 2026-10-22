@@ -66,7 +66,7 @@ class FrameBuffer:
                 RGBA8,
                 BOTTOM_UP,
                 frame_id,
-                time.monotonic(),
+                time.perf_counter(),
                 int(boundary),
             )
 

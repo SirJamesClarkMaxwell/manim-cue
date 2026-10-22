@@ -41,6 +41,7 @@ class ClipGroup(QObject):
         self.composition = composition
         self.base = base
         self.restored = restored
+        self.live = None
         self.connections: list = []
         self.released_at: float | None = None
         self.layers: list = []
@@ -51,6 +52,7 @@ class ClipGroup(QObject):
         self.pending: set = set()
         self.requested_playing = True
         self.static_base = False
+        self.base_frame = None
         self.running = False
         self.elapsed_ms = 0
         self.clock = QElapsedTimer()
@@ -76,7 +78,7 @@ class ClipGroup(QObject):
     def enter(self, slide: SlideConfig, base_video: bool, start_paused: bool, rate: float) -> bool:
         """Nowy slajd; True, gdy grupa przejmuje start bazy (przygotowanie pierwszej klatki)."""
         self.clear()
-        if not self.needed(slide):
+        if not self.needed(slide) and not (self.live and self.live.entry_cues):
             return False
         self.layers = slide.layers
         self.static_base = not base_video
@@ -106,6 +108,8 @@ class ClipGroup(QObject):
             self.pending.add(index)
         if base_video:
             self.pending.add(BASE)
+        if self.live and self.live.waiting_for_entry():
+            self.pending.add("live")
         QTimer.singleShot(PRIME_TIMEOUT_MS, lambda e=entry: self.prime_timeout(e))
         self.move()
         if not self.pending:
@@ -126,14 +130,24 @@ class ClipGroup(QObject):
             and not loading
             and not self.restored(frame)
         ):
+            self.base_frame = frame
             self.base.pause()
             self.pending.discard(BASE)
             self.maybe_start()
+        elif self.preparing and self.base_frame is not None and frame != self.base_frame:
+            # Pauza dekodera jest asynchroniczna; spóźniona klatka nie rusza obrazu bariery.
+            self.composition.video_item.videoSink().setVideoFrame(self.base_frame)
 
     def on_frame(self, entry: int, index: int, frame: QVideoFrame) -> None:
         if entry != self.entry:
             return
         if frame.isValid():
+            if self.preparing and index not in self.pending:
+                if index in self.frames and frame != self.frames[index]:
+                    self.composition.layer_items[index].videoSink().setVideoFrame(
+                        self.frames[index]
+                    )
+                return
             self.frames[index] = frame
             if self.preparing and index in self.pending:
                 self.players[index].pause()
@@ -164,12 +178,16 @@ class ClipGroup(QObject):
     def prime_timeout(self, entry: int) -> None:
         if entry != self.entry or not self.preparing:
             return
-        for index in [key for key in self.pending if key != BASE]:
+        for index in [key for key in self.pending if key not in (BASE, "live")]:
             self.drop(entry, index, f"brak pierwszej klatki po {PRIME_TIMEOUT_MS} ms")
+        if self.live:
+            self.live.cancel_unready_entries()
         self.pending.clear()
         self.maybe_start()
 
     def maybe_start(self) -> None:
+        if self.live and not self.live.waiting_for_entry():
+            self.pending.discard("live")
         if self.preparing and not self.pending:
             self.start()
 
@@ -187,6 +205,8 @@ class ClipGroup(QObject):
             if player.mediaStatus() != QMediaPlayer.MediaStatus.EndOfMedia:
                 player.play()
         self.run_clock(True)
+        if self.live:
+            self.live.start_entries()
 
     def pause_all(self) -> None:
         if not self.static_base:
@@ -204,6 +224,8 @@ class ClipGroup(QObject):
                 if player.mediaStatus() != QMediaPlayer.MediaStatus.EndOfMedia:
                     player.play()
             self.run_clock(True)
+            if self.live:
+                self.live.start_entries()
         else:
             for player in self.players.values():
                 player.pause()
@@ -272,6 +294,7 @@ class ClipGroup(QObject):
             player.deleteLater()
         self.players = {}
         self.frames = {}
+        self.base_frame = None
         self.layers = []
         self.preparing = False
         self.pending = set()

@@ -127,7 +127,7 @@ class Demo(Slide):
         )
         self.next_slide(
             notes="**5/5** — render sceny Orbit wjeżdża i rośnie obok panelu live; "
-            "spacja pauzuje wszystko razem.",
+            "spacja pauzuje bazę, klip i jego ruch; live działa dalej.",
             layers=[
                 orbit,
                 LiveLayer(
@@ -145,3 +145,25 @@ class Demo(Slide):
         self.play(FadeOut(square), FadeIn(view), run_time=1)
         self.play(view.animate.scale(0.5).to_corner(UR), run_time=2)
         self.play(view.animate.to_corner(DL), run_time=2)
+
+        self.remove(view)
+        self.clear()
+        marker = Square(side_length=1.5, color=BLUE).move_to((-4.7, 0, 0))
+        self.add(marker)
+        persistent = LiveLayer(
+            scene_file=Path(__file__).with_name("live_three.py"),
+            scene_name="ThreePanel",
+            rect=(0.36, 0.15, 0.28, 0.6),
+            session_id="three-panel",
+            enter_cue="flip",
+        )
+        other = ClipLayer(file=slide_file(orbit_json, 0), rect=(0.69, 0.15, 0.28, 0.6))
+        for number in (7, 8):
+            self.next_slide(
+                notes=f"**{number}/8** — jedno →: baza CE, trwały live i klip Orbit. "
+                "Trzy stałe prostokąty i kamery; poruszają się obiekty. Esc oddaje strzałki. "
+                "Spacja pauzuje bazę i klip. Info pokazuje statyczną miniaturę live. "
+                "Cofanie i replay nie cofają ani nie powtarzają cue live.",
+                layers=[persistent.model_copy(), other.model_copy()],
+            )
+            self.play(Rotate(marker, PI / 2), run_time=2, rate_func=linear)

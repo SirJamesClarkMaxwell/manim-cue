@@ -243,7 +243,16 @@ class LiveLayer(LayerBase):
     scene_name: str
     rect: Rect = (0.0, 0.0, 1.0, 1.0)
     fps: PositiveInt = 60
+    session_id: str | None = None
+    enter_cue: str | None = None
     thumbnail: FilePath | None = None
+
+    @field_validator("enter_cue")
+    @classmethod
+    def cue_is_line(cls, cue: str | None) -> str | None:
+        if cue is not None and (not cue.strip() or "\n" in cue or "\r" in cue):
+            raise ValueError("enter_cue musi być niepustą pojedynczą linią")
+        return cue
 
     @field_validator("rect")
     @classmethod
@@ -491,6 +500,28 @@ class PresentationConfig(BaseModel):
     slides: list[SlideConfig] = Field(min_length=1)
     resolution: tuple[PositiveInt, PositiveInt] = (1920, 1080)
     background_color: Color = Color("black")
+
+    @model_validator(mode="after")
+    def validate_live_runs(self) -> "PresentationConfig":
+        """Spójność sąsiednich wystąpień sesji; przerwa otwiera nową generację."""
+        previous = {}
+        for index, slide in enumerate(self.slides, start=1):
+            current = {}
+            for layer in slide.layers:
+                if not isinstance(layer, LiveLayer) or layer.session_id is None:
+                    continue
+                session_id = layer.session_id
+                if session_id in current:
+                    raise ValueError(f"slajd {index}: duplikat session_id={session_id!r}")
+                identity = (layer.scene_file.resolve(), layer.scene_name, layer.fps,
+                            layer.size(self.resolution))
+                if session_id in previous and previous[session_id][1] != identity:
+                    raise ValueError(
+                        f"slajdy {index - 1}, {index}: niespójna sesja {session_id!r}"
+                    )
+                current[session_id] = (index, identity)
+            previous = current
+        return self
 
     @field_validator("version")
     @classmethod

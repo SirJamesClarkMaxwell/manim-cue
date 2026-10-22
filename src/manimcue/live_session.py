@@ -175,6 +175,11 @@ class LiveSession:
             self.send("shutdown")
 
     @property
+    def stopping(self) -> bool:
+        """Żądanie zatrzymania wyklucza przejęcie nawet przed zmianą stanu."""
+        return self._stop_at is not None
+
+    @property
     def running(self) -> bool:
         """Proces jeszcze nieodebrany przez poll()."""
         return self._process is not None
@@ -208,7 +213,9 @@ def capture_first_frame(spec: LiveSpec, timeout: float = 120.0) -> OwnedFrame:
             if session.state == "error":
                 raise RuntimeError(f"Scena live {spec.scene_name}: {session.error}")
             if not session.running:
-                raise RuntimeError(f"Scena live {spec.scene_name}: proces zakończył się przed READY")
+                raise RuntimeError(
+                    f"Scena live {spec.scene_name}: proces zakończył się przed READY"
+                )
             frame = session.try_read_frame() or frame
             if time.monotonic() > deadline:
                 raise TimeoutError(f"Scena live {spec.scene_name}: brak READY po {timeout} s")

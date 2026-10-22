@@ -1,4 +1,4 @@
-"""Warstwy live w playerze (F4, D20, D27): sesje bieżącego slajdu, klatki do kompozycji, fokus.
+"""Warstwy live w playerze (D20, D27, D33): ciągi sesji, obraz, cue wejścia i fokus.
 
 Kompozycja nie zna `LiveSession` (runda 8, p. 12) — kontroler przenosi klatki do
 `SlideComposition.set_layer_image`. Jeden `QTimer` pompuje sesje bieżącego slajdu i te
@@ -33,6 +33,9 @@ BORDER_Z = 1000
 class LiveLayerController(QObject):
     """Właściciel sesji warstw live bieżącego slajdu i stanu aktywnej warstwy."""
 
+    changed = Signal()
+    frame_received = Signal(int, object, float)
+    cue_sent = Signal(int, str, float)
     error = Signal(str)
     """Treść `ERROR` sesji bieżącego slajdu — player pokazuje ją w oknie Info."""
 
@@ -40,10 +43,14 @@ class LiveLayerController(QObject):
         super().__init__()
         self.composition = composition
         self.key: object = None
-        # Klucz to indeks warstwy w kompozycji, nie pozycja wśród warstw live (runda 11, p. 3).
+        # Bieżące mapowanie kompozycji; tożsamość procesu i cache przechodzą między indeksami.
         self.sessions: dict[int, LiveSession] = {}
         self.started: dict[int, float] = {}
         self.stopping: list[LiveSession] = []
+        self.identities: dict[int, tuple] = {}
+        self.images: dict[LiveSession, QImage] = {}
+        self.last_frames: dict[LiveSession, object] = {}
+        self.entry_cues: dict[int, str] = {}
         self.active: int | None = None
         self.failed: set[int] = set()
         self.closing = False
@@ -58,39 +65,97 @@ class LiveLayerController(QObject):
         self.timer.setTimerType(Qt.TimerType.PreciseTimer)
         self.timer.timeout.connect(self.tick)
 
-    def show(self, key: object, slide: SlideConfig, resolution: tuple[int, int]) -> None:
-        """Sesje dla warstw slajdu wskazanego kluczem (prezentacja, indeks).
-
-        Ten sam klucz (replay, pętla, reverse → normalny kierunek) zostawia sesje. Reverse
-        dotyczy tylko klipu bazowego: wejście na slajd, także od tyłu, startuje live od początku.
-        """
-        if key == self.key or self.closing:
+    def show(
+        self, key: object, slide: SlideConfig, resolution: tuple[int, int], reason: str = "initial"
+    ) -> None:
+        """Przejmuje tylko żywe sesje z sąsiedniego slajdu tej samej prezentacji."""
+        if self.closing:
             return
-        # Bez release(): ta odtworzyłaby obwódkę błędu starego slajdu, indeksując już nowe
-        # prostokąty warstw (runda 10, p. 4).
+        self.entry_cues = {}
+        if key == self.key:
+            for index, session in self.sessions.items():
+                if session in self.images:
+                    self.composition.set_layer_image(index, self.images[session])
+            return
+        adjacent = (
+            isinstance(key, tuple)
+            and isinstance(self.key, tuple)
+            and key[0] == self.key[0]
+            and abs(key[1] - self.key[1]) == 1
+        )
+        old = self.sessions
+        old_started = self.started
+        old_identities = self.identities
         self.active = None
         self.drag_from = None
         self.failed = set()
         self.border.hide()
-        self.retire()
+        self.sessions, self.started, self.identities = {}, {}, {}
         self.key = key
         for index, layer in enumerate(slide.layers):
             if not isinstance(layer, LiveLayer):
                 continue
             width, height = layer.size(resolution)
-            session = LiveSession()
-            session.start(
-                LiveSpec(
-                    str(Path(layer.scene_file).resolve()),
-                    layer.scene_name,
-                    width,
-                    height,
-                    layer.fps,
-                )
+            identity = (
+                layer.session_id,
+                Path(layer.scene_file).resolve(),
+                layer.scene_name,
+                layer.fps,
+                width,
+                height,
             )
+            reused = next(
+                (
+                    i
+                    for i, session in old.items()
+                    if adjacent
+                    and layer.session_id is not None
+                    and old_identities[i] == identity
+                    and session.state in ("starting", "ready")
+                    and not session.stopping
+                ),
+                None,
+            )
+            if reused is not None:
+                session = old.pop(reused)
+                self.started[index] = old_started[reused]
+            else:
+                session = LiveSession()
+                session.start(
+                    LiveSpec(str(identity[1]), layer.scene_name, width, height, layer.fps)
+                )
+                self.started[index] = time.monotonic()
             self.sessions[index] = session
-            self.started[index] = time.monotonic()
+            self.identities[index] = identity
+            if session in self.images:
+                self.composition.set_layer_image(index, self.images[session])
+            if reason in ("next", "auto_next", "skip_all") and layer.enter_cue is not None:
+                self.entry_cues[index] = layer.enter_cue
+        for session in old.values():
+            session.request_stop()
+            self.stopping.append(session)
+            self.images.pop(session, None)
+            self.last_frames.pop(session, None)
         self.update_timer()
+
+    def waiting_for_entry(self) -> bool:
+        """READY jest trwałe; trwające cue zostanie przerwane zgodnie z D10."""
+        return any(self.sessions[i].state == "starting" for i in self.entry_cues)
+
+    def cancel_unready_entries(self) -> None:
+        """Timeout bariery usuwa tylko cue, nigdy player klipu."""
+        self.entry_cues = {
+            i: cue for i, cue in self.entry_cues.items() if self.sessions[i].state == "ready"
+        }
+
+    def start_entries(self) -> None:
+        """Jednorazowa wysyłka przy faktycznym starcie grupy, bez przejęcia fokusu."""
+        cues, self.entry_cues = self.entry_cues, {}
+        for index, cue in cues.items():
+            session = self.sessions[index]
+            if session.state == "ready" and not session.stopping:
+                session.send(cue)
+                self.cue_sent.emit(index, cue, time.perf_counter())
 
     def retire(self) -> None:
         """Sesje bieżącego slajdu przechodzą do odbioru; od tej chwili nie dotykają kompozycji."""
@@ -99,6 +164,9 @@ class LiveLayerController(QObject):
         self.stopping += self.sessions.values()
         self.sessions = {}
         self.started = {}
+        self.images = {}
+        self.last_frames = {}
+        self.entry_cues = {}
 
     def tick(self) -> None:
         now = time.monotonic()
@@ -113,7 +181,8 @@ class LiveLayerController(QObject):
         for index, session in self.sessions.items():
             frame = session.try_read_frame()
             if frame is not None:
-                # Bajty żyją w `frame` do powrotu z set_layer_image (QPixmap.fromImage).
+                # Bajty żyją w `frame`, a `last_frames` trzyma go do następnej klatki — obraz
+                # sesji bez kopii 5 MB na klatkę w wątku GUI.
                 image = QImage(
                     frame.pixels,
                     frame.width,
@@ -121,11 +190,15 @@ class LiveLayerController(QObject):
                     frame.width * 4,
                     QImage.Format.Format_RGBA8888,
                 )
+                self.images[session] = image
+                self.last_frames[session] = frame
                 self.composition.set_layer_image(index, image)
+                self.frame_received.emit(index, frame, time.perf_counter())
         for session in list(self.stopping):
             session.poll()
             if not session.running:
                 self.stopping.remove(session)
+        self.changed.emit()
         self.update_timer()
 
     def update_timer(self) -> None:

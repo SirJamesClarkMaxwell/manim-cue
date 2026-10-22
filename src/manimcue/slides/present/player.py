@@ -289,6 +289,9 @@ class Player(QMainWindow):
         self.video_sink.videoFrameChanged.connect(self.frame_changed)
         self.hide_info_window = hide_info_window
 
+        self.clips.live = self.live
+        self.live.changed.connect(self.clips.maybe_start)
+
         # Connecting key callbacks
 
         self.config.keys.QUIT.connect(self.close)
@@ -314,7 +317,7 @@ class Player(QMainWindow):
             def media_status_changed(status: QMediaPlayer.MediaStatus) -> None:
                 self.media_player.setLoops(1)  # Otherwise looping slides never end
                 if status == QMediaPlayer.MediaStatus.EndOfMedia:
-                    self.load_next_slide()
+                    self.load_next_slide(reason="skip_all")
 
             self.media_player.mediaStatusChanged.connect(media_status_changed)
 
@@ -325,7 +328,7 @@ class Player(QMainWindow):
                     status == QMediaPlayer.MediaStatus.EndOfMedia
                     and self.current_slide_config.auto_next
                 ):
-                    self.load_next_slide()
+                    self.load_next_slide(reason="auto_next")
 
             self.media_player.mediaStatusChanged.connect(media_status_changed)
 
@@ -335,7 +338,7 @@ class Player(QMainWindow):
                 # non-monotonicity in the position, when occurring outside of the loading of a new slide, indicates looping
                 if self.__termination_requested and self.__prev_pos > position:
                     if self.current_slide_config.auto_next:
-                        self.load_next_slide()
+                        self.load_next_slide(reason="auto_next")
                     else:
                         self.media_player.setPosition(self.media_player.duration())
                         self.media_player.pause()
@@ -446,7 +449,7 @@ class Player(QMainWindow):
     Loading slides
     """
 
-    def load_current_media(self, start_paused: bool = False) -> None:
+    def load_current_media(self, start_paused: bool = False, reason: str = "initial") -> None:
         url = QUrl.fromLocalFile(str(self.current_file.resolve(strict=True)))
         slide_config = self.current_slide_config
         reversed_slide = self.playing_reversed_slide
@@ -463,6 +466,7 @@ class Player(QMainWindow):
             (self.current_presentation_index, self.current_slide_index),
             slide_config,
             self.current_presentation_config.resolution,
+            reason,
         )
         grouped = not reversed_slide and self.clips.enter(
             slide_config, base_video, start_paused, self.playback_rate
@@ -494,7 +498,7 @@ class Player(QMainWindow):
 
             self.media_player.stop()
 
-    def load_current_slide(self) -> None:
+    def load_current_slide(self, reason: str = "initial") -> None:
         slide_config = self.current_slide_config
         if self.playing_reversed_slide:
             self.current_file = slide_config.rev_file
@@ -510,9 +514,9 @@ class Player(QMainWindow):
         self.__termination_requested = False
         self.__termination_achieved = False
 
-        self.load_current_media()
+        self.load_current_media(reason=reason)
 
-    def load_previous_slide(self) -> None:
+    def load_previous_slide(self, reason: str = "previous") -> None:
         if self.current_slide_index > 0:
             self.current_slide_index -= 1
         elif self.current_presentation_index > 0:
@@ -522,10 +526,11 @@ class Player(QMainWindow):
             logger.info("No previous slide.")
             return
 
-        self.load_current_slide()
+        self.load_current_slide(reason=reason)
 
-    def load_next_slide(self) -> None:
+    def load_next_slide(self, reason: str = "next") -> None:
         if self.playing_reversed_slide:
+            reason = "reverse_to_normal"
             self.playing_reversed_slide = False
             self.preview_next_slide()  # Slide number did not change, but next did
         elif self.current_slide_index < self.current_slides_count - 1:
@@ -540,7 +545,7 @@ class Player(QMainWindow):
             logger.info("No more slide to play.")
             return
 
-        self.load_current_slide()
+        self.load_current_slide(reason=reason)
 
     """
     Key callbacks and slots
@@ -654,8 +659,9 @@ class Player(QMainWindow):
 
     @Slot()
     def reverse(self) -> None:
-        self.playing_reversed_slide = True
-        self.load_previous_slide()
+        if self.current_slide_index > 0 or self.current_presentation_index > 0:
+            self.playing_reversed_slide = True
+            self.load_previous_slide(reason="reverse")
 
     @Slot()
     def replay(self) -> None:
