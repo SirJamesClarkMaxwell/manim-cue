@@ -2,6 +2,7 @@
 
 Architektura, decyzje transportowe i kryteria akceptacji: SPEC.md w korzeniu projektu.
 Faza 0: `manimcue.live_scene.LiveScene` plus klient testowy `manimcue.cue`.
+Faza 1: `manimcue.slides` — fork manim-slides 5.7.0, CLI `manim-cue`.
 """
 
 __version__ = "0.1.0"

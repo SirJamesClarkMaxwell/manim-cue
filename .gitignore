@@ -13,6 +13,10 @@ images/
 *.mov
 *.png
 *.log
+# wyjście `manim-cue render` w katalogu roboczym
+/slides/
+# klipy testowe upstreamu manim-slides — dane testów, nie wynik renderu
+!tests/slides/data/**/*.mp4
 
 # build
 dist/

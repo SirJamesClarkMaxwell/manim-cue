@@ -1,0 +1,81 @@
+import shutil
+from pathlib import Path
+
+import av
+import pytest
+from click.testing import CliRunner
+
+from manimcue.slides.__main__ import cli
+from manimcue.slides.utils import concatenate_video_files, merge_basenames
+
+
+def test_merge_basenames(paths: list[Path]) -> None:
+    path = merge_basenames(paths)
+    assert path.suffix == paths[0].suffix
+    assert path.parent == paths[0].parent
+
+
+def test_merge_basenames_same_with_different_parent_directories(
+    paths: list[Path],
+) -> None:
+    d1 = Path("a/b/c")
+    d2 = Path("d/e/f")
+    p1 = d1 / "one.txt"
+    p2 = d1 / "a/b/c/two.txt"
+    p3 = d2 / "d/e/f/one.txt"
+    p4 = d2 / "d/e/f/two.txt"
+
+    assert merge_basenames([p1, p2]).name == merge_basenames([p3, p4]).name
+
+
+def assert_has_decodable_video_stream(dest: Path) -> None:
+    assert dest.exists()
+    with av.open(str(dest)) as container:
+        assert sum(1 for _ in container.decode(video=0)) > 0
+
+
+def test_concatenate_video_files_relative_paths(
+    video_file: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # The concat list file lives in the system temp folder, and the concat
+    # demuxer resolves relative entries against *that* folder — so relative
+    # input paths used to fail with FileNotFoundError.
+    monkeypatch.chdir(video_file.parent)
+    relative = Path(video_file.name)
+    dest = tmp_path / "out.mp4"
+
+    concatenate_video_files([relative, relative], dest)
+
+    assert_has_decodable_video_stream(dest)
+
+
+def test_concatenate_video_files_quoted_path(video_file: Path, tmp_path: Path) -> None:
+    # A single quote in a path used to terminate the quoted list entry early,
+    # making the entry unparsable for the concat demuxer.
+    quoted_dir = tmp_path / "John's slides"
+    quoted_dir.mkdir()
+    src = quoted_dir / video_file.name
+    shutil.copy(video_file, src)
+    dest = tmp_path / "out.mp4"
+
+    concatenate_video_files([src, src], dest)
+
+    assert_has_decodable_video_stream(dest)
+
+
+def test_issue540(slides_file: Path) -> None:
+    runner = CliRunner()
+
+    with runner.isolated_filesystem():
+        results = runner.invoke(cli, ["render", str(slides_file), "Issue540", "-ql"])
+
+        assert results.exit_code == 0, results.output
+
+
+def test_merge_basenames_short_hash() -> None:
+    """Hash is truncated to 16 hex chars to keep paths under Windows MAX_PATH."""
+    paths = [Path("a/b/c/very_long_partial_movie_file_name.mp4")]
+    merged = merge_basenames(paths)
+    # Stem should be at most 16 hex characters (plus extension)
+    assert len(merged.stem) == 16
+    assert all(c in "0123456789abcdef" for c in merged.stem)

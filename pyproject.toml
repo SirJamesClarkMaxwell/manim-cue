@@ -20,12 +20,56 @@ dependencies = [
     # granicę, bo jest zweryfikowana w praniu, a luźniejsza <81 nigdy się nie nałożyła
     # w projekcie seminarium i była tam realną miną.
     "setuptools<80.10.2",
+    # Prerender CE (D18) — fork manim-slides renderuje oba silniki.
+    # <0.22: CE 0.22 przebudował zapis plików (output plan; brak `write_to_movie`,
+    # walidacja `max_files_cached`) i manim-slides 5.7.0 pada na renderze. Upstream
+    # testował 0.19.1. Wsparcie 0.22 to osobna praca — PLAN.md, faza 1.
+    "manim>=0.19,<0.22",
+    # Zależności forka manim-slides 5.7.0 (D13), przepisane z jego pyproject.toml.
+    "av>=9.0.0",
+    "beautifulsoup4>=4.12.3",
+    "click>=8.1.3",
+    "click-default-group>=1.2.2",
+    "jinja2>=3.1.2",
+    "lxml>=4.9.2",
+    "numpy>=1.19",
+    "pillow>=9.5.0",
+    "platformdirs>=4.0",
+    "pydantic>=2.0.1",
+    "pydantic-extra-types>=2.0.0",
+    "python-pptx>=0.6.21",
+    "qtpy>=2.4.1",
+    "requests>=2.28.1",
+    "rich>=13.3.2",
+    "rtoml>=0.11.0",
+    "tqdm>=4.64.1",
+    # Upstream wyklucza 6.8.1.1 (zepsuty wheel); jedno wiązanie Qt zamiast wyboru w extrach.
+    "pyside6>=6.6.1,!=6.8.1.1",
 ]
+
+[project.scripts]
+manim-cue = "manimcue.slides.__main__:cli"
 
 [dependency-groups]
 dev = [
     "pytest>=8.4",
+    "pytest-missing-modules>=0.1.0",
+    "pytest-qt>=4.2.0",
     "ruff>=0.13",
+]
+
+[tool.pytest.ini_options]
+markers = [
+    "gpu: wymaga prawdziwego kontekstu OpenGL (manimgl headless); bez sterownika skip",
+    "tex: wymaga instalacji LaTeX; bez niej skip",
+]
+# Z upstreamu manim-slides: ostrzeżenia z zależności Manima, nie z naszego kodu.
+filterwarnings = [
+    '''ignore:'audioop' is deprecated:DeprecationWarning''',
+    'ignore:pkg_resources is deprecated as an API:DeprecationWarning',
+    'ignore::DeprecationWarning:pkg_resources.*:',
+    'ignore:invalid escape sequence.*:DeprecationWarning',
+    'ignore:invalid escape sequence.*:SyntaxWarning',
 ]
 
 [tool.hatch.build.targets.wheel]
@@ -33,3 +77,6 @@ packages = ["src/manimcue"]
 
 [tool.ruff]
 line-length = 100
+# Kod i testy forka zostają w stylu upstreamu, żeby diff z kolejnym wydaniem manim-slides
+# dał się nałożyć (D13).
+extend-exclude = ["src/manimcue/slides", "tests/slides"]

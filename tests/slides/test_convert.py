@@ -1,0 +1,600 @@
+import shutil
+from enum import Enum
+from pathlib import Path
+from typing import cast
+
+import click
+import pytest
+import requests
+from bs4 import BeautifulSoup
+from click import Context, Parameter
+from pydantic import BaseModel
+
+from manimcue.slides.config import PresentationConfig
+from manimcue.slides.convert import (
+    PDF,
+    AutoAnimateEasing,
+    AutoAnimateMatcher,
+    AutoPlayMedia,
+    AutoSlideMethod,
+    BackgroundSize,
+    BackgroundTransition,
+    ControlsBackArrows,
+    ControlsLayout,
+    Converter,
+    Display,
+    HtmlZip,
+    JsBool,
+    JsFalse,
+    JsNull,
+    JsTrue,
+    KeyboardCondition,
+    NavigationMode,
+    PowerPoint,
+    PreloadIframes,
+    RevealJS,
+    RevealTheme,
+    ShowSlideNumber,
+    SlideNumber,
+    Transition,
+    TransitionSpeed,
+    file_to_data_uri,
+    get_duration_ms,
+    resolve_template_option,
+)
+
+
+def test_get_duration_ms(video_file: Path) -> None:
+    assert get_duration_ms(video_file) == 2000.0
+
+
+def test_file_to_data_uri(video_file: Path, video_data_uri_file: Path) -> None:
+    assert file_to_data_uri(video_file) == video_data_uri_file.read_text().strip()
+
+
+def test_resolve_template_option_accepts_builtin_template() -> None:
+    assert (
+        resolve_template_option(
+            cast(Context, None), cast(Parameter, None), "firebase_sync.html"
+        )
+        == "firebase_sync.html"
+    )
+
+
+def test_resolve_template_option_accepts_existing_path(tmp_path: Path) -> None:
+    template_file = tmp_path / "custom.html"
+    template_file.write_text("template")
+
+    assert (
+        resolve_template_option(
+            cast(Context, None), cast(Parameter, None), str(template_file)
+        )
+        == template_file
+    )
+
+
+def test_resolve_template_option_rejects_missing_template() -> None:
+    with pytest.raises(
+        click.BadParameter, match=r"Template 'missing\.html' was not found"
+    ):
+        resolve_template_option(
+            cast(Context, None), cast(Parameter, None), "missing.html"
+        )
+
+
+@pytest.mark.parametrize(
+    ("enum_type",),
+    [
+        (JsTrue,),
+        (JsFalse,),
+        (JsBool,),
+        (JsNull,),
+        (ControlsLayout,),
+        (ControlsBackArrows,),
+        (SlideNumber,),
+        (ShowSlideNumber,),
+        (KeyboardCondition,),
+        (NavigationMode,),
+        (AutoPlayMedia,),
+        (PreloadIframes,),
+        (AutoAnimateMatcher,),
+        (AutoAnimateEasing,),
+        (AutoSlideMethod,),
+        (Transition,),
+        (TransitionSpeed,),
+        (BackgroundSize,),
+        (BackgroundTransition,),
+        (Display,),
+        (RevealTheme,),
+    ],
+)
+def test_format_enum(enum_type: type[Enum]) -> None:
+    for enum in enum_type:
+        expected = str(enum)
+        got = f"{enum}"
+
+        assert expected == got
+
+        got = "{enum}".format(enum=enum)  # noqa: UP032
+
+        assert expected == got
+
+        got = format(enum, "")
+
+        assert expected == got
+
+
+@pytest.mark.parametrize(
+    ("enum_type",),
+    [
+        (ControlsLayout,),
+        (ControlsBackArrows,),
+        (SlideNumber,),
+        (ShowSlideNumber,),
+        (KeyboardCondition,),
+        (NavigationMode,),
+        (AutoPlayMedia,),
+        (PreloadIframes,),
+        (AutoAnimateMatcher,),
+        (AutoAnimateEasing,),
+        (AutoSlideMethod,),
+        (Transition,),
+        (TransitionSpeed,),
+        (BackgroundSize,),
+        (BackgroundTransition,),
+        (Display,),
+    ],
+)
+def test_quoted_enum(enum_type: type[Enum]) -> None:
+    for enum in enum_type:
+        if enum in ["true", "false", "null"]:
+            continue
+
+        expected = "'" + enum.value + "'"
+        got = str(enum)
+
+        assert expected == got
+
+
+@pytest.mark.parametrize(
+    ("enum_type",),
+    [
+        (ControlsLayout,),
+        (ControlsBackArrows,),
+        (SlideNumber,),
+        (ShowSlideNumber,),
+        (KeyboardCondition,),
+        (NavigationMode,),
+        (AutoPlayMedia,),
+        (PreloadIframes,),
+        (AutoAnimateMatcher,),
+        (AutoAnimateEasing,),
+        (AutoSlideMethod,),
+        (Transition,),
+        (TransitionSpeed,),
+        (BackgroundSize,),
+        (BackgroundTransition,),
+        (Display,),
+    ],
+)
+def test_quoted_enum_survives_pydantic_validation(enum_type: type[Enum]) -> None:
+    class Model(BaseModel):
+        value: enum_type  # ty: ignore[invalid-type-form]
+
+    for enum in enum_type:
+        if enum in ["true", "false", "null"]:
+            continue
+
+        model = Model(value=enum.value)
+        expected = "'" + enum.value + "'"
+        got = str(model.value)
+
+        assert expected == got
+
+
+@pytest.mark.parametrize(
+    ("enum_type",),
+    [
+        (JsTrue,),
+        (JsFalse,),
+        (JsBool,),
+        (JsNull,),
+        (RevealTheme,),
+    ],
+)
+def test_unquoted_enum(enum_type: type[Enum]) -> None:
+    for enum in enum_type:
+        expected = enum.value
+        got = str(enum)
+
+        assert expected == got
+
+
+def test_reveal_theme_members() -> None:
+    for member in RevealTheme:
+        if member.name.replace("_", "-") != member.value:
+            raise AssertionError(f"Expected {member.value}, got {member.name}")
+
+
+class TestConverter:
+    @pytest.mark.parametrize(
+        ("name", "converter"),
+        [("html", RevealJS), ("pdf", PDF), ("pptx", PowerPoint), ("zip", HtmlZip)],
+    )
+    def test_from_string(self, name: str, converter: type) -> None:
+        assert Converter.from_string(name) == converter
+
+    def test_revealjs_converter(
+        self, tmp_path: Path, presentation_config: PresentationConfig
+    ) -> None:
+        out_file = tmp_path / "slides.html"
+        RevealJS(presentation_configs=[presentation_config]).convert_to(out_file)
+        assert out_file.exists()
+        assert Path(tmp_path / "slides_assets").is_dir()
+        file_contents = out_file.read_text()
+        assert "manim" in file_contents.casefold()
+
+    def test_revealjs_offline_converter(
+        self, tmp_path: Path, presentation_config: PresentationConfig
+    ) -> None:
+        out_file = tmp_path / "slides.html"
+        RevealJS(presentation_configs=[presentation_config], offline="true").convert_to(
+            out_file
+        )
+        assert out_file.exists()
+        assets_dir = Path(tmp_path / "slides_assets")
+        assert assets_dir.is_dir()
+        for file in [
+            "black.css",
+            "reveal.css",
+            "reveal.js",
+            "zenburn.css",
+        ]:
+            assert (assets_dir / file).exists()
+
+    def test_revealjs_offline_uses_configurable_timeout(
+        self,
+        tmp_path: Path,
+        presentation_config: PresentationConfig,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        cache_root = tmp_path / "cache"
+        monkeypatch.setattr(
+            "manimcue.slides.convert.user_cache_path", lambda _: cache_root
+        )
+
+        requested_timeouts: list[float] = []
+
+        class MockResponse:
+            def __init__(self, content: bytes) -> None:
+                self.content = content
+
+            def raise_for_status(self) -> None:
+                return None
+
+        def mock_get(self: requests.Session, url: str, timeout: float) -> MockResponse:
+            requested_timeouts.append(timeout)
+            return MockResponse(b"asset-bytes")
+
+        monkeypatch.setattr(requests.Session, "get", mock_get)
+
+        out_file = tmp_path / "slides.html"
+        RevealJS(
+            presentation_configs=[presentation_config],
+            offline="true",
+            revealjs_assets_timeout=3.5,
+        ).convert_to(out_file)
+
+        assert out_file.exists()
+        assert requested_timeouts
+        assert all(timeout == 3.5 for timeout in requested_timeouts)
+
+    def test_revealjs_offline_populates_and_reuses_cache(
+        self,
+        tmp_path: Path,
+        presentation_config: PresentationConfig,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        cache_root = tmp_path / "cache"
+        cache_dir = (
+            cache_root / f"revealjs{RevealJS(presentation_configs=[]).reveal_version}"
+        )
+        monkeypatch.setattr(
+            "manimcue.slides.convert.user_cache_path", lambda _: cache_root
+        )
+
+        calls = 0
+
+        class MockResponse:
+            def __init__(self, content: bytes) -> None:
+                self.content = content
+
+            def raise_for_status(self) -> None:
+                return None
+
+        def mock_get(self: requests.Session, url: str, timeout: float) -> MockResponse:
+            nonlocal calls
+            calls += 1
+            return MockResponse(b"fresh-content")
+
+        monkeypatch.setattr(requests.Session, "get", mock_get)
+
+        out_file = tmp_path / "slides.html"
+        converter = RevealJS(presentation_configs=[presentation_config], offline="true")
+        converter.convert_to(out_file)
+
+        assert out_file.exists()
+        assert cache_dir.is_dir()
+        assert any(cache_dir.iterdir())
+        assert calls == 5
+
+        out_file_again = tmp_path / "slides-again.html"
+        converter.convert_to(out_file_again)
+
+        assert out_file_again.exists()
+        assert calls == 5
+        for name in ["black.css", "reveal.css", "reveal.js", "zenburn.css"]:
+            assert (cache_dir / name).read_text() == "fresh-content"
+
+    def test_revealjs_flush_cache_downloads_fresh_assets(
+        self,
+        tmp_path: Path,
+        presentation_config: PresentationConfig,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        cache_root = tmp_path / "cache"
+        cache_dir = (
+            cache_root / f"revealjs{RevealJS(presentation_configs=[]).reveal_version}"
+        )
+        cache_dir.mkdir(parents=True)
+        for name in ["black.css", "reveal.css", "reveal.js", "zenburn.css"]:
+            (cache_dir / name).write_text("stale-content")
+
+        monkeypatch.setattr(
+            "manimcue.slides.convert.user_cache_path", lambda _: cache_root
+        )
+
+        calls = 0
+
+        class MockResponse:
+            def __init__(self, content: bytes) -> None:
+                self.content = content
+
+            def raise_for_status(self) -> None:
+                return None
+
+        def mock_get(self: requests.Session, url: str, timeout: float) -> MockResponse:
+            nonlocal calls
+            calls += 1
+            return MockResponse(b"fresh-content")
+
+        monkeypatch.setattr(requests.Session, "get", mock_get)
+
+        out_file = tmp_path / "slides.html"
+        RevealJS(
+            presentation_configs=[presentation_config],
+            offline="true",
+            flush_revealjs_cache="true",
+        ).convert_to(out_file)
+
+        assert out_file.exists()
+        assert calls == 5
+        for name in ["black.css", "reveal.css", "reveal.js", "zenburn.css"]:
+            assert (cache_dir / name).read_text() == "fresh-content"
+
+    def test_revealjs_disable_cache_skips_writing_cache(
+        self,
+        tmp_path: Path,
+        presentation_config: PresentationConfig,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        cache_root = tmp_path / "cache"
+        cache_dir = (
+            cache_root / f"revealjs{RevealJS(presentation_configs=[]).reveal_version}"
+        )
+        cache_dir.mkdir(parents=True)
+        for name in ["black.css", "reveal.css", "reveal.js", "zenburn.css"]:
+            (cache_dir / name).write_text("stale-content")
+
+        monkeypatch.setattr(
+            "manimcue.slides.convert.user_cache_path", lambda _: cache_root
+        )
+
+        calls = 0
+
+        class MockResponse:
+            def __init__(self, content: bytes) -> None:
+                self.content = content
+
+            def raise_for_status(self) -> None:
+                return None
+
+        def mock_get(self: requests.Session, url: str, timeout: float) -> MockResponse:
+            nonlocal calls
+            calls += 1
+            return MockResponse(b"fresh-content")
+
+        monkeypatch.setattr(requests.Session, "get", mock_get)
+
+        out_file = tmp_path / "slides.html"
+        RevealJS(
+            presentation_configs=[presentation_config],
+            offline="true",
+            disable_revealjs_cache="true",
+        ).convert_to(out_file)
+
+        assert out_file.exists()
+        assert calls == 5
+        for name in ["black.css", "reveal.css", "reveal.js", "zenburn.css"]:
+            assert (cache_dir / name).read_text() == "stale-content"
+
+    def test_revealjs_data_encode(
+        self,
+        tmp_path: Path,
+        presentation_config: PresentationConfig,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        # Mock requests.Session.get to return a fake response (should not be called)
+        class MockResponse:
+            def __init__(self, content: bytes, text: str, status_code: int) -> None:
+                self.content = content
+                self.text = text
+                self.status_code = status_code
+
+            def raise_for_status(self) -> None:
+                return None
+
+        # Apply the monkeypatch
+        monkeypatch.setattr(
+            requests.Session,
+            "get",
+            lambda self, url, timeout: MockResponse(
+                b"body { background-color: #9a3241; }",
+                "body { background-color: #9a3241; }",
+                200,
+            ),
+        )
+        out_file = tmp_path / "slides.html"
+        RevealJS(
+            presentation_configs=[presentation_config], offline="false", one_file="true"
+        ).convert_to(out_file)
+        assert out_file.exists()
+        # Check that assets are not stored
+        assert not (tmp_path / "slides_assets").exists()
+
+        with open(out_file, encoding="utf-8") as file:
+            content = file.read()
+
+        soup = BeautifulSoup(content, "html.parser")
+
+        # Check if video is encoded in base64
+        videos = soup.find_all("section")
+        assert all(
+            "data:video/mp4;base64," in video["data-background-video"]
+            for video in videos
+        )
+
+        # Check if CSS is not inlined
+        styles = soup.find_all("style")
+        assert not any(
+            "background-color: #9a3241;" in (style.string or "") for style in styles
+        )
+        # Check if JS is not inlined
+        scripts = soup.find_all("script")
+        assert not any(
+            "background-color: #9a3241;" in (script.string or "") for script in scripts
+        )
+
+    def test_revealjs_offline_inlining(
+        self,
+        tmp_path: Path,
+        presentation_config: PresentationConfig,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        cache_root = tmp_path / "cache"
+        monkeypatch.setattr(
+            "manimcue.slides.convert.user_cache_path", lambda _: cache_root
+        )
+
+        # Mock requests.Session.get to return a fake response
+        class MockResponse:
+            def __init__(self, content: bytes, text: str, status_code: int) -> None:
+                self.content = content
+                self.text = text
+                self.status_code = status_code
+
+            def raise_for_status(self) -> None:
+                return None
+
+        # Apply the monkeypatch
+        monkeypatch.setattr(
+            requests.Session,
+            "get",
+            lambda self, url, timeout: MockResponse(
+                b"body { background-color: #9a3241; }",
+                "body { background-color: #9a3241; }",
+                200,
+            ),
+        )
+
+        out_file = tmp_path / "slides.html"
+        RevealJS(
+            presentation_configs=[presentation_config], offline="true", one_file="true"
+        ).convert_to(out_file)
+        assert out_file.exists()
+
+        with open(out_file, encoding="utf-8") as file:
+            content = file.read()
+
+        soup = BeautifulSoup(content, "html.parser")
+
+        # Check if CSS is inlined
+        styles = soup.find_all("style")
+        assert any(
+            "background-color: #9a3241;" in (style.string or "") for style in styles
+        )
+
+        # Check if JS is inlined
+        scripts = soup.find_all("script")
+        assert any(
+            "background-color: #9a3241;" in (script.string or "") for script in scripts
+        )
+
+    def test_htmlzip_converter(
+        self, tmp_path: Path, presentation_config: PresentationConfig
+    ) -> None:
+        archive = tmp_path / "got.zip"
+        expected = tmp_path / "expected.html"
+        got = tmp_path / "got.html"
+
+        HtmlZip(presentation_configs=[presentation_config]).convert_to(archive)
+        RevealJS(presentation_configs=[presentation_config]).convert_to(expected)
+
+        shutil.unpack_archive(str(archive), extract_dir=tmp_path)
+
+        assert archive.exists()
+        assert got.exists()
+        assert expected.exists()
+
+        assert got.read_text() == expected.read_text().replace(
+            "expected_assets", "got_assets"
+        )
+
+    @pytest.mark.parametrize("num_presentation_configs", (1, 2))
+    def test_revealjs_multiple_scenes_converter(
+        self,
+        tmp_path: Path,
+        presentation_config: PresentationConfig,
+        num_presentation_configs: int,
+    ) -> None:
+        out_file = tmp_path / "slides.html"
+        RevealJS(
+            presentation_configs=[
+                presentation_config for _ in range(num_presentation_configs)
+            ]
+        ).convert_to(out_file)
+        assert out_file.exists()
+        assets_dir = Path(tmp_path / "slides_assets")
+        assert assets_dir.is_dir()
+
+        got = sum(1 for _ in assets_dir.iterdir())
+        expected = num_presentation_configs * len(presentation_config.slides)
+
+        assert got == expected
+
+    @pytest.mark.parametrize("frame_index", ("first", "last"))
+    def test_pdf_converter(
+        self, frame_index: str, tmp_path: Path, presentation_config: PresentationConfig
+    ) -> None:
+        out_file = tmp_path / "slides.pdf"
+        PDF(
+            presentation_configs=[presentation_config], frame_index=frame_index
+        ).convert_to(out_file)
+        assert out_file.exists()
+
+    def test_pptx_converter(
+        self, tmp_path: Path, presentation_config: PresentationConfig
+    ) -> None:
+        out_file = tmp_path / "slides.pptx"
+        PowerPoint(presentation_configs=[presentation_config]).convert_to(out_file)
+        assert out_file.exists()

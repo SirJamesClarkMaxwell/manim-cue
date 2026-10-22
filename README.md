@@ -3,6 +3,22 @@
 Żywa scena Manima wyzwalana z zewnątrz. Jedno miejsce, które steruje animacją i ją wyzwala —
 żeby dało się potem synchronizować więcej źródeł.
 
+Od fazy 1 projekt jest też **forkiem [manim-slides](https://github.com/jeertmans/manim-slides)
+5.7.0** (MIT, © Jérome Eertmans; licencja w `src/manimcue/slides/LICENSE.md`): prezentacja
+prerenderowanych slajdów z notatkami i podglądem, docelowo z warstwami i wstrzykiwanym live
+(`PLAN.md`, decyzje D13-D19 w `SPEC.md`).
+
+```bash
+uv run manim-cue render examples/demo.py Demo        # Manim CE (<0.22, powód w pyproject.toml)
+uv run manim-cue render --GL examples/demo.py Demo   # manimgl
+uv run manim-cue present Demo
+```
+
+Różnice względem upstreamu: importy `manimcue.slides` zamiast `manim_slides`, CLI `manim-cue`,
+bez `%%manim_slides` (IPython) i dyrektywy Sphinx, bez sprawdzania wersji na PyPI. Plik
+konfiguracji `.manim-slides.toml` i logger `manim-slides` zostają — zgodność z istniejącymi
+deckami.
+
 ## Problem
 
 Manim ma jeden model wykonania: `construct()` leci raz, liniowo, do pliku. Brakuje sceny, która
@@ -45,22 +61,26 @@ Okno przyjmuje też klawiaturę, niezależnie od gniazda:
 | Klawisz | Co robi |
 |---------|---------|
 | `→` | kolejne cue z sekwencji `rotate` → `pulse` → `sweep` |
-| `←` | cofnięcie ostatniego cue — **skok do stanu sprzed niego**, nie animacja odwrotna |
+| `←` | cofnięcie ostatniego cue — animowany powrót do stanu sprzed niego |
 
 Komenda z gniazda wyzwala preset po nazwie i **nie** przesuwa pozycji w sekwencji, więc zdalny
-klient nie przestawia prezentacji pod rękami prelegenta. Gdy klawisz i komenda czekają razem,
-pierwszeństwo ma klawisz. Klawisz wciśnięty w trakcie animacji trafia do kolejki i wykona się
-po niej. Log pokazuje pozycję: `Cue: pulse  [2/3, nastepne: sweep]`.
+klient nie przestawia prezentacji pod rękami prelegenta. Wyjątek: komendy `next` i `back` to
+jawne odpowiedniki strzałek i kursor przesuwają. Gdy klawisz i komenda czekają razem,
+pierwszeństwo ma klawisz. Klawisz albo komenda w trakcie animacji **urywa ją** i scena skacze do
+stanu końcowego (D10). `pulse` jest zapętlone do następnego klawisza albo komendy (D9). Log
+pokazuje pozycję: `Cue: pulse  [2/3, nastepne: sweep]  [petla]`.
 
-Powody tych decyzji (D1-D3) są w `SPEC.md`; żywy render nie ma przewijania, więc cofanie jest
-skokiem stanu przez `Scene.undo()` manimgl, a nie odtworzeniem animacji od końca.
+Powody tych decyzji (D1-D3, D9, D10) są w `SPEC.md`. Cofanie to `Transform` do stanu zapisanego
+przed cue, domknięty przez `Scene.undo()` manimgl — interpolacja między stanami, nie odtworzenie
+animacji od końca.
 
 ## Czym to nie ma być
 
-- **Nie forkiem Manima.** Sterownik nad istniejącym API, bez łatania CE/GL/GX równolegle.
+- **Nie forkiem Manima.** Forkiem manim-slides — Manima (CE/GL/GX) używamy przez istniejące API.
 - **Nie przechwytywaniem ekranu.** OBS kompozytuje niezależne źródła, więc nie daje jednego
   punktu sterowania.
-- **Nie synchronizatorem wielu wideo** — nie w fazie 0. Patrz `PLAN.md`.
+- **Nie synchronizatorem co do klatki.** Warstwy startują i pauzują razem (D17), bez zegara
+  głównego i seeków.
 
 ## Dokumenty
 
@@ -78,7 +98,8 @@ Historia argumentów: `group-theory/PLAN-REVIEW-LOG.md` w tamtym repo.
 
 ## Testowanie
 
-Bez okna — kryteria 3, 4, 7, 8 i obie pułapki z `SPEC.md`:
+Bez okna — kryteria 3, 4, 7, 8 fazy 0, trzy pułapki z `SPEC.md` oraz testy upstreamu
+manim-slides (`tests/slides/`, w tym render CE i GL):
 
 ```bash
 uv run pytest -q
