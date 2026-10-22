@@ -1,0 +1,44 @@
+{
+  "platform": "Windows",
+  "qt_platform": "offscreen",
+  "requested_fps": 60,
+  "warmup_s": 3,
+  "results": [
+    {
+      "resolution": "960x540",
+      "duration_s": 30.001016400000026,
+      "distinct_received_fps": 59.96463506483062,
+      "received_fps": 63.39785208077145,
+      "fps_threshold": 60,
+      "fps_pass": false,
+      "idle_cpu_core_percent": 0.0,
+      "cpu_pass": true,
+      "command_p95_ms": 19.80795500014665,
+      "latency_pass": true,
+      "cold_start_s": 31.692275599999903,
+      "render_ms": 0.5673054242752227,
+      "readback_ms": 4.267853651987307,
+      "publish_ms": 0.14832271751006848,
+      "receiver_copy_ms": 1.4198092777772016,
+      "qt_delivery_ms": 1.034410888888715
+    },
+    {
+      "resolution": "1920x1080",
+      "duration_s": 30.000059799999917,
+      "distinct_received_fps": 59.96654713334954,
+      "received_fps": 63.399873622918754,
+      "fps_threshold": 30,
+      "fps_pass": true,
+      "idle_cpu_core_percent": 0.3124219445013811,
+      "cpu_pass": true,
+      "command_p95_ms": 25.264910000100826,
+      "latency_pass": true,
+      "cold_start_s": 2.022039199999881,
+      "render_ms": 0.4488800751886493,
+      "readback_ms": 7.601378678842573,
+      "publish_ms": 0.47220338346003127,
+      "receiver_copy_ms": 3.8918849444420784,
+      "qt_delivery_ms": 3.167364000001448
+    }
+  ]
+}

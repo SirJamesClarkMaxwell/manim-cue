@@ -94,6 +94,8 @@ class LiveScene(Scene):
         self.abort_cue = False
 
     def construct(self) -> None:
+        if hasattr(self, "live_buffer"):
+            return self.live_construct()
         # Tryb okna sprawdzamy PRZED zajęciem portu — inaczej render offline (-w/-o)
         # zostawiłby zbindowane gniazdo.
         if self.window is None:
@@ -213,7 +215,7 @@ class LiveScene(Scene):
 
     def close_sockets(self) -> None:
         """Zamyka oba gniazda na każdej ścieżce wyjścia z ``construct()``."""
-        for sock in (self.client, self.listener):
+        for sock in (getattr(self, "client", None), getattr(self, "listener", None)):
             if sock is not None:
                 sock.close()
         self.client = None
@@ -285,6 +287,8 @@ class LiveScene(Scene):
         Zadne cue w PRESETS go nie uzywa; gdy zacznie, trzeba nadpisac tez `wait()`
         albo podac mu `stop_condition=self.interrupt_requested`.
         """
+        if hasattr(self, "live_buffer"):
+            return self.live_progress(animations)
         if self.abort_cue:
             return
         last_t = 0
@@ -319,9 +323,7 @@ class LiveScene(Scene):
         t0 = time.perf_counter()
         state = self.undo_stack[-1]
         pairs = [
-            (mob, copy)
-            for mob, copy in state.mobjects_to_copies.items()
-            if mob in self.mobjects
+            (mob, copy) for mob, copy in state.mobjects_to_copies.items() if mob in self.mobjects
         ]
         t_pairs = time.perf_counter()
         anims = [Transform(mob, copy.copy()) for mob, copy in pairs]
@@ -378,6 +380,173 @@ class LiveScene(Scene):
             return ""
         nxt = self.SEQUENCE[self.cursor] if self.cursor < len(self.SEQUENCE) else "-"
         return f"  [{self.cursor}/{len(self.SEQUENCE)}, nastepne: {nxt}]"
+
+    # --- proces zarządzany bez okna ---------------------------------------
+
+    def live_construct(self) -> None:
+        """Pętla headless z barierą odbioru na granicach cue."""
+        self.buffer = LineBuffer()
+        self.client = None
+        self.listener = socket.socket()
+        self.listener.bind((HOST, 0))
+        self.listener.listen(1)
+        self.listener.setblocking(False)
+        self.live_bootstrap.send(self.listener.getsockname())
+        self.live_commands = deque()
+        self.live_seen = 0
+        self.live_frame_id = 0
+        self.live_loop = False
+        self.live_outgoing = bytearray()
+        self.live_metrics = {name: [0.0, 0] for name in ("render", "readback", "publish")}
+        try:
+            self.build_objects()
+            self.live_publish(boundary=True)
+            self.live_status("READY")
+            while True:
+                self.live_barrier()
+                while not self.live_commands:
+                    self.live_poll(POLL_TIMEOUT)
+                command = self.live_commands.popleft()
+                if command == "back":
+                    self.live_cue = "back"
+                    self.step_back()
+                    self.live_publish(boundary=True)
+                    continue
+                from_sequence = command == "next"
+                if from_sequence:
+                    command = self.advance()
+                    if command is None:
+                        self.live_status("SEQUENCE_END")
+                        continue
+                self.live_cue = command
+                self.save_state()
+                self.abort_cue = False
+                self.live_loop = command in self.LOOPS
+                self.live_status(f"CUE_START {command}")
+                while True:
+                    self.PRESETS[command](self)
+                    self.abort_cue = False
+                    self.live_poll(0)
+                    if not self.live_loop or self.live_commands:
+                        break
+                self.live_loop = False
+                self.live_publish(boundary=True)
+                self.live_bootstrap.send({"metrics": self.live_metrics})
+                self.live_status(f"CUE_DONE {command}")
+        finally:
+            self.live_bootstrap.send({"metrics": self.live_metrics})
+            self.close_sockets()
+
+    def live_status(self, message: str) -> None:
+        """Statusy mają framing komend; zapis nie czeka na odbiornik."""
+        self.live_outgoing.extend((message + "\n").encode("utf-8"))
+        self.live_flush()
+
+    def live_flush(self) -> None:
+        if self.client is not None and self.live_outgoing:
+            try:
+                sent = self.client.send(self.live_outgoing)
+                del self.live_outgoing[:sent]
+            except BlockingIOError:
+                pass
+            except OSError:
+                self.drop_client()
+
+    def live_poll(self, timeout: float) -> None:
+        self.drain_socket(timeout)
+        while self.buffer.has_line():
+            command = self.buffer.pop_line()
+            if command == "shutdown":
+                raise EndScene()
+            if command.startswith("frame_seen "):
+                try:
+                    frame_id = int(command.split()[1])
+                    if frame_id == self.live_frame_id:
+                        self.live_seen = frame_id
+                except (ValueError, IndexError):
+                    log.warning(f"Niepoprawne potwierdzenie: {command!r}")
+            elif command in ("next", "back") or command in self.PRESETS:
+                self.live_commands.append(command)
+            else:
+                log.warning(f"Nieznana komenda: {command!r}")
+        self.live_flush()
+
+    def live_barrier(self) -> None:
+        deadline = time.monotonic() + 2
+        while self.live_seen < self.live_frame_id:
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                raise RuntimeError("Odbiornik nie potwierdził klatki granicznej w 2 s")
+            self.live_poll(min(POLL_TIMEOUT, remaining))
+
+    def live_publish(self, boundary: bool = False, dt: float = 0) -> None:
+        began = time.monotonic()
+        self.update_frame(dt, force_draw=True)
+        rendered = time.monotonic()
+        pixels = self.camera.get_raw_fbo_data(dtype="f1")
+        read = time.monotonic()
+        self.live_frame_id += 1
+        self.live_buffer.publish(pixels, self.live_frame_id, boundary)
+        published = time.monotonic()
+        for name, elapsed in (
+            ("render", rendered - began),
+            ("readback", read - rendered),
+            ("publish", published - read),
+        ):
+            self.live_metrics[name][0] += elapsed
+            self.live_metrics[name][1] += 1
+
+    def live_times(self, duration: float):
+        """Przeciążenie pomija terminy zamiast nadrabiać klatki."""
+        began = time.monotonic()
+        target = began
+        last = 0.0
+        while True:
+            # Tempo trzyma sleep, nie select: select na Windows zaokrągla timeout w górę do
+            # ~15,6 ms (16 ms czeka 31 ms — zmierzone), co dawało ~29 fps zamiast 60. sleep ma
+            # od Pythona 3.11 timer wysokiej rozdzielczości. Komenda czeka najwyżej klatkę.
+            remaining = target - time.monotonic()
+            if remaining > 0:
+                time.sleep(remaining)
+            self.live_poll(0)
+            now = time.monotonic()
+            if now < target:
+                continue
+            if self.abort_cue or (self.live_commands and not self.live_loop):
+                self.abort_cue = True
+                return
+            elapsed = min(duration, now - began)
+            yield elapsed, elapsed - last
+            last = elapsed
+            if elapsed >= duration:
+                return
+            step = int((time.monotonic() - began) * self.camera.fps) + 1
+            target = min(began + duration, began + step / self.camera.fps)
+
+    def live_progress(self, animations) -> None:
+        if self.abort_cue:
+            return
+        for elapsed, dt in self.live_times(self.get_run_time(animations)):
+            for animation in animations:
+                animation.update_mobjects(dt)
+                animation.interpolate(min(1, elapsed / animation.run_time))
+            self.live_publish(dt=dt)
+
+    def wait(self, duration=None, stop_condition=None, note=None, ignore_presenter_mode=False):
+        if not hasattr(self, "live_buffer"):
+            return super().wait(duration, stop_condition, note, ignore_presenter_mode)
+        if self.abort_cue:
+            return
+        duration = self.default_wait_time if duration is None else duration
+        self.pre_play()
+        for _, dt in self.live_times(duration):
+            if self.should_update_mobjects():
+                self.live_publish(dt=dt)
+            else:
+                self.increment_time(dt)
+            if stop_condition is not None and stop_condition():
+                break
+        self.post_play()
 
     # --- treść sceny -------------------------------------------------------
 
