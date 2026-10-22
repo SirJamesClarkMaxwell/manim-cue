@@ -1,8 +1,8 @@
 # manim-cue — plan rozwoju
 
 Stan (2026-10-22): **fazy 0-3 i 7.0 (CE 0.22) zamknięte; 4, 5, 6a po pierwszej próbie
-prelegenta (uwagi niżej), 6b czeka na decyzję o `greenlet`. Aktywna: 5b (trwałe live), potem
-5c-5e.** Kierunek zmieniony 2026-10-21 decyzjami D13-D19 w `SPEC.md`: projekt staje się forkiem
+prelegenta (uwagi niżej), 6b czeka na decyzję o `greenlet`. Aktywna: 5c (druga próba), potem
+5d-5f.** Kierunek zmieniony 2026-10-21 decyzjami D13-D19 w `SPEC.md`: projekt staje się forkiem
 manim-slides 5.7.0, rozszerzonym o warstwy i wstrzykiwany live.
 Rundy 6-7 recenzji (codex) przebudowały fazy 2-9; decyzje D20-D22.
 
@@ -513,12 +513,12 @@ Diagnoza: codex (read-only, pomiary offscreen). Kolejność wybrał prelegent.
 
 1. **Podgląd następnego slajdu w Info nie animuje warstw.** Baza gra (171 klatek/3 s, pętla),
    ale `preview.set_layers` bez wideo — klipy i live to miniatury (`composition.py:74-79`).
-   Bez następnego slajdu zostaje stary podgląd (`player.py:563-585`). → **5c**: klipy w podglądzie
+   Bez następnego slajdu zostaje stary podgląd (`player.py:563-585`). → **5d**: klipy w podglądzie
    grają; live w podglądzie nie (osobny proces).
-2. **Styl obwódki** (kolor, grubość, krycie) zaszyty w `live_layers.py:27-30`. → **5e**:
+2. **Styl obwódki** (kolor, grubość, krycie) zaszyty w `live_layers.py:27-30`. → **5f**:
    `LiveLayer.active_border`/`error_border: BorderStyle`.
 3. **Przezroczyste tło warstw.** Live: transport RGBA gotowy, blokuje `background_opacity: 1.0`
-   na sztywno (`live_worker.py:35`) → **5d**. Klipy CE/GL z alfą: Qt przenosi alfę, ale
+   na sztywno (`live_worker.py:35`) → **5e**. Klipy CE/GL z alfą: Qt przenosi alfę, ale
    półprzezroczystość miesza się źle (alfa 128 nad niebieskim: `(255,0,127)` zamiast
    `(128,0,127)`), reverse wymusza `libx264` (`slides/utils.py:154`); `SceneView` — wykonalne
    z kodu. → później, osobny kontrakt.
@@ -594,6 +594,57 @@ Ręczne cue: ~10 ms od żądania do zmienionej klatki w GUI. Restart procesu by�
 zmiany slajdu. Rozrzut przy sesji trwałej wyznacza klip (pierwsza zmieniona klatka zależy od
 treści klipu); cel ≤ 50 ms — mediana tak, maksimum o 1 ms ponad. Kryterium 8 czeka na próbę.
 Wykonawca: codex (~25 min), przegląd i pomiar w oknie — Claude.
+
+## Faza 5c — druga próba: proporcje, demo, stan dla prelegenta
+
+**Uwagi z drugiej próby (2026-10-22, slajdy 7-8; potwierdzone przeklikaniem skryptem ze zrzutami
+obu okien):** animacje różnej długości; oba nowe panele „wyglądają dziwnie”; „nie wiem, kiedy co się
+wykona przy ← / →, czy operacja się udała i w którym momencie prezentacji jestem”. Przyczyny:
+1. **Live zniekształcone:** `live_worker.py:33` ustawia rozdzielczość kamery, nie kształt kadru —
+   kadr zostaje 16:9 w prostokącie o innych proporcjach (obrót kwadratu daje równoległobok).
+2. **Klip rozciągnięty:** `composition.py:103` — `IgnoreAspectRatio` (koło Orbit jako elipsa).
+3. **Klip znika na ~100 ms** przy wejściu na slajd z klipem (przygotowanie bariery).
+4. **Demo:** baza 2 s, cue `flip` 0,4 s, Orbit 2 s; `flip` przełącza kolor, więc stan slajdu 8
+   zależy od liczby wejść, a `←` go nie przywraca (D33: bez cofania cue).
+5. **Brak informacji o stanie:** numer slajdu tylko w Info (przy jednym monitorze Info ukryte,
+   `present/__init__.py`); nie widać, czy slajd gra, czeka na przygotowanie, jest w pauzie lub
+   skończony, czy live jest gotowe, co zrobił ostatni klawisz; `V` + `→` zostaje na tym samym
+   slajdzie (upstream) bez wyjaśnienia; spacja na skończonym slajdzie nic nie mówi.
+6. Cienka biała pozioma linia przez cały kadr okna głównego w oknie o proporcjach innych niż 16:9
+   (zrzut prelegenta) — nie odtworzona w oknie 16:9; do zdiagnozowania.
+
+**Projekt:**
+- Live: kadr sceny o proporcjach prostokąta — wysokość kadru domyślna manimgl, szerokość
+  `wysokość · w/h`; ta sama zasada dla miniatury (`capture_first_frame`).
+- Klipy: `KeepAspectRatio` wewnątrz prostokąta warstwy, wyśrodkowane, pusty margines
+  przezroczysty; obwódka i klik dalej po prostokącie warstwy.
+- Bez mignięcia: do pierwszej klatki nowego wejścia klip pokazuje miniaturę / ostatnią klatkę.
+- Demo 7-8: wszystkie trzy animacje po 2 s, liniowe; cue wejścia **ustawia stan** (idempotentne:
+  ten sam wynik przy każdym wejściu), np. kolor i kąt bezwzględne; czarne tło sceny live.
+- **Stan dla prelegenta:** jeden wiersz w Info i nakładka w oknie głównym przełączana klawiszem
+  (domyślnie wyłączona — widzi ją publiczność), z tego samego źródła: `slajd 7/8 · gra / pauza /
+  koniec / przygotowanie / reverse · live: start / gotowe / błąd · fokus: slajdy / live` oraz
+  wynik ostatniego klawisza przez ~2 s (np. `→ slajd 8`, `→ brak następnego slajdu`,
+  `V reverse slajdu 7 — → odtworzy go do przodu`, `spacja: slajd skończony`).
+- Linia: diagnoza na oknie o proporcjach z zrzutu (1614×956) i poprawka, jeśli to nasz element.
+
+**Kryteria akceptacji:**
+1. Live: w prostokącie 0,28×0,6 kwadrat sceny ma równe boki w pikselach (±2 px) także w trakcie
+   obrotu; miniatura tak samo; warstwy 16:9 bez zmian (istniejące testy pikseli).
+2. Klip 16:9 w prostokącie 0,28×0,6: koło Orbit okrągłe (±2 px), margines pokazuje to, co pod
+   warstwą.
+3. Wejście na slajd z klipem: w żadnej klatce okna między żądaniem przejścia a startem prostokąt
+   klipu nie jest pusty (test na kolejnych klatkach).
+4. Demo: trzy animacje slajdu 8 kończą się w tym samym czasie (± 1 klatka); stan slajdu 8 po
+   wejściu identyczny przy 1. i 3. wejściu (piksele).
+5. Stan: wiersz Info i nakładka zmieniają się zgodnie z tabelą zdarzeń (`→`, `←`, `V`, `R`,
+   spacja, klik/Esc, brak slajdu, błąd live, przygotowanie) — test offscreen na tekście; nakładka
+   domyślnie ukryta, przełącznik w `Config.keys` (nowy klawisz, domyślny bez konfliktu).
+6. Linia: przyczyna ustalona; brak linii w oknie 1614×956 (zrzut) albo raport, że to nie nasz kod.
+7. Testy F0-F5b i upstreamu zielone.
+8. **Próba prelegenta:** slajdy 7-8 i nawigacja — wiadomo, gdzie jesteś i co zrobił klawisz.
+
+**Budżet:** ~4 h, stop i raport przy 8 h. Wykonawca: codex w worktree; przegląd i próba — Claude.
 
 ## Faza 7 — live w CE
 
