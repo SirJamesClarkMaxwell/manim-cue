@@ -1304,3 +1304,103 @@ PoC „nagrania stanów” i ocena dróg). Przegląd read-only.
     **Poprawka planu:** mierzyć liczbę elementów rodziny, punktów, przyrost pamięci procesu, czas nagrania i koszt odświeżania. Przed eksperymentem ustalić progi zaliczenia. Nadać nagraniu deterministyczny klucz obejmujący całą zawartość i parametry próbkowania. Dodać przypadek identycznego początku i zmienionej dalszej części nagrania. **~2 h traktować jako limit eksperymentu na wąskim podzbiorze**, nie estymację poprawnej obsługi powyższych mechanizmów.
 
 **Werdykt:** tak, PoC można wykonać po poprawkach — jako eksperyment nagrania wektorowego o jawnym, ograniczonym zakresie. Jego sukces nie będzie podstawą do uznania żywego krokowania za rozwiązane ani niemożliwe (`PLAN.md:458`, `:466–486`). Przegląd był read-only; nie wykonywałem renderów ani pomiarów.
+
+## Runda 15 — codex, 2026-10-22: kontrakt F7.0 (zgodność z CE 0.22)
+
+Pytania: `codex-round15-prompt` (pełność listy złamań API, semantyka cache i flush, segmenty
+w układzie 0.22, „tylko 0.22”, kryteria, budżet). Źródło 0.22 z rozpakowanego wheela. Przegląd
+read-only.
+
+**Co weszło:**
+- p. 1: `max_files_cached = -1` przed `Scene.__init__`, przywracane w `finally`; kryterium 3
+  z limitem 0.
+- p. 2-3 rozwiązane inaczej: zamiast wrappera CLI albo czyszczenia segmentów atrybutem klasy —
+  `--flush_cache` znika razem z flagą CE (segmenty czyści `manim cache clear`), atrybut
+  `Slide.flush_cache` zachowuje semantykę upstreamu. Zmiana względem upstreamu zapisana jawnie.
+- p. 4: czytelny błąd, gdy plan wyjścia nie jest wideo (kryterium 4).
+- p. 6: test trafienia w cache CE dla `SceneView` (kryterium 5), komentarz o hashu.
+- p. 5, 7: poza zakresem 7.0 jako ograniczenia forka sprzed 0.22 (CE 0.21 też wstawiał `None`
+  dla pominiętych animacji, reverse wymusza `libx264` niezależnie od wersji CE). Zamiast korpusu
+  — regresja end-to-end demo decku 0.21 vs 0.22 (kryterium 6).
+- p. 8: decyzja „tylko 0.22” opisana jako świadome ograniczenie wsparcia.
+- p. 9: budżet ~3 h, stop przy 6 h (codex proponował 4-6 h przy szerszym zakresie).
+
+**Odpowiedź codex (bez zmian):**
+
+Kontrakt 7.0 wymaga poprawek przed implementacją. Najpoważniejsze przeoczenie: ustawienie `max_files_cached = -1` dopiero w `render()` nie zapobiegnie usuwaniu segmentów w CE 0.22.
+
+Poniżej `CE22/` oznacza wskazany rozpakowany wheel, a `CE21/` — `.venv/Lib/site-packages/manim/`. Przegląd był statyczny, tylko do odczytu; nie uruchamiałem renderów ani testów zapisujących pliki.
+
+1. **[KRYTYCZNE] Limit cache trzeba ustawić przed inicjalizacją sceny.**
+
+   **Dowód:** `CE22/scene/scene.py:252–257` kopiuje `config.max_files_cached` do ustawień writera podczas `Scene.__init__`. `CE22/scene/scene_file_writer.py:554–556` czyści cache według `self.settings.max_files_cached`, a nie bieżącego `config`. Tymczasem fork zmienia limit dopiero w `src/manimcue/slides/slide/manim.py:159–160`. CE21 odczytywało konfigurację podczas czyszczenia (`CE21/scene/scene_file_writer.py:1063`).
+
+   **Konsekwencja:** prosta zamiana `float("inf")` na `-1` jest nieskuteczna. Przy ponad 100 segmentach — albo konfiguracji `max_files_cached=0` — CE usunie pliki przed `_save_slides`, powodując błąd składania slajdów.
+
+   **Poprawka planu:** zapewnić limit `-1` podczas `Scene.__init__`, przywracając globalną konfigurację przez `finally`. Dodać test z początkowym limitem **0** i kilkoma animacjami: wszystkie slajdy muszą powstać, a konfiguracja musi zostać przywrócona również po wyjątku.
+
+2. **[WAŻNE] Atrybut klasy i CLI nie mają tej samej dotychczasowej semantyki.**
+
+   **Dowód:** `src/manimcue/slides/slide/manim.py:162–179` rozdziela dwie ścieżki. Flaga CE z CLI uruchamia końcowe `flush_cache_directory()`. Samo `self.flush_cache` trafia wyłącznie do `_save_slides`; tam usuwa katalog wynikowych slajdów (`base.py:615–616`). Ponadto ścieżka CLI zeruje `config["flush_cache"]` przed późniejszym przekazaniem go do `_save_slides`.
+
+   **Konsekwencja:** propozycja „atrybut klasy czyści także segmenty CE” **zmienia zachowanie upstreamu**. Usunięcie CLI odbiera jednorazowe wymuszenie czyszczenia bez edycji sceny. Przepisanie testów CLI na atrybut klasy ukrywa tę utratę funkcjonalności.
+
+   **Poprawka planu:** jawnie opisać zmianę semantyki. Jeżeli celem pozostaje zgodność CLI forka, zachować własną opcję wrappera `manim-cue render`, obsługiwaną przed przekazaniem argumentów do CE. Osobno testować czyszczenie wyników slajdów, segmentów CE i kombinację z `--disable_caching`.
+
+3. **[WAŻNE] `clear_segment_cache` nie zostawia pustego katalogu.**
+
+   **Dowód:** `CE22/utils/caching.py:17–31` wybiera tylko nieukryte pliki `.mov`, `.mp4`, `.webm`; `clear_segment_cache` usuwa właśnie ten zbiór. Manifest jest planowany osobno (`CE22/_config/output_plan.py:358`). Obecny test wymaga pustego katalogu przez `not list(local_media_folder.iterdir())` (`tests/slides/test_slide.py:151`, analogicznie po drugim czyszczeniu).
+
+   **Konsekwencja:** wymiana funkcji czyszczącej nie wystarczy do zazielenienia testu. Pozostający `partial_movie_file_list.txt` jest poprawnym zachowaniem CE22, a nie pozostałym segmentem.
+
+   **Poprawka planu:** określić, że znikają **rozpoznawane segmenty**, a manifest i inne pliki pozostają. Test powinien sprawdzać wszystkie trzy rozszerzenia i zachowanie pliku kontrolnego. Katalog pobierać z planu sceny/writera, zamiast rekonstruować jego położenie.
+
+4. **[WAŻNE] Usunięcie `write_to_movie` jest poprawne tylko przy właściwym formacie wyjścia.**
+
+   **Dowód:** `CE22/_config/render_session.py:72–79` rozwiązuje `format=auto` do MP4/MOV, ale przy `live_preview` lub GUI wybiera `NONE`. `CE22/renderer/opengl_renderer.py:966–968` zapisuje klatki według `output_spec`; `CE22/scene/scene_file_writer.py:361–362` nie dodaje segmentów dla wyjścia niewideo.
+
+   **Konsekwencja:** zwykły render OpenGL faktycznie zapisuje segmenty bez `write_to_movie`. Nie jest jednak prawdą, że robi to zawsze. Podgląd interaktywny, `--format=none`, PNG lub sekwencja PNG mogą zostawić `_save_slides` bez segmentów.
+
+   **Poprawka planu:** ustalić kontrakt obsługiwanych trybów: wymusić format wideo przed inicjalizacją sceny albo wcześnie odrzucać niezgodne tryby czytelnym komunikatem. Dodać osobne przypadki zwykłego OpenGL i OpenGL z podglądem.
+
+5. **[WAŻNE] Ścieżki segmentów są obsługiwane poprawnie, ale kontrakt formatów pozostaje otwarty.**
+
+   **Dowód:** `manim.py:94–98` pobiera pełne ścieżki z `partial_movie_files`; CE22 tworzy je przez `output_plan.segment_path()` (`scene/scene_file_writer.py:369`). `_save_slides` zachowuje rozszerzenie (`base.py:650–658`). GIF używa segmentów MP4 albo MOV, nie GIF (`CE22/_config/output.py:119–130`). Tymczasem reverse zawsze wybiera `libx264` (`src/manimcue/slides/utils.py:154`).
+
+   **Konsekwencja:** nie potrzeba nowego wyszukiwania segmentów ani globowania katalogu. Jednak segment `.webm` prowadzi do próby zapisania H.264 do kontenera WebM podczas reverse; przezroczysty MOV również wymaga sprawdzenia zachowania alfa. Samo odnalezienie plików nie oznacza obsługi formatu.
+
+   **Poprawka planu:** jawnie ograniczyć 7.0 do określonych formatów albo objąć testami MP4/MOV/WebM, reverse i przezroczystość. Dodać niestandardowy `partial_movie_dir` oraz GIF, aby wykryć błędne założenie o rozszerzeniu końcowego filmu. To także ograniczenie istniejącego forka, nie wyłącznie nowa regresja CE22.
+
+6. **[WAŻNE] Zmiany hashowania wymagają testu trafienia w cache, nie tylko jego unieważnienia.**
+
+   **Dowód:** CE22 zmienia sygnaturę `get_hash_from_play_call` o wymagane argumenty `backend`, `encoder_fingerprint`, `renderer_state` (`CE22/utils/hashing.py:416`). Serializuje też `pixel_array` dla animacji i mobjectów (`:464–468`), podczas gdy komentarz `scene_view.py:63–65` opisuje tylko dotychczasowe założenie o `__dict__`. Obecny `test_ce_cache_follows_new_source_render` sprawdza zmianę źródła, lecz nie dowodzi ponownego użycia niezmienionego segmentu.
+
+   **Konsekwencja:** bezpośredniego błędu wywołania tu nie ma — fork nie wywołuje tej funkcji. Jest jednak nieopisana zmiana kontraktu cache. Test może przechodzić również wtedy, gdy cache nigdy nie trafia.
+
+   **Poprawka planu:** dopisać sekwencję: identyczny render → potwierdzone trafienie CE; zmiana dalszej klatki źródła → unieważnienie; zmiana ustawień enkodera/backendu → odrębna tożsamość segmentu. Zachować test pikseli wyjścia i zaktualizować komentarz.
+
+7. **[WAŻNE] Kryteria pomijają najbardziej ryzykowne mapowanie indeksów animacji.**
+
+   **Dowód:** CE22 zachowuje `None` dla pominiętych animacji (`scene/scene_file_writer.py:364–367`). Fork usuwa te wpisy (`manim.py:94–98`), a następnie przesuwa indeksy o `from_animation_number` (`base.py:622–629`) i wycina listę według indeksów slajdu (`:646`). Testy `skip_animations` istnieją (`tests/slides/test_slide.py:545`), ale nie obejmują połączenia z `-n a,b`. Test pętli w `:356` sprawdza konstruowanie sceny; test reverse w `:209–213` porównuje ścieżki, nie kolejność klatek.
+
+   **Konsekwencja:** zielony zestaw może nie wykryć slajdu z niewłaściwych animacji, błędnych granic lub niepoprawnego cofania.
+
+   **Poprawka planu:** dodać integracyjny korpus Cairo/OpenGL: kilka `play()` na slajd, `wait()`, pomijany środkowy slajd, `start_skip_animations`/`stop_skip_animations`, `-n a,b` przecinające granice slajdów, pętla oraz `--save_sections`. Sprawdzać zawartość i długości klipów oraz odwróconą kolejność klatek; uwzględnić reverse dzielony na fragmenty.
+
+8. **[DROBNE] Wsparcie wyłącznie 0.22 jest rozsądną decyzją produktową, ale nie koniecznością techniczną.**
+
+   **Dowód:** wskazane użycia `Scene`, `next_section`, kamery Cairo, `ImageMobject`, `FadeIn`/`FadeOut`, `AnimationGroup` i metod mobjectów zachowują potrzebne sygnatury. `checkhealth.py:16` korzysta jedynie z wersji, a `render.py:58` deleguje CLI. Główne różnice dotyczą konfiguracji i cyklu życia writera. `pyproject.toml:32` obecnie deklaruje także starsze CE.
+
+   **Konsekwencja:** obsługa obu wersji jest wykonalna przez niewielkie rozgałęzienie inicjalizacji i czyszczenia, lecz wymaga podwójnej walidacji. Jej odrzucenie nie wynika z niemożliwości zachowania API. Zawężenie zależności usuwa wcześniej deklarowane wsparcie.
+
+   **Poprawka planu:** pozostawić `>=0.22,<0.23`, jeśli brak konsumenta 0.21 jest potwierdzony; nazwać to świadomym ograniczeniem wsparcia i odnotować w dokumentacji. Górna granica jest uzasadniona zależnością od wewnętrznych API CE. Nie widzę podstaw do wymagania obsługi obu wersji w 7.0.
+
+9. **[WAŻNE] Dwie godziny wystarczą na łatkę startową, nie na pełne potwierdzenie kontraktu.**
+
+   **Dowód:** `PLAN.md:542–560` zakłada kilka zmian konfiguracji, istniejący zestaw testów i demonstrację. Dochodzą przeoczona inicjalizacja ustawień writera, decyzja o CLI, macierz trybów wyjścia oraz testy indeksowania i cache opisane powyżej.
+
+   **Konsekwencja:** można szybko uzyskać zielone podstawowe rendery, pozostawiając błąd zależny od liczby segmentów albo pomijanych animacji.
+
+   **Poprawka planu:** przyjąć orientacyjnie **4–6 h** na implementację i ukierunkowaną walidację; szersze wsparcie formatów wycenić osobno. Zachować raport przy 4 h jako punkt kontroli, bez uznawania podstawowego renderu za zakończenie zgodności.
+
+**Werdykt:** 7.0 można implementować po poprawkach. Warunki wejścia to przede wszystkim ustawienie limitu przed `Scene.__init__`, jawna decyzja o semantyce czyszczenia i CLI oraz dopisanie testów granic animacji. Lista trzech usuniętych/zmienionych kluczy nie opisuje jeszcze pełnego kontraktu migracji.

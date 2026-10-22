@@ -1,7 +1,7 @@
 # manim-cue — plan rozwoju
 
-Stan (2026-10-22): **fazy 0, 1 i 2 zamknięte; faza 3 zaimplementowana (próba w oknie: miniatura
-widoczna). Aktywna: faza 4.** Kierunek zmieniony 2026-10-21 decyzjami D13-D19 w `SPEC.md`:
+Stan (2026-10-22): **fazy 0-3 zamknięte; 4, 5, 6a czekają na próbę prelegenta, 6b — na decyzję
+o `greenlet`. Aktywna: faza 7.0 (CE 0.22).** Kierunek zmieniony 2026-10-21 decyzjami D13-D19 w `SPEC.md`:
 projekt staje się forkiem manim-slides 5.7.0, rozszerzonym o warstwy i wstrzykiwany live.
 Rundy 6-7 recenzji (codex) przebudowały fazy 2-9; decyzje D20-D22.
 
@@ -511,6 +511,79 @@ silnikach). Wynik może zamknąć ten kierunek.
 Najpierw adapter Cairo (zegar, publikacja w trakcie `play()`, przerwanie, `wait()`, wyłączony
 cache, brak plików filmu), potem OpenGL jako osobny adapter z własnymi testami. Zgodność z CE 0.22
 sprawdzić przed adapterami.
+
+### 7.0 — zgodność forka z CE 0.22 (kontrakt)
+
+**Cel:** fork renderuje na CE 0.22, na której stoi seminarium; adaptery live 7a/7b powstają od
+razu na 0.22. Nic nowego funkcjonalnie.
+
+**Ustalenia (wheel CE 0.22.0 i upstream, 2026-10-22):**
+- Upstream manim-slides nie ma poprawki: brak wydania po 5.7.0, `main` wyprzedza `v5.7.0`
+  o jeden commit (CI). Poprawka jest nasza.
+- CE 0.22 przeniósł wyjście na plan wyjścia (`_config/output_plan.py`, `resolve_output_plan`
+  w `Scene.__init__`). Klucz `write_to_movie` zniknął — `slide/manim.py:48` rzuca.
+- `max_files_cached` przyjmuje tylko liczbę całkowitą ≥ 0 albo `-1` (bez limitu);
+  `float("inf")` z `slide/manim.py:160` odrzucony.
+- `flush_cache` zniknął z konfiguracji i z CLI (`--flush_cache`); czyszczenie segmentów to
+  komenda `manim cache` i `manim.utils.caching.clear_segment_cache(dir)`. Odwołania:
+  `slide/manim.py:162-179`, testy `tests/slides/test_slide.py:146`, `:168`.
+- `file_writer.partial_movie_files` i `Scene.next_section(skip_animations=...)` zostały.
+- CE 0.22 nadal woła `Image.fromarray(..., mode="RGBA")` (`camera/camera.py:1044`), więc
+  pin `pillow<13` zostaje; zmienia się tylko wersja w komentarzu.
+- Warstwa live (F0-F4) to manimgl — `live_worker.py:38` ustawia `write_to_movie` w konfiguracji
+  manimgl, nie CE; poza zakresem.
+
+- (runda 15) CE 0.22 kopiuje `config.max_files_cached` do ustawień writera w `Scene.__init__`
+  (`scene/scene.py:252-257`) i czyści cache według kopii (`scene_file_writer.py:554-556`);
+  CE 0.21 czytało konfigurację w chwili czyszczenia.
+- (runda 15) `format=auto` daje wideo, ale przy podglądzie na żywo/GUI — `NONE`
+  (`_config/render_session.py:72-79`); wtedy writer nie dodaje segmentów.
+
+**Decyzja (świadome ograniczenie wsparcia):** wyłącznie CE 0.22, `manim>=0.22,<0.23`.
+Seminarium stoi na 0.22, CE 0.21 nie ma konsumenta; obsługa obu jest wykonalna (rozgałęzienie
+inicjalizacji), ale to podwójna walidacja bez zysku. Górna granica, bo fork zależy od
+wewnętrznych API CE, które wydanie minor łamie.
+
+**Projekt:**
+- `Slide.__init__`: `max_files_cached = -1` **przed** `super().__init__` (writer bierze kopię),
+  przywrócenie konfiguracji w `finally`; zamiast `write_to_movie` — po inicjalizacji czytelny
+  błąd, gdy plan wyjścia nie jest wideo (`segment_cache_dir is None`).
+- `render()`: bez manipulacji `max_files_cached` i `flush_cache` konfiguracji CE.
+- **Flush:** CE 0.22 usunął `--flush_cache`; segmenty czyści jego komenda `manim cache clear`.
+  Fork niczego nie dokłada: atrybut `Slide.flush_cache` zachowuje semantykę upstreamu (czyści
+  tylko katalog slajdów, `base.py:615`). Zmiana zachowania względem upstreamu: `manim-cue render
+  ... --flush_cache` znika razem z flagą CE. Fragmenty testu upstreamu z `--flush_cache`
+  usunięte z komentarzem o powodzie.
+- `scene_view.py`: komentarz o hashu cache zaktualizowany do 0.22 (hash obejmuje `pixel_array`).
+- `pyproject.toml`, `README.md`: pin i komentarze.
+- Praca w osobnym worktree z własnym `.venv` — główny `.venv` obsługuje próbę prelegenta.
+
+**Poza zakresem 7.0 (ograniczenia forka sprzed 0.22, runda 15 p. 5, 7):** segmenty WebM
+i przezroczysty MOV przy reverse (`utils.py:154` wymusza `libx264`), własny `partial_movie_dir`,
+GIF, `-n a,b` przecinające granice slajdów. CE 0.21 też wstawiał `None` dla pominiętych
+animacji — mapowanie indeksów się nie zmienia.
+
+**Kryteria akceptacji:**
+1. `uv sync` instaluje CE 0.22; `manim-cue checkhealth` bez błędu.
+2. Pełny `uv run pytest` zielony (upstream render CE Cairo i `--renderer=opengl`, GL,
+   `test_scene_view`); pominięcia te same co przed zmianą.
+3. Render z `max_files_cached = 0` i kilkoma animacjami: wszystkie slajdy powstają, konfiguracja
+   przywrócona także po wyjątku w konstruktorze.
+4. Wyjście niewideo (`format=none`/png): czytelny błąd w konstruktorze, nie pusty deck.
+5. Cache CE: drugi identyczny render `SceneView` trafia w cache (segmenty nie powstają od
+   nowa); zmiana źródła nadal unieważnia (istniejący test).
+6. Regresja end-to-end: demo deck i `Orbit` na 0.22 vs 0.21 — ta sama liczba slajdów, rodzaje
+   warstw, długości klipów i klipów odwróconych per slajd (± 1 klatka).
+7. `manim-cue present Demo` na renderze 0.22 startuje bez tracebacku (offscreen).
+8. Odstępstwo z fazy 1 (pin `<0.22`) zamknięte w `PLAN.md` i `SPEC.md`.
+
+**Budżet:** ~3 h (runda 15 podniosła z 2 h), stop i raport przy 6 h.
+
+### 7a — adapter live Cairo (zarys; kontrakt po 7.0)
+
+Zegar, publikacja klatek w trakcie `play()` do strumienia F2, przerwanie (D10), `wait()`,
+wyłączony cache, brak plików filmu, korpus scen D22. Ryzyko: progi F2 (960×540 ≥ 60 fps)
+liczone pod GPU; Cairo rysuje na CPU — najpierw pomiar, potem osobne progi do decyzji.
 
 ## Faza 8 — integracja z seminarium
 
