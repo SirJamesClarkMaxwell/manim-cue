@@ -585,6 +585,41 @@ VFR, `become`/`Transform` między dwoma widokami, sterowanie przez `.animate`.
 
 ---
 
+## Decyzje po próbie prelegenta F4-F6a (2026-10-22, runda 16)
+
+**D33. Trwała sesja live i cue wejścia.** _Prelegent: „jedno kliknięcie ma robić kilka rzeczy
+naraz w scenie głównej, interaktywnej i innej CE; sceny nieruchome, tylko animacje”. Restart live
+przy każdym slajdzie (D27) to też największy zmierzony koszt zmiany slajdu: ~1,8 s na ciepło._
+- **Ciąg sesji:** `LiveLayer.session_id: str | None`; warstwy o tym samym `session_id` na
+  **sąsiednich** slajdach jednej prezentacji to jeden ciąg — proces i stan sceny przechodzą.
+  Zgodność wewnątrz ciągu: kanoniczna ścieżka sceny, klasa, `fps` i rozmiar renderu (szerokość,
+  wysokość prostokąta); pozycja i `thumbnail` nie należą do tożsamości. `session_id` unikalny na
+  slajdzie. Niezgodność → błąd walidacji z indeksami slajdów. Przerwa kończy ciąg; to samo ID
+  dalej = nowa generacja. Sesji zatrzymywanej (`request_stop`) ani w ERROR nigdy się nie
+  przejmuje. Bez `session_id` — D27 bez zmian.
+- **Ciągłość obrazu:** ostatnia klatka, metadane i błąd należą do sesji, nie do indeksu warstwy;
+  każde wejście odtwarza mapowanie sesja → indeks kompozycji i od razu wstawia ostatni obraz
+  (bezczynna scena nie publikuje ponownie). Fokus zwalniany przy zmianie slajdu (D20).
+- **Zdarzenia nawigacji:** player przekazuje kontrolerowi przyczynę zatwierdzonego przejścia, nie
+  flagę `playing_reversed_slide` (`←` ustawia ją na `False`, `V` — przed sprawdzeniem istnienia
+  slajdu). `enter_cue` idzie **tylko** przy zatwierdzonym wejściu do przodu (`next` ze zmianą
+  slajdu, `auto_next`, `skip_all`); nie przy powtórzeniu pętli, przejściu reverse → normalny plik
+  tego samego slajdu, wejściu od tyłu, replay ani zamknięciu.
+- **Wspólny start:** koordynacja potrzebna, gdy slajd ma klipy/klatki kluczowe (D31) **albo**
+  live z `enter_cue` w sesji jeszcze nie-READY — także nad bazą statyczną. Baza i klipy czekają na
+  pierwszych klatkach, live na READY (≤ 5 s; bez READY live wypada, cue nie idzie, baza startuje),
+  potem w jednym ticku `play()` grupy i `send(enter_cue)`. Sesja ciepła nie wstrzymuje startu.
+  `start_paused`/pauza w przygotowaniu: cue idzie przy pierwszym faktycznym starcie.
+- **Cue w trakcie innego cue:** `enter_cue` przerywa trwające (D10 — skok do końca), więc start
+  live może się spóźnić o jedną publikację; zgłoszone, nie korygowane.
+- **Poza D33 (osobny etap, protokół checkpointów — runda 16 p. 3-5):** cofanie cue wejścia przy
+  `←`/`V` i ponowne cue przy replay. Do tego czasu wejście od tyłu zostawia live w bieżącym stanie;
+  `back` (D3) cofa tylko cue z sekwencji `next`, nie nazwane `enter_cue`.
+- Bez zmian: fokus (D20; cue wejścia nie przejmuje fokusu), brak pauzy live (D17 dla live to tylko
+  wspólny start; spacja pauzuje bazę i klipy), brak zegara głównego, podgląd Info z miniaturami.
+
+---
+
 ## Zakres, którego nie wolno rozszerzyć bez decyzji
 
 **Synchronizacja co do klatki.** Warstwy startują i pauzują razem (D17) — i na tym koniec.

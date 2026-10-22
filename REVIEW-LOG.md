@@ -1404,3 +1404,139 @@ Poniżej `CE22/` oznacza wskazany rozpakowany wheel, a `CE21/` — `.venv/Lib/si
    **Poprawka planu:** przyjąć orientacyjnie **4–6 h** na implementację i ukierunkowaną walidację; szersze wsparcie formatów wycenić osobno. Zachować raport przy 4 h jako punkt kontroli, bez uznawania podstawowego renderu za zakończenie zgodności.
 
 **Werdykt:** 7.0 można implementować po poprawkach. Warunki wejścia to przede wszystkim ustawienie limitu przed `Scene.__init__`, jawna decyzja o semantyce czyszczenia i CLI oraz dopisanie testów granic animacji. Lista trzech usuniętych/zmienionych kluczy nie opisuje jeszcze pełnego kontraktu migracji.
+## Runda 16 — codex, 2026-10-22: D33 i kontrakt F5b (trwałe live, jedno kliknięcie)
+
+Pytania: `codex-round16-prompt` (kierunek wejścia, `back` przy wyjściu wstecz, bariera D31 z READY,
+klucz sesji, wymóg `rect`, mierzalność ≤ 50 ms, diagnoza uwag z próby, budżet). Przegląd read-only.
+
+**Co weszło:**
+- p. 1-2: jawna przyczyna zatwierdzonego przejścia zamiast `playing_reversed_slide`; `enter_cue`
+  tylko przy wejściu do przodu, bez powtórzeń pętli i przejścia reverse → normalny plik.
+- p. 3-5 i 13: cofanie cue wejścia i replay live **wydzielone** do osobnego etapu (checkpointy);
+  5b to minimum pokazu. D33 zapisuje, że `back` nie cofa nazwanego `enter_cue`.
+- p. 6: koordynacja startu także dla live z `enter_cue` nad bazą statyczną; timeout live osobno.
+- p. 7: zamiast potwierdzania przygotowania wejścia — jawna polityka: `enter_cue` przerywa
+  trwające cue (D10), spóźnienie o jedną publikację zgłoszone.
+- p. 8: obraz, metadane i błąd przy sesji; mapowanie sesja → indeks na każdym wejściu.
+- p. 9: generacja w kluczu, sesji zatrzymywanej i w ERROR nie przejmuje się, ID unikalne na slajdzie.
+- p. 10: tożsamość ciągu bez pozycji i `thumbnail` (ścieżka, klasa, fps, rozmiar renderu).
+- p. 11: pomiar na wspólnej osi `perf_counter`, ≥ 10 prób, ≤ 50 ms jako cel, nie gwarancja.
+- p. 12: pomiar przed zmianą zostaje pierwszym etapem; demo ze stałymi kamerami.
+- Budżet ~6 h na zawężony zakres (codex: ~8 h wiarygodne dla prototypu).
+
+**Odpowiedź codex (bez zmian):**
+
+1. **[KRYTYCZNE] Kierunku wejścia nie da się odczytać z `playing_reversed_slide`.**
+
+   **Dowód:** `player.py:651` — `previous()` ustawia flagę na `False`, choć przechodzi wstecz; `player.py:656` — `reverse()` ustawia ją na `True` przed sprawdzeniem, czy poprzedni slajd istnieje. `player.py:527` — następne przejście po reverse odtwarza normalnie **ten sam slajd**. `player.py:661` — replay nie wywołuje `load_current_media()` ani kontrolera.
+
+   **Konsekwencja:** samo przekazanie flagi do `show()` pomyli zwykłe cofnięcie z wejściem do przodu, ominie replay i może ponownie uruchomić cue po reverse. `V` na pierwszym slajdzie zostawia flagę zmienioną mimo braku przejścia.
+
+   **Poprawka planu:** jawnie przekazywać przyczynę **zatwierdzonego przejścia**, osobno od trybu odtwarzania pliku. Wymagana tabela:
+   
+   - pierwszy slajd, również start od wskazanego indeksu — osobna inicjalizacja;
+   - `next` — wejście dopiero przy rzeczywistej zmianie slajdu, nie przy wznowieniu;
+   - `previous` i `V` — przejście wstecz, różny tryb bazy;
+   - reverse → normalny plik tego samego slajdu — osobne zdarzenie;
+   - `R` — osobne zdarzenie, również podczas reverse;
+   - granica prezentacji — nowa sesja;
+   - brak poprzedniego/następnego slajdu — brak zdarzenia;
+   - zamknięcie — anulowanie, bez cue i cofania.
+
+2. **[WAŻNE] „Koniec pętli” nie oznacza obecnie wejścia na slajd.**
+
+   **Dowód:** `player.py:332` — zamówione zakończenie pętli albo przechodzi dalej przy `auto_next`, albo zatrzymuje bieżący slajd na końcu. Zwykłe powtórzenia pętli nie wywołują `show()`. `player.py:312` i `player.py:323` — `skip_all` oraz `auto_next` prowadzą bezpośrednio do `load_next_slide()`, które uwzględnia też flagę reverse.
+
+   **Konsekwencja:** zapis D33 (`SPEC.md:598`) pozwala interpretować każde powtórzenie jako ponowne cue. Ponadto `auto_next` podczas reverse może najpierw przełączyć ten sam slajd na normalny plik.
+
+   **Poprawka planu:** cue tylko na zatwierdzonym wejściu do przodu; powtórzenie pętli i zatrzymanie na jej końcu bez cue. Osobno określić zachowanie `skip_all` i `auto_next` podczas reverse oraz przetestować je przez rzeczywiste callbacki.
+
+3. **[KRYTYCZNE] Nazwane `enter_cue` może być w ogóle niecofalne przez `back`.**
+
+   **Dowód:** `live_scene.py:425` — kursor sekwencji przesuwa tylko komenda `next`; nazwany preset wykonuje `save_state()` bez przesunięcia kursora (`live_scene.py:432`). `step_back()` odmawia cofania przy `cursor == 0` (`live_scene.py:363`).
+
+   **Konsekwencja:** świeża sesja wykonuje `enter_cue="spin"`, ale późniejsze `back` niczego nie cofa. Przy niezerowym kursorze może przywrócić ostatni snapshot, jednocześnie błędnie przesuwając kursor sekwencji.
+
+   **Poprawka planu:** nie opierać cofania wejścia na istniejącym `back`. W planie trzeba jawnie uwzględnić zmianę protokołu i zarządzania stanem sceny.
+
+4. **[KRYTYCZNE] Jedno `back` nie przywraca stanu sprzed wejścia przy ręcznych cue, replay i pominiętym wejściu.**
+
+   **Dowód:** `live_scene.py:327` — cofany jest ostatni snapshot. Ręczne strzałki trafiają do live (`live_layers.py:214`). D33 nakazuje `back` na podstawie obecności pola (`SPEC.md:599`), choć plan dopuszcza niewysłanie cue po timeout (`PLAN.md:549`). Przerwanie domyka animację do końca (`SPEC.md:283`).
+
+   **Konsekwencja:** po wejściu B i ręcznym cue cofnięte zostanie ręczne cue, a nie wejście B. Po niewysłanym wejściu można cofnąć wcześniejsze cue z A. Replay dokłada kolejne snapshoty. Samo wysłanie komendy nie dowodzi jej wykonania.
+
+   **Poprawka planu:** odporna reguła to **checkpoint przed wejściem**, identyfikowany generacją sesji i identyfikatorem wejścia. Wyjście wstecz przywraca ten checkpoint wraz z kursorem i historią, niezależnie od ręcznych cue. Brak potwierdzonego checkpointu oznacza brak cofania. Przy trwającym cue: przerwać zgodnie z D10, następnie przywrócić checkpoint i potwierdzić wynik. Replay powinien wracać do tego samego checkpointu i uruchamiać wejście ponownie.
+
+5. **[KRYTYCZNE] Kontrakt cofania myli slajd opuszczany z odtwarzanym.**
+
+   **Dowód:** `player.py:651` — `←` ładuje poprzedni slajd normalnie; `player.py:656` — `V` ładuje reverse **poprzedniego** slajdu. Tymczasem `PLAN.md:565` przypisuje `←` reverse bazy. D33 opisuje cofnięcie cue slajdu opuszczanego (`SPEC.md:599`).
+
+   **Konsekwencja:** po B→A baza może przedstawiać animację A, podczas gdy live właśnie cofa animację wejścia B. Nawet poprawny stan końcowy nie gwarantuje spójnej animacji trzech scen.
+
+   **Poprawka planu:** rozpisać konkretną oś czasu A→B→A: który plik bazy gra, które cue live jest cofane, kiedy pokazuje się stan A. Poprawić kryterium dotyczące `←`; zdecydować, czy celem jest zgodność stanów końcowych, czy również animacji cofania.
+
+6. **[KRYTYCZNE] Rozszerzenie samej bariery `ClipGroup` omija podstawowy przypadek baza + live.**
+
+   **Dowód:** `clip_layers.py:64` — grupa jest potrzebna tylko dla klipu wideo lub keyframes; `clip_layers.py:79` — w pozostałych przypadkach `enter()` natychmiast zwraca `False`. `player.py:467` dodatkowo pomija grupę podczas reverse.
+
+   **Konsekwencja:** slajd z bazą i nieruchomym live z `enter_cue` nie otrzyma bariery D33. Demo z dodatkowym klipem ukryje błąd.
+
+   **Poprawka planu:** rozszerzyć warunek uruchomienia koordynacji o `enter_cue`, również nad bazą statyczną. Zdefiniować wysłanie cue przy `start_paused`, pauzie podczas przygotowania i późniejszym wznowieniu. Timeout live nie może korzystać bezpośrednio ze ścieżki usuwania playera klipu (`clip_layers.py:164`).
+
+7. **[KRYTYCZNE] READY nie oznacza, że trwała sesja jest bezczynna i gotowa do wspólnego startu.**
+
+   **Dowód:** `live_session.py:70` ustawia `ready` po inicjalizacji; `CUE_START` i `CUE_DONE` nie zmieniają tego stanu. `live_scene.py:478` kolejkuje komendy, a `live_scene.py:570` pozwala nowej komendzie przerwać bieżące cue.
+
+   **Konsekwencja:** wejście B podczas animacji A spełnia warunek READY, lecz cue B rozpocznie się po przerwaniu, domknięciu i publikacji A. „Jeden tick” wysłania nie oznacza wspólnego początku animacji.
+
+   **Poprawka planu:** oddzielić „proces zainicjalizowany” od „wejście przygotowane”. Przed zwolnieniem bariery wymagać potwierdzenia przygotowania konkretnego wejścia i odebranej klatki granicznej. Ustalić politykę dla trwającego cue oraz szybkich przejść; nie używać samego `state == "ready"`.
+
+8. **[KRYTYCZNE] Zachowanie procesu nie zachowuje obrazu ani poprawnego indeksu warstwy.**
+
+   **Dowód:** `live_layers.py:43` — sesje i metadane są indeksowane po pozycji w kompozycji. `composition.py:88` zachowuje pixmapy tylko przy tej samej liście warstw. Nowy slajd dostaje miniaturę (`composition.py:109`). Odczyt nie zwraca ponownie tego samego `frame_id` (`frame_buffer.py:101`), a bezczynna scena nie publikuje stale (`composition.py:80`).
+
+   **Konsekwencja:** przy A→B live może przeskoczyć do miniatury i pozostać na niej mimo zachowanego PID. Zmiana pozycji live w liście, np. `[live, clip]`→`[clip, live]`, grozi wysłaniem obrazu lub obwódki pod zły indeks.
+
+   **Poprawka planu:** przechowywać ostatni obraz i metadane przy tożsamości sesji; na każdym wejściu odtworzyć mapowanie sesja→indeks kompozycji i natychmiast wstawić obraz. Przenieść także czas startu i błąd; fokus zwalniać. Dodać test zmiany indeksu i przejścia bez nowej publikacji.
+
+9. **[WAŻNE] Klucz `(prezentacja, session_id)` nie wystarcza do zarządzania życiem sesji.**
+
+   **Dowód:** `live_session.py:172` — `request_stop()` ustawia termin zabicia procesu, ale nie zmienia od razu `state`; sesja może nadal wyglądać na READY. ERROR również zamawia zatrzymanie (`live_session.py:73`). Obecny kontroler oddziela sesje zatrzymywane (`live_layers.py:95`), a test szybkiego powrotu wymaga nowego obiektu (`tests/test_live_layers.py:204`).
+
+   **Konsekwencja:** po przerwie w ciągu slajdów szybki powrót może odzyskać sesję już skazaną na zakończenie. Wyczyszczenie `failed` może ukryć błąd przenoszonej sesji. Dwa wystąpienia tego samego ID na jednym slajdzie mają nieokreślone znaczenie.
+
+   **Poprawka planu:** klucz logiczny uzupełnić generacją procesu; sesji zatrzymywanej nigdy nie przywracać. Zdefiniować ciągłość jako sąsiednie slajdy tej samej prezentacji plus jawnie dozwolone operacje na tym samym slajdzie. ERROR pozostaje błędem do opuszczenia ciągu lub jawnego restartu. Walidować unikalność ID na slajdzie i zgodność wewnątrz ciągłego odcinka. Późniejsze użycie ID po przerwie tworzy nową generację.
+
+10. **[WAŻNE] `rect` jest zbyt restrykcyjny, a semantyka `thumbnail` pominięta.**
+
+    **Dowód:** D33 wymaga identycznego `rect` (`SPEC.md:595`), lecz rozmiar renderu zależy tylko od szerokości i wysokości, nie pozycji (`config.py:253`). Miniatura live jest pierwszą klatką świeżej sceny (`config.py:237`, `slides/slide/base.py:726`).
+
+    **Konsekwencja:** przesunięcie nieruchomego panelu między slajdami niepotrzebnie staje się błędem walidacji. Miniatura B może przedstawiać stan początkowy procesu, choć trwały live jest już po cue A; podgląd Info nadal pokazuje miniatury.
+
+    **Poprawka planu:** dla zgodności procesu porównywać kanoniczną ścieżkę sceny, klasę, fps i wynikowy rozmiar renderu. Stałe położenie pozostawić wymogiem demonstracji, jeśli tego chce prelegent. `thumbnail` wyłączyć z tożsamości sesji; określić ją jako fallback/podgląd, bez obietnicy stanu B. Ciągłość obrazu głównego zapewniać cache’em z punktu 8.
+
+11. **[WAŻNE] Kryterium ≤50 ms miesza dostarczenie klatki z jej wyświetleniem.**
+
+    **Dowód:** istniejący test wprost mierzy dostarczenie do GUI, nie wyświetlenie (`tests/test_clip_layers.py:332`). Live przechodzi przez kolejkę wysyłki (`live_session.py:108`), oczekiwanie `select` (`live_scene.py:415`), render/readback/publikację (`live_scene.py:533`) i timer GUI 4 ms (`live_layers.py:21`). Kod dokumentuje zaokrąglanie timeoutu `select` na Windows (`live_scene.py:560`).
+
+    **Konsekwencja:** test offscreen może mierzyć użyteczną metrykę programową, ale nie potwierdzi tego, co zobaczy prelegent. Pierwsza poprawna klatka może być niezmieniona; pierwsza zmieniona zależy także od treści animacji.
+
+    **Poprawka planu:** zastosować kontrolowane animacje z natychmiastową zmianą znacznika w każdym z trzech obszarów. Rejestrować wspólną osią monotoniczną: żądanie, zwolnienie bariery, odbiór cue, publikację live i pierwszą zmienioną klatkę odebraną w GUI. Oddzielić opóźnienie od rozrzutu, READY od pierwszej klatki i test offscreen od pomiaru okna. ≤50 ms traktować jako cel na określonym sprzęcie, raportowany z wielu prób, a nie gwarancję wynikającą z jednego ticku.
+
+12. **[WAŻNE] Diagnoza ospałości jest częściowa, a „nieruchome sceny” nie jest jednoznaczne.**
+
+    **Dowód:** ranking opiera się na offscreen i sam odnotowuje brak pomiaru okna (`PLAN.md:525`). D33 deklaruje restart największym kosztem (`SPEC.md:592`), choć replay i pętla już zachowują proces (`live_layers.py:64`). Na slajdzie 5 faktycznie przesuwa się prostokąt Orbit (`examples/demo.py:119`), a notatka błędnie obiecuje pauzę wszystkiego (`examples/demo.py:129`).
+
+    **Konsekwencja:** trwałość usuwa koszt restartu podczas zmiany slajdu, ale nie wyjaśnia opóźnienia ręcznych cue ani renderowania. Trzy stałe prostokąty nie dowodzą jeszcze, że kamera i układ wewnątrz scen pozostają nieruchome.
+
+    **Poprawka planu:** zachować pomiar przed zmianą jako pierwszy etap. Osobno mierzyć start procesu, przejście z zachowaniem sesji i reakcję na cue. W demo ustalić stałe prostokąty i kamery oraz widoczne animacje obiektów. Punkty 1–3 uwag mogą pozostać w 5c–5e; 5b musi jednak naprawić ciągłość obrazu i jawnie opisać statyczny podgląd oraz brak pauzy live.
+
+13. **[WAŻNE] ~8 h jest wiarygodne dla prototypu, nie pełnego kontraktu.**
+
+    **Dowód:** `PLAN.md:542` obejmuje model, walidację, trwałość, nawigację, barierę, pomiary i demo. Obecne testy sprawdzają głównie restart oraz izolację starych sesji (`tests/test_live_layers.py:187`), a nie checkpointy, replay i ciągłość między slajdami.
+
+    **Konsekwencja:** pełne wykonanie wymaga również protokołu przywracania, potwierdzeń operacji i testów wyścigów. Limit 16 h łatwo osiągnąć przed próbą prelegenta.
+
+    **Poprawka planu:** rozdzielić zakres. Minimalny etap realizujący pokaz: trwała sesja w sąsiednich slajdach, zachowany obraz, jedno cue wejścia, wspólny start i pomiar w oknie. Odroczyć animowane cofanie live i deterministyczny replay — **jawnie wyłączając je z kryteriów tego etapu**. Zachować poprawną izolację procesów, błędy i anulowanie szybkich przejść. Jeśli cofanie i replay pozostają wymagane, zwiększyć budżet po zaprojektowaniu protokołu.
+
+**Werdykt:** 5b można implementować po poprawkach, ale obecny D33 nie jest gotowym kontraktem. Najpierw trzeba rozstrzygnąć zdarzenia nawigacji, checkpointy cofania, gotowość do startu i przenoszenie obrazu. Przegląd był statyczny i read-only; nie uruchamiałem testów ani pomiarów.

@@ -1,9 +1,9 @@
 # manim-cue — plan rozwoju
 
-Stan (2026-10-22): **fazy 0-3 zamknięte; 4, 5, 6a czekają na próbę prelegenta, 6b — na decyzję
-o `greenlet`. Faza 7.0 (CE 0.22) zamknięta.** Kierunek zmieniony 2026-10-21 decyzjami D13-D19
-w `SPEC.md`:
-projekt staje się forkiem manim-slides 5.7.0, rozszerzonym o warstwy i wstrzykiwany live.
+Stan (2026-10-22): **fazy 0-3 i 7.0 (CE 0.22) zamknięte; 4, 5, 6a po pierwszej próbie
+prelegenta (uwagi niżej), 6b czeka na decyzję o `greenlet`. Aktywna: 5b (trwałe live), potem
+5c-5e.** Kierunek zmieniony 2026-10-21 decyzjami D13-D19 w `SPEC.md`: projekt staje się forkiem
+manim-slides 5.7.0, rozszerzonym o warstwy i wstrzykiwany live.
 Rundy 6-7 recenzji (codex) przebudowały fazy 2-9; decyzje D20-D22.
 
 ## Wizja (prelegent, 2026-10-21)
@@ -506,6 +506,76 @@ silnikach). Wynik może zamknąć ten kierunek.
 - **Do decyzji prelegenta:** zależność `greenlet` (C, szeroko używana: gevent, SQLAlchemy) jako
   mechanizm współbieżności kooperacyjnej w jednym wątku. Tak → F6b jako API (`ChildView`), testy,
   potem GL. Nie → kierunek zamknięty, „scena w scenie” to F6a (render) i warstwy F5.
+
+## Uwagi z próby prelegenta F4-F6a (2026-10-22)
+
+Diagnoza: codex (read-only, pomiary offscreen). Kolejność wybrał prelegent.
+
+1. **Podgląd następnego slajdu w Info nie animuje warstw.** Baza gra (171 klatek/3 s, pętla),
+   ale `preview.set_layers` bez wideo — klipy i live to miniatury (`composition.py:74-79`).
+   Bez następnego slajdu zostaje stary podgląd (`player.py:563-585`). → **5c**: klipy w podglądzie
+   grają; live w podglądzie nie (osobny proces).
+2. **Styl obwódki** (kolor, grubość, krycie) zaszyty w `live_layers.py:27-30`. → **5e**:
+   `LiveLayer.active_border`/`error_border: BorderStyle`.
+3. **Przezroczyste tło warstw.** Live: transport RGBA gotowy, blokuje `background_opacity: 1.0`
+   na sztywno (`live_worker.py:35`) → **5d**. Klipy CE/GL z alfą: Qt przenosi alfę, ale
+   półprzezroczystość miesza się źle (alfa 128 nad niebieskim: `(255,0,127)` zamiast
+   `(128,0,127)`), reverse wymusza `libx264` (`slides/utils.py:154`); `SceneView` — wykonalne
+   z kodu. → później, osobny kontrakt.
+4. **Ospałość.** Ranking zmierzony: restart procesu live przy każdym slajdzie (~1,8 s ciepło,
+   31,7 s zimno), readback GPU→CPU 1080p 7,4 ms + kopie, bariera F5 56-186 ms; konwersja klatki
+   w GUI 0,6 ms — nie ona. Brak pomiaru w prawdziwym oknie. → **5b** (pomiar + trwałe live);
+   rozdzielczość renderu live niezależna od prostokąta — kandydat po pomiarze.
+5. **Jedno kliknięcie, trzy sceny** — nie ma ani testu, ani mechanizmu; zmiana slajdu restartuje
+   live, spacja nie pauzuje live (notatka slajdu 5 demo jest błędna), Orbit na slajdzie 5 jeździ.
+   → **5b**.
+
+Stan kryteriów prób F4-F6a: prelegent nie potwierdził ani nie odrzucił pozostałych punktów.
+
+## Faza 5b — trwałe live i jedno kliknięcie w trzech scenach
+
+**Cel:** D33. Jedno `→` uruchamia naraz animację bazy CE, cue w scenie live i klip innej sceny
+CE; sceny stoją, ruszają się tylko animacje. Proces live przechodzi przez sąsiednie slajdy.
+**Bez** cofania cue wejścia i replay live (osobny etap, protokół checkpointów — runda 16), pauzy
+live, zegara głównego, ruchu warstw.
+
+**Projekt:**
+- Model: `LiveLayer.session_id`, `LiveLayer.enter_cue`; walidacja ciągów (D33) po renderze
+  i przy `from_file`, z indeksami slajdów.
+- Player: jawna przyczyna zatwierdzonego przejścia (tabela z D33) do `LiveLayerController.show()`;
+  `previous()`/`reverse()` bez zgadywania z `playing_reversed_slide`.
+- Kontroler: sesje po tożsamości (prezentacja, `session_id`, generacja), nie po indeksie warstwy;
+  ostatni obraz, metadane i błąd przy sesji; mapowanie sesja → indeks odtwarzane na wejściu.
+- Koordynacja startu: warunek „live z `enter_cue` nie-READY” obok klipów/klatek kluczowych, także
+  nad bazą statyczną; timeout live nie idzie ścieżką usuwania playera klipu.
+- Pomiar (`examples/measure_player.py`): wspólna oś `perf_counter` — żądanie przejścia, zwolnienie
+  bariery, wysłanie cue, publikacja live, pierwsza **zmieniona** klatka odebrana w GUI dla każdej
+  z trzech warstw; zimny start procesu osobno; reakcja na ręczne cue osobno. Wynik JSON.
+- Demo: slajdy 7-8 — trzy nieruchome prostokąty i kamery (baza, live z `session_id`
+  i `enter_cue`, klip innej sceny CE bez klatek kluczowych), animacje ze zmianą widoczną od
+  pierwszej klatki. Poprawka notatki slajdu 5 (spacja nie pauzuje live).
+
+**Kryteria akceptacji:**
+1. Pomiar przed zmianą i po niej w prawdziwym oknie (Claude; sandbox codex nie uruchamia okna):
+   przejście slajd → slajd z live — restart vs sesja trwała; wyniki w `PLAN.md`.
+2. Model: round-trip JSON obu pól; niespójny ciąg, duplikat ID na slajdzie → błąd z indeksami;
+   zmiana pozycji przy tym samym rozmiarze — dozwolona; v3 bez pól czytany jak dotąd.
+3. Trwałość: A → B w ciągu — ten sam PID, obraz po cue na A widoczny na B od razu (bez nowej
+   publikacji), także gdy live zmienia indeks w liście warstw (`[live, clip]` → `[clip, live]`);
+   bez `session_id` — nowy PID (D27).
+4. Zdarzenia: `enter_cue` przy `next`, `auto_next`, `skip_all`; brak przy powtórzeniu pętli,
+   reverse → normalny plik, `←`, `V`, `R`, zamknięciu (testy przez rzeczywiste callbacki playera).
+5. Jeden klik (integracyjny, offscreen): `→` na decku trzech scen — wszystkie trzy zmieniają
+   piksele; raport opóźnień i rozrzutu z ≥ 10 prób; cel ≤ 50 ms rozrzutu przy ciepłej sesji na
+   tym sprzęcie (cel, nie gwarancja); zimny start osobno.
+6. Odporność: sesja zatrzymywana ani w ERROR nie jest przejmowana; szybkie A → B → A nie myli
+   sesji; live bez READY w 5 s nie blokuje startu bazy; cue wejścia nie przejmuje fokusu, klik
+   w live na B daje strzałki (D20).
+7. Testy F0-F7.0 i upstreamu zielone.
+8. **Próba prelegenta:** demo, slajdy 7-8 — jedno `→`, trzy animacje naraz, bez restartu panelu.
+
+**Budżet:** ~6 h, stop i raport przy 12 h. Wykonawca: codex w osobnym worktree; przegląd diffu
+i pomiar w oknie — Claude.
 
 ## Faza 7 — live w CE
 
