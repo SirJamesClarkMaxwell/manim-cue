@@ -395,6 +395,8 @@ sprawdzone dodatkowo ręcznie.
   plan): nie ma `config["write_to_movie"]` (`slide/manim.py:48` rzuca `AttributeError`), doszła
   walidacja `max_files_cached`. Upstream testował CE 0.19.1. Fork przypięty do `manim<0.22`.
   Seminarium stoi na CE 0.22 z załataną kopią — łatki najpewniej pokrywają właśnie to.
+  **Zamknięte w fazie 7.0 (2026-10-22):** fork dostosowany do planu wyjścia CE 0.22,
+  pin zmieniony na `manim>=0.22,<0.23`; zgodność z 0.21 świadomie poza wsparciem.
 - `slide/manimlib.py` podmienia `sys.argv` na `[__file__]` przed importem manimlib, żeby launcher
   manimgl nie parsował argumentów cudzego procesu. Skutek uboczny: konfigurację manimgl ustala
   ten, kto zaimportuje manimlib pierwszy (`tests/conftest.py`).

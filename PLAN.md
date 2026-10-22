@@ -1,7 +1,8 @@
 # manim-cue — plan rozwoju
 
 Stan (2026-10-22): **fazy 0-3 zamknięte; 4, 5, 6a czekają na próbę prelegenta, 6b — na decyzję
-o `greenlet`. Aktywna: faza 7.0 (CE 0.22).** Kierunek zmieniony 2026-10-21 decyzjami D13-D19 w `SPEC.md`:
+o `greenlet`. Faza 7.0 (CE 0.22) zamknięta.** Kierunek zmieniony 2026-10-21 decyzjami D13-D19
+w `SPEC.md`:
 projekt staje się forkiem manim-slides 5.7.0, rozszerzonym o warstwy i wstrzykiwany live.
 Rundy 6-7 recenzji (codex) przebudowały fazy 2-9; decyzje D20-D22.
 
@@ -71,7 +72,7 @@ tak samo jak oryginał. Nic nowego funkcjonalnie — fundament pod fazy 3-5.
   Błąd upstreamu: `PresentationConfig.from_file` czytał JSON kodowaniem systemowym (cp1252),
   a `to_file` zapisuje UTF-8 (`config.py:335`, test `test_notes_round_trip_utf8`). Po poprawce
   prelegent potwierdził notatki i podgląd.
-- **Odstępstwo:** Manim CE przypięty do `<0.22` — manim-slides 5.7.0 pada na CE 0.22
+- **Odstępstwo (zamknięte w fazie 7.0, 2026-10-22):** Manim CE był przypięty do `<0.22` — manim-slides 5.7.0 pada na CE 0.22
   (`SPEC.md`, ustalenia rundy 6). Wsparcie CE 0.22 to osobna praca: przed adapterami CE
   (faza 7), bezwzględnie przed integracją seminarium (faza 8), bo seminarium stoi na CE 0.22.
 - Przy okazji naprawione: testy fazy 0 padały na każdej opcji pytesta poza `-q`, bo manimgl
@@ -578,6 +579,23 @@ animacji — mapowanie indeksów się nie zmienia.
 8. Odstępstwo z fazy 1 (pin `<0.22`) zamknięte w `PLAN.md` i `SPEC.md`.
 
 **Budżet:** ~3 h (runda 15 podniosła z 2 h), stop i raport przy 6 h.
+
+**Wynik (2026-10-22, Windows 11):**
+- Fork korzysta z planu wyjścia CE 0.22; limit segmentów `-1` jest ustawiany przed
+  inicjalizacją writera, a globalna konfiguracja przywracana w `finally`. Wyjścia niewideo
+  są odrzucane czytelnym błędem konstruktora, także w podglądzie OpenGL.
+- Usunięte odwołania do `write_to_movie` i konfiguracji `flush_cache` CE. Atrybut
+  `Slide.flush_cache` nadal czyści wyłącznie wynikowe slajdy; segmenty CE czyści
+  `manim cache clear`. Wsparcie ograniczone świadomie do `>=0.22,<0.23`.
+- Testy regresji obejmują limit cache równy 0, przywracanie po wyjątku, wyjścia niewideo
+  i trafienie w cache `SceneView` przed unieważnieniem po zmianie źródła.
+- `checkhealth`: kod 0, CE 0.22.0. `Orbit` i `Demo` wyrenderowane; względem CE 0.21
+  identyczne liczby klatek obu kierunków (Demo: 60/120/120/60/90/300; Orbit: 120),
+  liczby slajdów, rodzaje warstw i pętle. Player Demo offscreen: 8 s bez tracebacku.
+- Pełny `uv run --frozen pytest -q -p no:cacheprovider`: **387 passed, 2 skipped**
+  (te same pominięcia: upstreamowy test ekranu i kompilacja TeX), 253,85 s.
+  Wykonawca: codex (`workspace-write`, osobny worktree), ~18 min; przegląd diffu — Claude.
+- Odstępstwo fazy 1 dotyczące pinu `<0.22` zamknięte. Nie rozszerzono zakresu fazy.
 
 ### 7a — adapter live Cairo (zarys; kontrakt po 7.0)
 

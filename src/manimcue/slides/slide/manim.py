@@ -43,10 +43,19 @@ class Slide(BaseSlide, Scene):
     """
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
-        # OpenGL renderer disables 'write_to_movie' by default
-        # which is required for saving the animations
-        config["write_to_movie"] = True
-        super().__init__(*args, **kwargs)
+        # CE 0.22 kopiuje limit do writera podczas inicjalizacji sceny.
+        max_files_cached = config["max_files_cached"]
+        try:
+            config["max_files_cached"] = -1
+            super().__init__(*args, **kwargs)
+        finally:
+            config["max_files_cached"] = max_files_cached
+
+        if self.output_plan.segment_cache_dir is None:
+            raise ValueError(
+                "Slide wymaga wyjścia wideo; wybierz --format=mp4 "
+                "i wyłącz podgląd na żywo (live_preview/GUI)."
+            )
 
     @property
     def _frame_shape(self) -> tuple[float, float]:
@@ -155,28 +164,13 @@ class Slide(BaseSlide, Scene):
         self, *args: Any, **kwargs: Any
     ) -> None:
         """MANIM renderer."""
-        # We need to disable the caching limit since we rely on intermediate files
-        max_files_cached = config["max_files_cached"]
-        config["max_files_cached"] = float("inf")
-
-        flush_manim_cache = config["flush_cache"]
-
-        if flush_manim_cache:
-            # We need to postpone flushing *after* we saved slides
-            config["flush_cache"] = False
-
         super().render(*args, **kwargs)
-
-        config["max_files_cached"] = max_files_cached
 
         self._save_slides(
             use_cache=not (config["disable_caching"] or self.disable_caching),
-            flush_cache=(config["flush_cache"] or self.flush_cache),
+            flush_cache=self.flush_cache,
             skip_reversing=self.skip_reversing,
         )
-
-        if flush_manim_cache:
-            self.renderer.file_writer.flush_cache_directory()
 
 
 class ThreeDSlide(Slide, ThreeDScene):

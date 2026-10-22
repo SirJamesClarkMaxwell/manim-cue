@@ -183,6 +183,14 @@ def test_ce_cache_follows_new_source_render(tmp_path: Path) -> None:
     clip = segments_clip(tmp_path / "clip.mp4")
     files = render(tmp_path, [], SCENES_DIR / "scene_view_ce.py", "TwoViewsCE", clip)
     assert near(Clip(files[0]).pixel(0.75, x=3), COLORS[3])  # 1,75 s klipu
+    # Identyczny render ma użyć segmentów CE bez ponownego zapisu.
+    segments = list((tmp_path / "media").rglob("partial_movie_files/**/*.mp4"))
+    assert segments
+    stamps = {path: path.stat().st_mtime_ns for path in segments}
+    files = render(tmp_path, [], SCENES_DIR / "scene_view_ce.py", "TwoViewsCE", clip)
+    assert {path: path.stat().st_mtime_ns for path in segments} == stamps
+    assert set((tmp_path / "media").rglob("partial_movie_files/**/*.mp4")) == set(segments)
+    assert near(Clip(files[0]).pixel(0.75, x=3), COLORS[3])
     original = COLORS[:]
     COLORS[3] = (0, 255, 0)
     try:

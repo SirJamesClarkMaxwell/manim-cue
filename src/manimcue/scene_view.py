@@ -60,8 +60,8 @@ class Playback:
         self.started_at = self.paused_at if self.paused_at is not None else self.clock()
 
 
-# Stan poza `__dict__` mobjectu: hash cache CE serializuje `__dict__` (z referencją do sceny
-# i dekodera serializowałby wszystko). W mobjecie zostaje deterministyczny identyfikator —
+# Stan poza `__dict__` mobjectu: hash cache CE 0.22 serializuje `__dict__` i `pixel_array`
+# (z referencją do sceny i dekodera serializowałby wszystko). W mobjecie zostaje identyfikator —
 # klucz źródła i numer widoku — więc hash zmienia się z nowym renderem źródła (runda 13, p. 5).
 # ponytail: rejestr żyje do końca procesu renderu; zamykanie dodać, gdy render w jednym
 # procesie zacznie tworzyć setki widoków.

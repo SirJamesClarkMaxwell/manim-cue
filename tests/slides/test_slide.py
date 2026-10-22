@@ -22,8 +22,11 @@ from manim import (
     FadeIn,
     FadeOut,
     GrowFromCenter,
+    Scene,
     Square,
     Text,
+    config,
+    tempconfig,
 )
 from manim.renderer.opengl_renderer import OpenGLRenderer
 
@@ -142,13 +145,7 @@ def test_clear_cache(
         assert local_media_folder.is_dir() and list(local_media_folder.iterdir())
         assert local_slides_folder.exists()
 
-        results = runner.invoke(
-            render, [str(slides_file), "BasicSlide", "-ql", "--flush_cache"]
-        )
-
-        assert results.exit_code == 0, results
-        assert local_media_folder.is_dir() and not list(local_media_folder.iterdir())
-        assert local_slides_folder.exists()
+        # CE 0.22 usunął --flush_cache; segmenty czyści manim cache clear.
 
         results = runner.invoke(
             render, [str(slides_file), "BasicSlide", "-ql", "--disable_caching"]
@@ -158,20 +155,78 @@ def test_clear_cache(
         assert local_media_folder.is_dir() and list(local_media_folder.iterdir())
         assert local_slides_folder.exists()
 
-        results = runner.invoke(
-            render,
-            [
-                str(slides_file),
-                "BasicSlide",
-                "-ql",
-                "--disable_caching",
-                "--flush_cache",
-            ],
+
+def test_ce_cache_limit_restored_and_segments_preserved(tmp_path: Path) -> None:
+    class SeveralSlides(CESlide):
+        def construct(self) -> None:
+            dot = Dot()
+            self.play(FadeIn(dot), run_time=0.2)
+            self.next_slide()
+            self.play(dot.animate.shift(RIGHT), run_time=0.2)
+            self.next_slide()
+            self.play(FadeOut(dot), run_time=0.2)
+
+    with tempconfig(
+        {
+            "max_files_cached": 0,
+            "media_dir": str(tmp_path / "media"),
+            "quality": "low_quality",
+        }
+    ):
+        scene = SeveralSlides(output_folder=tmp_path / "slides")
+        assert config.max_files_cached == 0
+        assert scene.renderer.file_writer.settings.max_files_cached == -1
+        scene.render()
+        assert config.max_files_cached == 0
+        assert len(scene._partial_movie_files) == 3
+        assert all(path.is_file() for path in scene._partial_movie_files)
+        deck = PresentationConfig.from_file(tmp_path / "slides" / "SeveralSlides.json")
+        assert len(deck.slides) == 3
+        assert all(
+            slide.file.is_file() and slide.rev_file.is_file() for slide in deck.slides
         )
 
-        assert results.exit_code == 0, results
-        assert local_media_folder.is_dir() and not list(local_media_folder.iterdir())
-        assert local_slides_folder.exists()
+
+def test_ce_cache_limit_restored_after_init_error(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def fail_init(self, *args: Any, **kwargs: Any) -> None:
+        assert config.max_files_cached == -1
+        raise RuntimeError("błąd konstruktora")
+
+    monkeypatch.setattr(Scene, "__init__", fail_init)
+    with tempconfig({"max_files_cached": 0}):
+        with pytest.raises(RuntimeError, match="błąd konstruktora"):
+            CESlide()
+        assert config.max_files_cached == 0
+
+
+@pytest.mark.parametrize("output_format", ["none", "png", "png-sequence"])
+def test_ce_rejects_nonvideo_output(tmp_path: Path, output_format: str) -> None:
+    with tempconfig(
+        {
+            "format": output_format,
+            "max_files_cached": 0,
+            "media_dir": str(tmp_path / "media"),
+        }
+    ):
+        with pytest.raises(ValueError, match="Slide wymaga wyjścia wideo"):
+            CESlide(output_folder=tmp_path / "slides")
+        assert config.max_files_cached == 0
+        assert not (tmp_path / "slides").exists()
+
+
+def test_ce_opengl_rejects_live_preview_without_video(tmp_path: Path) -> None:
+    with tempconfig(
+        {
+            "renderer": "opengl",
+            "live_preview": True,
+            "media_dir": str(tmp_path / "media"),
+        }
+    ):
+        with pytest.raises(ValueError, match="Slide wymaga wyjścia wideo"):
+            CESlide(output_folder=tmp_path / "slides")
+        assert not (tmp_path / "slides").exists()
 
 
 @pytest.mark.parametrize(

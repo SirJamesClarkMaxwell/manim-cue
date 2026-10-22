@@ -9,7 +9,7 @@ prerenderowanych slajdów z notatkami i podglądem, docelowo z warstwami i wstrz
 (`PLAN.md`, decyzje D13-D19 w `SPEC.md`).
 
 ```bash
-uv run manim-cue render examples/demo.py Demo        # Manim CE (<0.22, powód w pyproject.toml)
+uv run manim-cue render examples/demo.py Demo        # Manim CE 0.22 (>=0.22,<0.23)
 uv run manim-cue render --GL examples/demo.py Demo   # manimgl
 uv run manim-cue present Demo
 ```

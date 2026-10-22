@@ -21,10 +21,10 @@ dependencies = [
     # w projekcie seminarium i była tam realną miną.
     "setuptools<80.10.2",
     # Prerender CE (D18) — fork manim-slides renderuje oba silniki.
-    # <0.22: CE 0.22 przebudował zapis plików (output plan; brak `write_to_movie`,
-    # walidacja `max_files_cached`) i manim-slides 5.7.0 pada na renderze. Upstream
-    # testował 0.19.1. Wsparcie 0.22 to osobna praca — PLAN.md, faza 1.
-    "manim>=0.19,<0.22",
+    # Tylko 0.22: seminarium stoi na 0.22, a 0.22 przebudował zapis plików (output plan),
+    # więc fork zależy od wewnętrznych API, które wydanie minor łamie — stąd <0.23.
+    # Świadome ograniczenie wsparcia, PLAN.md, faza 7.0.
+    "manim>=0.22,<0.23",
     # Zależności forka manim-slides 5.7.0 (D13), przepisane z jego pyproject.toml.
     "av>=9.0.0",
     "beautifulsoup4>=4.12.3",
@@ -33,8 +33,8 @@ dependencies = [
     "jinja2>=3.1.2",
     "lxml>=4.9.2",
     "numpy>=1.19",
-    # <13: Manim CE 0.21 woła Image.fromarray(zera float, mode="RGBA") przy każdym ImageMobject
-    # w Cairo (camera.py:1130); Pillow 13 usunął parametr mode → "Invalid mode for data type".
+    # <13: Manim CE 0.22 woła Image.fromarray(zera float, mode="RGBA") przy każdym ImageMobject
+    # w Cairo (camera.py:1127); Pillow 13 usunął parametr mode → "Invalid mode for data type".
     "pillow>=9.5.0,<13",
     "platformdirs>=4.0",
     "pydantic>=2.0.1",

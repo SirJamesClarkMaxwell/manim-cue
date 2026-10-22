@@ -781,7 +781,7 @@ wheels = [
 
 [[package]]
 name = "manim"
-version = "0.21.0"
+version = "0.22.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "audioop-lts" },
@@ -811,9 +811,9 @@ dependencies = [
     { name = "typing-extensions" },
     { name = "watchdog" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/b1/2e/08d46ab1eb765f054cc9e4f64e95896d6fc53642c8f0e29c6c5c29028fe7/manim-0.21.0.tar.gz", hash = "sha256:2f3d719e726c9abf49b1bea503fb17510ee2063dab53915ab44a2c47c32f9a13", size = 580380, upload_time = "2026-08-10T21:58:34.544Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/98/fa/cef49e8c5c5617232ae8324a8ad14d8d724eb308dc898687240daca2800b/manim-0.22.0.tar.gz", hash = "sha256:e227aef6dab218c7fe68fa31ed1ff418e1c86a450f43509ed2630f3ffd06602d", size = 599668, upload_time = "2026-10-08T13:27:34.513Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/02/b9/52a764c6fd593055cd401ca1f5bae9701e0fca750ae7627d38a48869fc32/manim-0.21.0-py3-none-any.whl", hash = "sha256:021001097bb568372fa8f5d1dcf46ba085c8502c10efb2312ff45f19f7facb60", size = 679365, upload_time = "2026-08-10T21:58:32.824Z" },
+    { url = "https://files.pythonhosted.org/packages/2d/05/35fc67b65a8ecbe38de39b9747adabc18de696683e0e27b5e121ad6d05ae/manim-0.22.0-py3-none-any.whl", hash = "sha256:bce56dbe420ce002cb77076c0b4e041637a0bd41ce5749e837e96375937e935f", size = 700688, upload_time = "2026-10-08T13:27:32.887Z" },
 ]
 
 [[package]]
@@ -862,7 +862,7 @@ requires-dist = [
     { name = "click-default-group", specifier = ">=1.2.2" },
     { name = "jinja2", specifier = ">=3.1.2" },
     { name = "lxml", specifier = ">=4.9.2" },
-    { name = "manim", specifier = ">=0.19,<0.22" },
+    { name = "manim", specifier = ">=0.22,<0.23" },
     { name = "manimgl", specifier = ">=1.7.2" },
     { name = "numpy", specifier = ">=1.19" },
     { name = "pillow", specifier = ">=9.5.0,<13" },
