@@ -6,9 +6,14 @@
 
 Co sprawdzić w oknie (kryterium 5 fazy 1): notatki w oknie Info, podgląd następnego slajdu,
 slajd 2 zapętlony do naciśnięcia `→`, cofanie (`←`).
+
+Faza 3 (kryterium 8): slajd 3 ma warstwę live `examples/live_panel.py` w prawym górnym rogu —
+w F3 widać jej miniaturę (pierwszą klatkę sceny), w oknie głównym, w Info i w podglądzie.
 """
 
-from manimcue.slides import Slide
+from pathlib import Path
+
+from manimcue.slides import LiveLayer, Slide
 from manimcue.slides.slide import MANIM
 
 if MANIM:
@@ -41,8 +46,15 @@ else:
     )
 
 
+PANEL = LiveLayer(
+    scene_file=Path(__file__).with_name("live_panel.py"),
+    scene_name="Panel",
+    rect=(0.6, 0.05, 0.35, 0.35),
+)
+
+
 class Demo(Slide):
-    """Trzy slajdy: wzrost, pętla, obrót."""
+    """Trzy slajdy: wzrost, pętla, obrót; na trzecim warstwa live."""
 
     def construct(self) -> None:
         circle = Circle(radius=2, color=BLUE)
@@ -57,7 +69,10 @@ class Demo(Slide):
         self.next_slide(notes="**2/3** — pętla: kropka krąży, dopóki nie naciśniesz `→`.", loop=True)
         self.play(MoveAlongPath(dot, circle), run_time=2, rate_func=linear)
 
-        self.next_slide(notes="**3/3** — kropka wraca do środka i zamienia się w obrót kwadratu.")
+        self.next_slide(
+            notes="**3/3** — kropka wraca do środka, obrót kwadratu. W rogu warstwa live.",
+            layers=[PANEL],
+        )
         self.play(dot.animate.move_to(ORIGIN))
         self.remove(dot)
         self.add(square)

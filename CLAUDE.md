@@ -2,21 +2,30 @@
 
 ## Przeczytaj najpierw
 
-1. **`SPEC.md`** — ustalenia zweryfikowane w kodzie manimgl, architektura, dwie pułapki, na których
-   szkic już raz padł, i kryteria akceptacji. Ten plik jest wynikiem pięciu rund adwersaryjnej
-   recenzji; **nie wyprowadzaj tych faktów od nowa i nie zmieniaj decyzji bez powodu.**
-2. **`PLAN.md`** — fazy. Faza 0 jest jedyną aktywną.
+1. **`SPEC.md`** — ustalenia zweryfikowane w kodzie manimgl, manim-slides i Manim CE, architektura,
+   trzy pułapki, na których szkic już padł, kryteria akceptacji fazy 0 i decyzje D1-D19.
+   Fazy 0 dotyczyło pięć rund adwersaryjnej recenzji; **nie wyprowadzaj tych faktów od nowa i nie
+   zmieniaj decyzji bez powodu.**
+2. **`PLAN.md`** — fazy. Aktywna jest faza 3 (model danych slajdu + minimalna kompozycja).
+3. **`REVIEW-LOG.md`** — rundy recenzji codex; runda 7 zawiera kontrakt fazy 2.
 
 ## Zasady
 
-- **Zakres fazy 0 jest zamknięty.** Dziewięć kryteriów akceptacji z `SPEC.md`, nic poza tym.
-  Pierwotny szacunek to ~1 h na Windowsie. Przy przekroczeniu ~2 h — zatrzymać się i zgłosić.
-- **Nie rozszerzaj o synchronizację wielu wideo.** Jest jawnie poza zakresem i ma podany powód.
-- **Nie forkuj Manima.** Projekt jest sterownikiem nad istniejącym API.
+- **Zakres fazy jest zamknięty.** Kryteria akceptacji z `PLAN.md`, nic poza tym. Każda faza ma
+  szacunek czasu; przy przekroczeniu dwukrotnym — zatrzymać się i zgłosić.
+- **Synchronizacja warstw to wspólny start i pauza (D17).** Zegar główny, seek, frame-lock — poza
+  zakresem, z podanym powodem.
+- **Nie forkuj Manima.** Forkujemy manim-slides (D13) — to nie Manim. CE, GL i GX używamy przez
+  ich istniejące API.
 - **Identyfikatory po angielsku, docstringi i komentarze po polsku.** Projekt macierzysty ma stan
   mieszany (`self.trojkat.set_color()` obok `self.vacancy_bonds`) i to jest uznane za błąd —
-  nie powtarzać go tutaj.
-- **Jeden wątek.** Rozwiązaniem czekania jest `select` z timeoutem jednej klatki, nie wątek odbiorczy.
+  nie powtarzać go tutaj. **Wyjątek:** kod z forka w `src/manimcue/slides/` zachowuje angielskie
+  komentarze upstreamu, żeby diff z kolejnym wydaniem manim-slides dał się nałożyć.
+- **Jeden wątek kodu aplikacji na proces.** Player Qt i proces live to osobne procesy (D15).
+  Wewnętrzne wątki Qt i sterowników są dozwolone (backend FFmpeg Qt sam je uruchamia). W procesie
+  live rozwiązaniem czekania jest `select` z timeoutem jednej klatki, nie wątek odbiorczy.
+- **Plan i decyzje przechodzą przez codex.** Po zmianie planu albo decyzji w SPEC — runda
+  adwersaryjnej recenzji `codex exec -s read-only`, wynik w `REVIEW-LOG.md`.
 
 ## Środowisko
 
@@ -30,15 +39,16 @@
   deklaruje `audioop-lts` dla 3.13+.
 - `manimgl` importuje `pkg_resources` i sam ostrzega „pin to Setuptools<81". `setuptools<80.10.2`
   to ciaśniejsza granica wzięta z extry `[manimgl]` manim-slides, zweryfikowana w praniu.
-Uruchomienie wymaga **okna** — `manimgl` otwiera je domyślnie, `-p` to tryb presentera i nie jest
-potrzebny. W renderze offline (`-w`, `-o`) scena ma rzucić czytelny `RuntimeError`.
+`LiveScene` w trybie zwykłym wymaga **okna** — `manimgl` otwiera je domyślnie, `-p` to tryb
+presentera i nie jest potrzebny. W renderze offline (`-w`, `-o`) scena ma rzucić czytelny
+`RuntimeError`.
 
 ## Projekt macierzysty
 
-`C:\Users\fzabi\Desktop\STUDIA\scientific-student-seminaries\group-theory` — plan seminarium
-(`PLAN.md`, decyzja D18 i R8) oraz pełna historia argumentów (`PLAN-REVIEW-LOG.md`).
-Punkt integracji, gdy faza 2 dojdzie: klasy bazowe `SeminarScene` / `SeminarScene3D` w tamtym
-`deck/base.py`, **nie** sceny treściowe.
+`C:\Users\fzabi\Desktop\STUDIA\scientific-student-seminaries\group-theory` (ścieżka z innej maszyny;
+na tej jej nie ma) — plan seminarium (`PLAN.md`, decyzja D18 i R8) oraz pełna historia argumentów
+(`PLAN-REVIEW-LOG.md`). Punkt integracji (faza 7): klasy bazowe `SeminarScene` / `SeminarScene3D`
+w tamtym `deck/base.py`, **nie** sceny treściowe.
 
 ## Sąsiednie projekty w `dev/`, warto znać
 

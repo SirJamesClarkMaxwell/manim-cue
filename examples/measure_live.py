@@ -78,6 +78,7 @@ class Measurement:
         self.frame = None
         self.distinct = 0
         self.received = 0
+        self.frame_ids = []
         self.copy_times = []
         self.delivery_times = []
         self.session.start(spec)
@@ -90,6 +91,7 @@ class Measurement:
         if frame is not None:
             self.copy_times.append(copied - began)
             self.received += 1
+            self.frame_ids.append(frame.frame_id)
             if self.frame is None or self.frame.pixels != frame.pixels:
                 self.distinct += 1
             image = QImage(
@@ -148,12 +150,16 @@ def measure(app, scene_file, width, height):
         receiver.until(lambda: "CUE_START move" in receiver.events)
         receiver.distinct = 0
         receiver.received = 0
+        receiver.frame_ids.clear()
         receiver.copy_times.clear()
         receiver.delivery_times.clear()
         began = time.monotonic()
         receiver.during(30)
         elapsed = time.monotonic() - began
-        fps = receiver.distinct / elapsed
+        # Runda 8: wszystkie liczniki zamrożone razem z końcem okna, surowe liczby obok ilorazów.
+        distinct, received, frame_ids = receiver.distinct, receiver.received, receiver.frame_ids[:]
+        published = frame_ids[-1] - frame_ids[0] + 1
+        fps = distinct / elapsed
         copy_ms = statistics.mean(receiver.copy_times) * 1000
         delivery_ms = statistics.mean(receiver.delivery_times) * 1000
         receiver.until(lambda: "CUE_DONE move" in receiver.events)
@@ -183,10 +189,15 @@ def measure(app, scene_file, width, height):
         return {
             "resolution": f"{width}x{height}",
             "duration_s": elapsed,
+            "distinct_received_frames": distinct,
+            "received_frames": received,
+            "published_frames": published,
+            "received_share": received / published,
             "distinct_received_fps": fps,
-            "received_fps": receiver.received / elapsed,
+            "published_fps": published / elapsed,
             "fps_threshold": threshold,
-            "fps_pass": fps >= threshold,
+            # D26 po rundzie 8: dopuszczony błąd granic okna, najwyżej 2 klatki na okno.
+            "fps_pass": distinct >= threshold * elapsed - 2,
             "idle_cpu_core_percent": cpu_percent,
             "cpu_pass": cpu_percent < 5,
             "command_p95_ms": p95,

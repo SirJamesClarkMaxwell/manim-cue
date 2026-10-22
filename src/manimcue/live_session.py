@@ -11,7 +11,7 @@ from pathlib import Path
 from manimcue.frame_buffer import FrameBuffer, OwnedFrame, buffer_size
 from manimcue.live_worker import run_worker
 
-__all__ = ["LiveSession", "LiveSpec", "OwnedFrame"]
+__all__ = ["LiveSession", "LiveSpec", "OwnedFrame", "capture_first_frame"]
 
 
 @dataclass(frozen=True)
@@ -174,6 +174,11 @@ class LiveSession:
             self._stop_at = time.monotonic() + 2
             self.send("shutdown")
 
+    @property
+    def running(self) -> bool:
+        """Proces jeszcze nieodebrany przez poll()."""
+        return self._process is not None
+
     def _cleanup(self):
         if self._socket is not None:
             self._socket.close()
@@ -185,3 +190,32 @@ class LiveSession:
             self._shm.close()
             self._shm.unlink()
             self._shm = None
+
+
+def capture_first_frame(spec: LiveSpec, timeout: float = 120.0) -> OwnedFrame:
+    """Pierwsza klatka sceny po READY — miniatura warstwy live w renderze (F3).
+
+    Blokuje do READY albo błędu, więc nie dla GUI. Proces zawsze jest odbierany przed powrotem.
+    """
+    session = LiveSession()
+    session.start(spec)
+    deadline = time.monotonic() + timeout
+    ready = False
+    frame = None
+    try:
+        while not (ready and frame is not None):
+            ready = "READY" in session.poll() or ready
+            if session.state == "error":
+                raise RuntimeError(f"Scena live {spec.scene_name}: {session.error}")
+            if not session.running:
+                raise RuntimeError(f"Scena live {spec.scene_name}: proces zakończył się przed READY")
+            frame = session.try_read_frame() or frame
+            if time.monotonic() > deadline:
+                raise TimeoutError(f"Scena live {spec.scene_name}: brak READY po {timeout} s")
+            time.sleep(0.005)
+        return frame
+    finally:
+        session.request_stop()
+        while session.running:
+            session.poll()
+            time.sleep(0.01)

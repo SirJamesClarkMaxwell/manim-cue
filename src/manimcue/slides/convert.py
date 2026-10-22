@@ -36,6 +36,7 @@ from pydantic import (
     PositiveFloat,
     PositiveInt,
     ValidationError,
+    field_validator,
 )
 from pydantic_core import CoreSchema, core_schema
 from pydantic_extra_types.color import Color
@@ -43,7 +44,7 @@ from tqdm import tqdm
 
 from . import templates
 from .commons import folder_path_option, verbosity_option
-from .config import PresentationConfig, SlideType
+from .config import PresentationConfig, SlideType, check_no_live_layers
 from .logger import logger
 from .present import get_scenes_presentation_config
 
@@ -152,6 +153,15 @@ class Converter(BaseModel):
         None,
         description="Custom template path or built-in template name.",
     )
+
+    @field_validator("presentation_configs")
+    @classmethod
+    def no_live_layers(
+        cls, presentation_configs: list[PresentationConfig]
+    ) -> list[PresentationConfig]:
+        # F3 (D23): także przy użyciu konwerterów z kodu, przed utworzeniem plików wyjściowych.
+        check_no_live_layers(presentation_configs)
+        return presentation_configs
 
     def convert_to(self, dest: Path) -> None:
         """Convert self, i.e., a list of presentations, into a given format."""
@@ -1157,6 +1167,11 @@ def convert(  # noqa: C901
 ) -> None:
     """Convert SCENE(s) into a given format and writes the result in DEST."""
     presentation_configs = get_scenes_presentation_config(scenes, folder)
+
+    try:
+        check_no_live_layers(presentation_configs)
+    except ValueError as e:
+        raise click.UsageError(str(e)) from None
 
     try:
         if to == "auto":

@@ -1,4 +1,5 @@
 import json
+import math
 import mimetypes
 import shutil
 from collections.abc import Callable
@@ -164,6 +165,43 @@ class Config(BaseModel):
         return self
 
 
+FORMAT_VERSION = 2
+"""Wersja formatu JSON (F3, D24): 1 to upstream 5.7.0 bez pola, 2 dodaje warstwy live."""
+
+
+class LiveLayer(BaseModel):
+    """Warstwa live slajdu (F3, D24): scena `LiveScene` w prostokącie kadru.
+
+    ``rect`` to (x, y, szerokość, wysokość) jako ułamki kadru, (0, 0) w lewym górnym rogu.
+    ``thumbnail`` wypełnia render: pierwsza klatka sceny, widoczna przed startem procesu.
+    """
+
+    scene_file: FilePath
+    scene_name: str
+    rect: tuple[float, float, float, float] = (0.0, 0.0, 1.0, 1.0)
+    fps: PositiveInt = 60
+    thumbnail: FilePath | None = None
+
+    @field_validator("rect")
+    @classmethod
+    def rect_inside_frame(
+        cls, rect: tuple[float, float, float, float]
+    ) -> tuple[float, float, float, float]:
+        x, y, w, h = rect
+        eps = 1e-9
+        # Całość w kadrze to ograniczenie początkowego układu F3; ruch poza kadr to sprawa F5.
+        if not all(map(math.isfinite, rect)) or w <= 0 or h <= 0 or x < 0 or y < 0 or x + w > 1 + eps or y + h > 1 + eps:
+            raise ValueError(
+                f"rect {rect} musi leżeć w kadrze (ułamki 0..1) i mieć dodatnie wymiary"
+            )
+        return rect
+
+    def size(self, resolution: tuple[int, int]) -> tuple[int, int]:
+        """Rozdzielczość procesu live: prostokąt warstwy w pikselach prezentacji."""
+        width, height = resolution
+        return max(1, round(self.rect[2] * width)), max(1, round(self.rect[3] * height))
+
+
 class BaseSlideConfig(BaseModel):
     """Base class for slide config."""
 
@@ -177,6 +215,9 @@ class BaseSlideConfig(BaseModel):
     src: FilePath | None = None
     type: SlideType = SlideType.Video
     direction: Literal["horizontal", "vertical"] = "horizontal"
+    # Zwykła wartość domyślna, nie default_factory: wrapper wpisuje `default` do sygnatury
+    # next_slide, a pydantic i tak kopiuje listę dla każdej instancji.
+    layers: list[LiveLayer] = []
 
     @model_validator(mode="after")
     def determine_slide_type(self) -> "BaseSlideConfig":
@@ -324,10 +365,37 @@ class SlideConfig(BaseSlideConfig):
         return cls(file=file, rev_file=rev_file, **pre_slide_config.model_dump())
 
 
+def check_no_live_layers(presentation_configs: list["PresentationConfig"]) -> None:
+    """D23: warstwa live nie ma odpowiednika w plikach wyjściowych — błąd zamiast cichej utraty.
+
+    Prezentację wskazuje numer: ``convert`` bez nazw scen wybiera je z promptu.
+    """
+    for number, presentation_config in enumerate(presentation_configs, start=1):
+        for index, slide_config in enumerate(presentation_config.slides, start=1):
+            if slide_config.layers:
+                names = ", ".join(layer.scene_name for layer in slide_config.layers)
+                raise ValueError(
+                    f"Prezentacja {number}, slajd {index}: warstwa live ({names}); "
+                    "eksport do plików nie obsługuje warstw live"
+                )
+
+
 class PresentationConfig(BaseModel):
+    version: int = FORMAT_VERSION
     slides: list[SlideConfig] = Field(min_length=1)
     resolution: tuple[PositiveInt, PositiveInt] = (1920, 1080)
     background_color: Color = Color("black")
+
+    @field_validator("version")
+    @classmethod
+    def version_is_known(cls, version: int) -> int:
+        # Starszy fork zignorowałby nieznane pola po cichu, więc nowszy format to błąd.
+        if version > FORMAT_VERSION:
+            raise ValueError(
+                f"Plik w formacie {version}, nowszym niż obsługiwany ({FORMAT_VERSION}); "
+                "zaktualizuj manim-cue"
+            )
+        return version
 
     @classmethod
     def from_file(cls, path: Path) -> "PresentationConfig":
@@ -345,6 +413,12 @@ class PresentationConfig(BaseModel):
                 if rev_file := slide.get("rev_file", None):
                     slide["rev_file"] = parent / rev_file
 
+                # F3: ścieżki warstw live względem tego samego katalogu co klipy.
+                for layer in slide.get("layers", []):
+                    for key in ("scene_file", "thumbnail"):
+                        if value := layer.get(key):
+                            layer[key] = parent / value
+
             return cls.model_validate(obj)
 
     def to_file(self, path: Path) -> None:
@@ -360,6 +434,8 @@ class PresentationConfig(BaseModel):
         prefix: str = "",
     ) -> None:
         """Copy the files to a given directory."""
+        # Runda 8: kopia samych klipów zgubiłaby scenę i miniaturę warstwy.
+        check_no_live_layers([self])
         for slide_config in self.slides:
             file = slide_config.file
             rev_file = slide_config.rev_file

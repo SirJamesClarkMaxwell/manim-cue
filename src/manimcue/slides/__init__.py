@@ -10,7 +10,7 @@ from typing import Any
 
 from .__version__ import __version__
 
-__all__ = ("Slide", "ThreeDSlide", "__version__")
+__all__ = ("LiveLayer", "Slide", "ThreeDSlide", "__version__")
 
 
 def __getattr__(name: str) -> Any:
@@ -19,4 +19,8 @@ def __getattr__(name: str) -> Any:
         from . import slide
 
         return getattr(slide, name)
+    if name == "LiveLayer":
+        from .config import LiveLayer
+
+        return LiveLayer
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

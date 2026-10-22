@@ -2,17 +2,17 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from qtpy.QtCore import Qt, QTimer, QUrl, Signal, Slot
-from qtpy.QtGui import QCloseEvent, QIcon, QKeyEvent, QPixmap, QScreen
+from qtpy.QtGui import QCloseEvent, QIcon, QKeyEvent, QScreen
 from qtpy.QtMultimedia import QAudioOutput, QMediaPlayer, QVideoFrame
-from qtpy.QtMultimediaWidgets import QVideoWidget
 from qtpy.QtWidgets import (
     QHBoxLayout,
     QLabel,
     QMainWindow,
-    QStackedWidget,
     QVBoxLayout,
     QWidget,
 )
+
+from manimcue.composition import SlideComposition, SlideView
 
 from ..config import Config, PresentationConfig, SlideConfig, SlideType
 from ..logger import logger
@@ -30,6 +30,8 @@ class Info(QWidget):
         *,
         aspect_ratio_mode: Qt.AspectRatioMode,
         screen: QScreen | None,
+        composition: SlideComposition,
+        preview: SlideComposition,
     ) -> None:
         super().__init__()
 
@@ -51,18 +53,9 @@ class Info(QWidget):
             QLabel("Current slide"),
             alignment=Qt.AlignmentFlag.AlignBottom | Qt.AlignmentFlag.AlignHCenter,
         )
-        self.main_video_widget = QVideoWidget()
-        self.main_video_widget.setAspectRatioMode(aspect_ratio_mode)
-        self.video_sink = self.main_video_widget.videoSink()
-
-        current_layout.addWidget(self.main_video_widget)
-
-        self.main_image_label = QLabel()
-        self.main_image_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.main_image_label.setScaledContents(False)
-        self.main_image_label.setMinimumSize(720, 480)
-        self.main_image_label.hide()
-        current_layout.addWidget(self.main_image_label)
+        # F3 (D25): ten sam obraz co okno główne — drugi widok tej samej kompozycji.
+        self.main_view = SlideView(composition, aspect_ratio_mode)
+        current_layout.addWidget(self.main_view)
 
         left_layout.addWidget(current_container)
 
@@ -126,20 +119,13 @@ class Info(QWidget):
             QLabel("Next slide"),
             alignment=Qt.AlignmentFlag.AlignBottom | Qt.AlignmentFlag.AlignHCenter,
         )
-        self.next_video_widget = QVideoWidget()
-        self.next_video_widget.setAspectRatioMode(aspect_ratio_mode)
+        # F3 (D25): podgląd to własna kompozycja, z miniaturami warstw następnego slajdu.
+        self.next_view = SlideView(preview, aspect_ratio_mode)
         self.next_media_player = QMediaPlayer()
-        self.next_media_player.setVideoOutput(self.next_video_widget)
+        self.next_media_player.setVideoOutput(preview.video_item)
         self.next_media_player.setLoops(-1)
 
-        perview_layout.addWidget(self.next_video_widget)
-
-        self.next_image_label = QLabel()
-        self.next_image_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.next_image_label.setScaledContents(False)
-        self.next_image_label.setMinimumSize(360, 240)
-        self.next_image_label.hide()
-        perview_layout.addWidget(self.next_image_label)
+        perview_layout.addWidget(self.next_view)
 
         right_layout.addWidget(preview_container)
 
@@ -255,27 +241,19 @@ class Player(QMainWindow):
         self.frame = QVideoFrame()
 
         self.audio_output = QAudioOutput()
-        self.video_widget = QVideoWidget()
-        self.video_sink = self.video_widget.videoSink()
-        self.video_widget.setAspectRatioMode(aspect_ratio_mode)
+        # F3 (D25): kompozycja w QGraphicsScene zamiast stosu QVideoWidget/QLabel. Ten sam
+        # obiekt ogląda okno Info; podgląd następnego slajdu ma własny.
+        resolution = self.current_presentation_config.resolution
+        self.composition = SlideComposition(resolution, aspect_ratio_mode)
+        self.preview = SlideComposition(resolution, aspect_ratio_mode)
+        self.video_sink = self.composition.video_item.videoSink()
+        self.view = SlideView(self.composition, aspect_ratio_mode)
 
-        self.image_label = QLabel(self)
-        self.image_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.image_label.setScaledContents(False)
-        w, h = self.current_presentation_config.resolution
-        self.image_label.setMinimumSize(w, h)
-
-        # Use QStackedWidget to switch between video and image without layout recalculation
-        self.media_stack = QStackedWidget()
-        self.media_stack.addWidget(self.video_widget)
-        self.media_stack.addWidget(self.image_label)
-        self.media_stack.setCurrentWidget(self.video_widget)
-
-        self.setCentralWidget(self.media_stack)
+        self.setCentralWidget(self.view)
 
         self.media_player = QMediaPlayer(self)
         self.media_player.setAudioOutput(self.audio_output)
-        self.media_player.setVideoOutput(self.video_widget)
+        self.media_player.setVideoOutput(self.composition.video_item)
         self.playback_rate = playback_rate
 
         self.presentation_changed.connect(self.presentation_changed_callback)
@@ -284,6 +262,8 @@ class Player(QMainWindow):
         self.info = Info(
             aspect_ratio_mode=aspect_ratio_mode,
             screen=info_window_screen,
+            composition=self.composition,
+            preview=self.preview,
         )
         self.info.close_event.connect(self.closeEvent)
         self.info.key_press_event.connect(self.keyPressEvent)
@@ -449,15 +429,17 @@ class Player(QMainWindow):
 
     def load_current_media(self, start_paused: bool = False) -> None:
         url = QUrl.fromLocalFile(str(self.current_file.resolve(strict=True)))
+        # F3: kadr bieżącej prezentacji i warstwy slajdu (w F3 miniatury, nieruchome także
+        # przy reverse, replay i pętli).
+        self.composition.set_resolution(self.current_presentation_config.resolution)
+        self.composition.set_layers(self.current_slide_config.layers)
         if self.current_slide_config.type == SlideType.Video or (
             self.current_slide_config.type == SlideType.Image
             and self.current_file.suffix.lower() == ".gif"
         ):
             self.media_player.setSource(url)
 
-            self.media_stack.setCurrentWidget(self.video_widget)
-            self.info.main_image_label.hide()
-            self.info.main_video_widget.show()
+            self.composition.show_video()
 
             if self.playing_reversed_slide:
                 self.media_player.setPlaybackRate(
@@ -474,17 +456,9 @@ class Player(QMainWindow):
             else:
                 self.media_player.play()
         else:
-            w, _ = self.current_presentation_config.resolution
-            pixmap = QPixmap(url.toLocalFile())
-            scaled_pixmap = pixmap.scaledToWidth(w)
-            self.image_label.setPixmap(scaled_pixmap)
-            self.info.main_image_label.setPixmap(scaled_pixmap)
+            self.composition.show_image(self.current_file)
 
             self.media_player.stop()
-
-            self.media_stack.setCurrentWidget(self.image_label)
-            self.info.main_image_label.show()
-            self.info.main_video_widget.hide()
 
     def load_current_slide(self) -> None:
         slide_config = self.current_slide_config
@@ -555,19 +529,25 @@ class Player(QMainWindow):
     def preview_next_slide(self) -> None:
         if slide_config := self.next_slide_config:
             url = QUrl.fromLocalFile(str(slide_config.file.resolve(strict=True)))
-            if self.next_slide_config.type == SlideType.Video:
-                self.info.next_video_widget.show()
-                self.info.next_image_label.hide()
+            # F3: następny slajd bywa pierwszym slajdem następnej prezentacji (jak w
+            # next_slide_config) — wtedy kadr bierzemy z niej.
+            presentation_config = self.current_presentation_config
+            if (
+                not self.playing_reversed_slide
+                and self.current_slide_index == self.current_slides_count - 1
+            ):
+                presentation_config = self.presentation_configs[
+                    self.current_presentation_index + 1
+                ]
+            self.preview.set_resolution(presentation_config.resolution)
+            self.preview.set_layers(slide_config.layers)
+            if slide_config.type == SlideType.Video:
+                self.preview.show_video()
                 self.info.next_media_player.setSource(url)
                 self.info.next_media_player.play()
             else:
-                self.info.next_video_widget.hide()
-                self.info.next_image_label.show()
                 self.info.next_media_player.stop()
-                w, _ = self.current_presentation_config.resolution
-                pixmap = QPixmap(url.toLocalFile())
-                scaled_pixmap = pixmap.scaledToWidth(w)
-                self.info.next_image_label.setPixmap(scaled_pixmap)
+                self.preview.show_image(slide_config.file)
 
     def show(  # ty: ignore[invalid-method-override]
         self, screens: list[QScreen]
@@ -684,10 +664,10 @@ class Player(QMainWindow):
         """
         if frame.isValid():
             self.frame = frame
-        else:
+        elif self.frame.isValid():
+            # Runda 8: ponowne ustawienie pustej klatki wywołałoby ten slot rekurencyjnie.
+            # Info ogląda tę samą kompozycję (D25), więc nie potrzebuje kopii klatki.
             self.video_sink.setVideoFrame(self.frame)  # Reuse previous frame
-
-        self.info.video_sink.setVideoFrame(self.frame)
 
     def closeEvent(self, event: QCloseEvent) -> None:  # noqa: N802
         self.close()

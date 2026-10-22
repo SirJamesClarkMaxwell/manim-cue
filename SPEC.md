@@ -6,6 +6,11 @@ Ten plik istnieje po to, żeby nie wygrzebywać od nowa ustaleń, które już zo
 zweryfikowane w kodzie manimgl i przepuszczone przez pięć rund adwersaryjnej recenzji.
 Pełna historia argumentów: `PLAN-REVIEW-LOG.md` w `scientific-student-seminaries/group-theory/`.
 
+> **Zmiana kierunku (2026-10-21).** Projekt staje się forkiem manim-slides 5.7.0 z warstwami
+> i wstrzykiwanym live — decyzje D13-D19 na końcu pliku. Faza 0 i jej ustalenia zostają w mocy:
+> `LiveScene` jest backendem live. Część decyzji D4-D12 jest przez D13-D19 zmieniona; przy każdej
+> jest odsyłacz.
+
 ---
 
 ## Problem
@@ -110,6 +115,11 @@ manimgl), plik wartowniczy (`select` nie działa na plikach w Windows), `QLocalS
 manim-slides (steruje odtwarzaniem nagranych klipów, więc metody Manima nie stosują się wcale;
 dodatkowo wątek GUI Qt i patch vendora).
 
+> **Korekta (2026-10-21).** Player manim-slides 5.7.0 nie ma `QLocalServer` ani żadnych gniazd —
+> sprawdzone grepem po całym pakiecie. Uzasadnienie odrzucenia jako transportu pozostaje słuszne
+> (steruje klipami, nie scenami), ale samo `QLocalServer` pochodzi najpewniej z załatanej kopii
+> w seminarium, nie z upstreamu.
+
 **`select` z timeoutem jednej klatki (`1/60`) rozwiązuje naraz dwa problemy**: nie ma busy-loopa
 zjadającego rdzeń, i nie ma blokującego `readline()`, które zamroziłoby okno. Jeden wątek, bez
 współbieżności.
@@ -136,7 +146,7 @@ laptopie. Token/uwierzytelnianie poza zakresem PoC.
 
 ## Trzy pułapki, na których szkic już padł
 
-Obie wyłapane w rundzie 5 recenzji — nie powtarzać:
+Pierwsze dwie wyłapane w rundzie 5 recenzji, trzecia w teście wizualnym fazy 0 — nie powtarzać:
 
 1. **Brak `accept()`.** Pierwsza wersja robiła `select.select([self.sock], ...)`, co zakłada **już
    połączone** gniazdo. Bez listenera i `accept()` pętla nie przyjmie pierwszego klienta i kod
@@ -146,8 +156,6 @@ Obie wyłapane w rundzie 5 recenzji — nie powtarzać:
 2. **Dekodowanie UTF-8 per `recv()`.** `recv(...).decode("utf-8")` rzuci wyjątkiem, gdy pakiet TCP
    rozdzieli znak wielobajtowy — i framing po `\n` tego **nie** ratuje, bo kolejność operacji jest
    odwrotna. Poprawnie: buforować **bajty**, dzielić po `b"\n"`, dopiero kompletną linię dekodować.
-
----
 
 3. **Kolejność w `select`: klient przed listenerem.** Znalezione w teście wizualnym fazy 0,
    nie w recenzji. Pierwsza wersja iterowała po `ready` w kolejności, w jakiej `select` zwraca
@@ -194,6 +202,9 @@ pierwotne pułapki mają testy automatyczne (`tests/test_live_scene.py`); kryter
 potwierdzone linią `Cue:` pokazującą, że dwie komendy wysłane w trakcie 6-sekundowej animacji
 wykonały się po niej i w kolejności. Trzecia pułapka wyszła właśnie w tym przebiegu.
 
+_Luka w dowodzie: kryterium 9 wymaga zmierzonego czasu pracy, a liczba nie została nigdzie
+zapisana._
+
 ---
 
 ## Decyzje fazy 1 (cue sheet i feeling prezentacji)
@@ -231,7 +242,7 @@ w żywej scenie wymagałby nagrywania klatek każdego cue do bufora — osobna d
 _Pierwotna wersja D3 mówiła „skok, nie animacja". Zmienione na wniosek prelegenta po obejrzeniu
 fazy 0; skok został uznany za zbyt ostry w odczuciu._
 
-**D4. Cue sheet w TOML.** Rozstrzyga pierwsze otwarte pytanie fazy 1: TOML, bo resztę ekosystemu
+**D4. Cue sheet w TOML.** _Skreślone przez D19._ Rozstrzyga pierwsze otwarte pytanie fazy 1: TOML, bo resztę ekosystemu
 `uv` już w nim stoi, a `tomllib` jest w stdlib od 3.11 — zero nowych zależności. Pola na cue:
 nazwa, kolejność, notatka dla prelegenta.
 
@@ -242,7 +253,8 @@ callable'em, a nie jedną animacją — `pulse` już dziś woła `play()` dwa ra
 Czas wynika z animacji w środku; pole `duration` w cue sheet byłoby drugim źródłem prawdy
 i rozjechałoby się z kodem przy pierwszej zmianie `run_time`.
 
-**D7. Widok prelegenta: terminal jako minimum, drugie okno dopuszczone.** Bieżące cue,
+**D7. Widok prelegenta: terminal jako minimum, drugie okno dopuszczone.** _Załatwione przez
+okno Info manim-slides (D19)._ Bieżące cue,
 następne cue, notatka i pozycja (`3/8`) idą na stdout — to działa od razu i bez zależności.
 
 _Zmiana względem pierwotnej wersji D7:_ zakaz drugiego okna **został zdjęty przez prelegenta**
@@ -283,7 +295,9 @@ na koniec trwającego cue**, do 6 s przy `sweep`. Przerywalność jest naprawą 
 `wait()` ma w manimgl własną pętlę i **nie** jest przerywany — żadne cue go dziś nie używa,
 a gdy zacznie, trzeba podać mu `stop_condition=self.interrupt_requested`.
 
-**D11. Selektywny live-render — kierunek na fazę 2.** Wniosek prelegenta: nie każdy element scen
+**D11. Selektywny live-render — kierunek na fazę 2.** _Odwrócone przez D14: domyślny jest
+prerender, live się wstrzykuje; „ruch prerenderowany w żywej scenie” wraca jako warstwy (D16)._
+Wniosek prelegenta: nie każdy element scen
 musi być liczony na żywo; live dałoby się włączać i wyłączać per element albo per cue, a resztę
 brać z prerenderu. To **zbiega się z pierwotną motywacją projektu**: w scenie czterowidokowej
 seminarium trzy panele są statyczne, a żywy render potrzebny jest tylko dla panelu NV⁻, który dziś
@@ -301,7 +315,8 @@ Co **nie** jest tanie i zostaje poza tą decyzją: pokazywanie prerenderowanego 
 czyli dokładnie „synchronizację wielu źródeł" z fazy 3 — odrzuconą z podanymi powodami.
 Klatki statyczne wystarczają do przypadku seminarium i nie łamią żadnej zasady.
 
-**D12. Silnik zostaje manimgl; manimgx odroczony.** Ustalone wspólnie po researchu: manimgx nie
+**D12. Silnik zostaje manimgl; manimgx odroczony.** _Kolejność silników zmieniona przez D18;
+warunek wejścia manimgx zostaje._ Ustalone wspólnie po researchu: manimgx nie
 ma udokumentowanego trybu interaktywnego (ani okna, ani pętli zdarzeń, ani krokowania klatek,
 ani zdarzeń klawiatury), jego `present` to sekcje nagranej linii czasu, w Pyodide nie ma gniazd
 TCP, a wersja 0.1.1 ma tydzień. Prelegent sam ocenił go jako „bardzo młody i niestabilny".
@@ -313,18 +328,218 @@ gdyby kiedyś przyszło migrować.
 
 ---
 
+## Decyzje zmiany kierunku (2026-10-21)
+
+Powód: prelegent opisał docelowy kształt — fork manim-slides, scena jako obiekt w innej scenie,
+notatki i podgląd, domyślnie prerender z wstrzykiwanym live, silniki CE → GL → GX. Decyzje
+podjęte w rozmowie, po sprawdzeniu kodu manim-slides 5.7.0 i Manim CE 0.22 w pobranych wheelach.
+
+**Zweryfikowane przed decyzjami:**
+- manim-slides 5.7.0 (MIT): player to `QMainWindow` z `QVideoWidget` wpiętym w `Player.__init__`
+  (`present/player.py:258`) i `QMediaPlayer`. Okno `Info` ma notatki (markdown), podgląd
+  następnego slajdu (wideo albo obraz), zegar; player rozdziela okna na dwa ekrany.
+  `BaseSlideConfig`: `loop`, `auto_next`, `playback_rate`, `reversed_playback_rate`, `notes`,
+  `skip_animations`, `src`, typ `Video`/`Image`. Render CE w `slide/manim.py`, GL
+  w `slide/manimlib.py`.
+- Manim CE 0.22 ma pętlę okna OpenGL analogiczną do manimgl (`renderer.render(...)` plus
+  `window.is_closing`, `scene/scene.py:1523-1600`), a oba renderery CE mają `get_frame()`
+  zwracające tablicę pikseli także bez okna.
+
+**D13. Pełny fork manim-slides 5.7.0, wchłonięty w `src/manimcue/slides/`.** Tag `v5.7.0`,
+commit `305bd8a`. Importy przemianowane na `manimcue.slides`, CLI `manim-cue` — jeden pakiet,
+bez kolizji z oryginałem w środowisku seminarium. Podklasy nie wystarczą: warstwy (D16) wymagają
+wymiany `QVideoWidget` w `Player.__init__`, a `SceneView` — zmian w `Slide`. Upstream śledzony
+ręcznie, diffem między wydaniami. Usunięte: `%%manim_slides` (IPython) i dyrektywa Sphinx.
+Zostają: `convert`, `wizard`, `checkhealth`. Licencja upstreamu leży obok kodu.
+Odrzucone: `git subtree` (przemianowanie pakietu gryzie się z każdym pullem; bez przemianowania
+kolizja z `manim_slides`), osobne repo-fork (dwa repo, dwa cykle wydań).
+
+**D14. Domyślnie prerender, live wstrzykiwany.** Odwraca D11. Slajd jest klipem albo obrazem,
+jak w manim-slides; live to osobny typ slajdu, a potem warstwy.
+
+**D15. Live pokazywany jako strumień klatek.** Proces `LiveScene` renderuje bez okna
+i publikuje klatki w `multiprocessing.shared_memory`; player pokazuje je jako warstwę. Sterowanie
+zostaje po TCP z fazy 0. **Jeden wątek na proces** — Qt w procesie playera, `select` w procesie
+live; zasada z `CLAUDE.md` obowiązuje per proces. Odrzucone: osobne okno manimgl (dwa okna na
+projektorze, fokus, brak kompozycji) i kontekst GL osadzony w Qt w jednym procesie (dwie pętle
+zdarzeń, `play()` blokuje Qt).
+
+**D16. Scena jako obiekt — w dwóch miejscach.** Warstwy w playerze (czas prezentacji: pozycja,
+skala, wyzwalanie, silniki mogą się mieszać) oraz `SceneView` w Manimie (czas renderu: mobject
+z klatkami innej sceny, wynik to jeden klip). Kolejność: najpierw warstwy, bo strumień live
+trafia właśnie tam.
+
+**D17. Synchronizacja warstw: wspólny start i pauza.** Każda warstwa wideo ma własny
+`QMediaPlayer`; player startuje i pauzuje je razem. Dryf na długich klipach zaakceptowany.
+Warstwa live ma własny zegar. Odrzucone: zegar główny z seekiem (seek w `QMediaPlayer` na Windowsie
+zależy od keyframe'ów, dużo pracy) i warstwy bez wideo (ogranicza „przesuwanie renderu” do kadrów).
+
+**D18. Silniki: prerender CE i GL od razu, live GL → CE → GX.** Prerender obu silników daje
+manim-slides. Live w GL już działa (faza 0); CE dochodzi potem; manimgx na warunkach z D12. Przy
+warstwach w playerze seminarium na CE i tak może pokazać panel live z GL.
+
+**D19. Skreślone i załatwione przez manim-slides.** D4 (cue sheet w TOML) skreślone: notatki
+w `next_slide(notes=...)`, konfiguracja w JSON manim-slides — TOML byłby drugim źródłem prawdy,
+z tego samego powodu co w D6. D7 i D8 załatwia okno `Info`; podgląd slajdu live to prerenderowana
+miniatura (droga wybrana w D8).
+
+---
+
+## Ustalenia rundy 6 (codex, 2026-10-22) — nie powtarzać tej pracy
+
+Pełna odpowiedź: `REVIEW-LOG.md`. Twierdzenia zweryfikowane przez codex w kodzie; oznaczone ✓
+sprawdzone dodatkowo ręcznie.
+
+**Faza 1 (zweryfikowane w praktyce, nie przez codex):**
+- **manim-slides 5.7.0 nie działa z Manim CE 0.22.** CE 0.22 przebudował zapis plików (output
+  plan): nie ma `config["write_to_movie"]` (`slide/manim.py:48` rzuca `AttributeError`), doszła
+  walidacja `max_files_cached`. Upstream testował CE 0.19.1. Fork przypięty do `manim<0.22`.
+  Seminarium stoi na CE 0.22 z załataną kopią — łatki najpewniej pokrywają właśnie to.
+- `slide/manimlib.py` podmienia `sys.argv` na `[__file__]` przed importem manimlib, żeby launcher
+  manimgl nie parsował argumentów cudzego procesu. Skutek uboczny: konfigurację manimgl ustala
+  ten, kto zaimportuje manimlib pierwszy (`tests/conftest.py`).
+
+**Live bez okna (faza 2):**
+- ✓ **Bez okna manimgl nie trzyma tempa animacji.** `sleep()` wyrównujący czas wirtualny do
+  rzeczywistego działa tylko przy oknie (`scene/scene.py:250-254`), zegary startu też
+  (`:522-524`). Headless policzy sekundowe cue tak szybko, jak pozwoli GPU. Potrzebny własny
+  zegar na `time.monotonic()`.
+- ✓ **Launcher tworzy okno przed załadowaniem sceny** (`__main__.py:29-32`), gdy
+  `show_in_window`, a to jest `not -w`. `-w` z kolei włącza zapis filmu. Zmienna środowiskowa
+  w `construct()` nie wystarczy — proces live potrzebuje własnego punktu startowego, który tworzy
+  `Scene(window=None)` z wyłączonym zapisem, bez launchera manimgl i bez `manim-cue render --GL`
+  (ten zawsze dodaje `-w`, `render.py:54`).
+- ✓ `is_window_closing()` bez okna zwraca `None` nawet przy `quit_interaction` (`scene.py:719`);
+  pomijanie rysowania niezmienionej klatki też wymaga okna (`:243`). Headless potrzebuje
+  zakończenia przez transport i publikacji tylko po zmianie obrazu. `on_key_press` bez okna nie
+  dostaje zdarzeń — klawisze przychodzą wtedy wyłącznie z playera po TCP.
+- Fundament offscreen istnieje: `Camera.init_context()` tworzy standalone ModernGL
+  (`camera/camera.py:72`), `init_fbo()` własne FBO (`:81`). Pomiar samego odczytu FBO (RTX 4060):
+  1920×1080 — mediana 1,8 ms; 960×540 — 0,6 ms. 1080p60 to ~498 MB/s samego payloadu.
+- Publikacja tylko w `emit_frame()` gubi klatkę startową (`build_objects` rysuje przez
+  `update_frame(force_draw=True)`) i końcową po przerwaniu (`finish_animations()` domyka stan bez
+  renderu, `scene.py:561`).
+- **`SharedMemory` nie daje synchronizacji** — to goły `memoryview`. Najprostszy poprawny protokół:
+  player uruchamia proces live przez `multiprocessing.Process` i przekazuje `Lock`; producent
+  renderuje poza blokadą i kopiuje gotowe bajty pod nią; `QTimer` robi `acquire(False)`, kopiuje
+  i zwalnia przed malowaniem; zajęta klatka jest pomijana.
+
+**Player i warstwy (fazy 3-4):**
+- `Player.frame_changed` (`player.py:664-690`) trzyma ostatnią poprawną klatkę jednego sinka
+  i przekazuje ją do `Info` — ochrona przed czarną klatką między klipami. Warstwy muszą to
+  przenieść per warstwa (`QGraphicsVideoItem.videoSink()`), a `Info` musi dzielić model warstw.
+- **Wspólny start nie wynika z `setSource(); play()` w pętli:** backend FFmpeg Qt 6.12 ładuje
+  źródło asynchronicznie i `play()` w trakcie ładowania tylko zapamiętuje żądanie. Trzeba załadować
+  wszystkie warstwy, poczekać na gotowość, dopiero potem wydać wspólny start.
+- `Player` ma jeden stan odtwarzania, jeden licznik pętli, jeden replay i gotowy `rev_file`
+  (`player.py:491-639`). Warstwy wymagają zapisanej semantyki: co kończy slajd, `auto_next`,
+  krótszy klip, reverse.
+- `SlideConfig` wymaga istniejących `file` i `rev_file` (`config.py:317`), player rozwiązuje
+  ścieżkę przed rozgałęzieniem typu (`player.py:451`). Slajd live wymaga zmiany modelu danych,
+  nie tylko nowej wartości enuma.
+
+**CE i `SceneView` (fazy 5-6):**
+- Cairo `get_frame()` tylko kopiuje tablicę kamery (`cairo_renderer.py:186`); render dzieje się
+  w `update_frame()`. `play()` może pominąć liczenie klatek przy trafieniu w cache, a statyczne
+  `wait()` idzie przez `freeze_current_frame()`. Live w CE wymaga osobnych adapterów Cairo
+  i OpenGL, z wyłączonym cache.
+- `play()` w CE i GL przechodzi całą animację synchronicznie — wywołanie `play()` sceny podrzędnej
+  z updatera gospodarza blokuje jego klatkę. `ImageMobjectFromCamera` (CE) daje piksele, nie
+  wykonanie sceny. „Scena w scenie” to dwa różne zakresy: odtwarzanie gotowych klatek i krokowana
+  animacja podrzędna.
+
+**Zasada jednego wątku:** backend FFmpeg Qt sam uruchamia wątki (`QtConcurrent::run`), a player
+obsługuje sinki z innych wątków (`player.py:668`). Zasada dotyczy **kodu aplikacji**: jeden wątek
+naszego kodu na proces; wewnętrzne wątki Qt i sterowników dozwolone.
+
+---
+
+## Decyzje po rundzie 7 (2026-10-22)
+
+Prelegent przyjął punkty 2-6 z „Do decyzji przed fazą 2” bez zmian (progi wydajności, model
+danych przed slajdem live, semantyka warstw, dwa zakresy `SceneView`, CE 0.22 przed fazą
+integracji). Na punkt 1 odpowiedział: *„może użytkownik jak kliknie na dane okno?”*.
+
+**D20. Proces live: przygotowanie przy wejściu na slajd, aktywacja kliknięciem.** _Interpretacja
+odpowiedzi prelegenta, doprecyzowana z codex — do potwierdzenia._ Wejście na slajd z warstwą live
+uruchamia proces i przygotowuje scenę do pierwszej klatki (do tego czasu miniatura). Kliknięcie
+warstwy daje jej klawiaturę, ale samo nie wyzwala cue. Przy aktywnym live skonfigurowane
+`NEXT`/`PREVIOUS` idą do sceny jako `next`/`back` i nie przesuwają slajdu; pozostałe skróty
+playera zachowują znaczenie. Esc, klik poza warstwą, zmiana slajdu albo utrata aktywności okna
+oddają klawiaturę playerowi. Wyjście ze slajdu zatrzymuje proces; ponowne wejście to nowa sesja.
+Odrzucone: start dopiero po kliknięciu (zimny start ≥1,5 s plus `build_objects`) i start
+wszystkich scen razem z playerem (każda scena headless tworzy własny kontekst GL i FBO).
+Routing klawiszy to jeden router przed `Player.dispatch` (`player.py:695`), obejmujący też
+zdarzenia z okna Info (`:183`).
+
+**D21. Proces live przez `multiprocessing` (spawn) z przekazanym `Lock` i nazwaną SharedMemory.**
+Sprawdzone przez codex: spawn działa z wrapperem `manim-cue.exe` (`spawn.py:192` bierze
+`__main__.__spec__.name`, a `Lock` jest duplikowany do dziecka, `synchronize.py:100`). Warunki:
+target to funkcja modułowa bez importów Manima i Qt na poziomie modułu; w targecie
+`sys.argv=[argv0]` przed pierwszym importem Manima i pliku sceny; przekazywane są dane, nie
+obiekty sceny ani Qt; proces i blokada z jednego `mp.get_context("spawn")`.
+Protokół pamięci: jeden pisarz, jeden czytelnik, nagłówek v1 (magic, wersja, wymiary, stride,
+rozmiar, format RGBA8, orientacja bottom-up, `frame_id`, czas monotoniczny) i payload pod tą samą
+blokadą; render i odczyt FBO poza blokadą; czytelnik `acquire(False)`, kopia, zwolnienie przed
+konwersją Qt. Klatki graniczne (pierwsza, koniec cue, cofnięcie) potwierdzane komendą
+`frame_seen <id>`; worker czeka na nią przed następnym cue (timeout 2 s = błąd odbiornika).
+Odrzucony seqlock na gołym `memoryview`: brak operacji atomowych i porządku pamięci
+(`shared_memory.py:185`), więc „licznik przed i po” nie specyfikuje gwarancji.
+
+**D22. Korpus scen testowych w `tests/scenes/`.** Trzy rodzaje: sceny poprawne (docelowo mają
+działać), sceny negatywne (sukces = czytelna diagnoza; zwykłe zielone testy z `pytest.raises`,
+bez xfail) i testy infrastruktury bez sceny Manima. Brakująca funkcja z ustalonym API:
+`xfail(strict=True, raises=..., reason="F<n>: ...")`, import modułu wewnątrz testu. Zapowiedź bez
+API: tylko wpis w manifeście `tests/scenes/MANIFEST.md`, bez pustego testu. Brak GPU albo TeX
+to jawny skip środowiskowy (znacznik `gpu`, `tex`), nie wada implementacji. Kryteria obrazu:
+pozycje, maski kolorów, tolerancja — hash tylko dla syntetycznych bajtów transportu.
+
+---
+
+## Decyzje fazy 3 (2026-10-22, przed rundą 8)
+
+Prelegent po próbie F1/F2 w oknach: dwa osobne okna (player i odbiornik live) to nie jest
+docelowy kształt; kolejność faz bez zmian — „faza 3, potem 4, 5, 6”.
+
+**D23. `convert` przy warstwie live: jawny błąd.** Komunikat z indeksem slajdu i nazwą sceny.
+Odrzucony obraz zastępczy: każdy konwerter (HTML, PDF, PPTX) musiałby składać kompozycję.
+
+**D24. Warstwa live to pole `layers: list[LiveLayer]` w `BaseSlideConfig`.** Ścieżki: autorskie
+`scene_file` względem CWD renderu (walidowane już w `next_slide`), zapisane w JSON względem
+`path.parent.parent` — jak `file`. Miniatura: PNG pierwszej klatki z procesu spawn, klucz cache
+ze ścieżki, bajtów pliku, klasy, rozmiaru i wersji generatora (zależności sceny: `--flush-cache`).
+`copy_to` i konwertery odrzucają warstwy (D23). Wrapper
+`BaseSlideConfig.wrapper` (`config.py:202`) robi z niego argument `next_slide`, a JSON zapisuje
+i czyta go bez nowej ścieżki. `rect` jako ułamki kadru (niezależne od silnika i jednostek sceny),
+rozdzielczość procesu live z `rect` × `resolution`. `PresentationConfig.version = 2`, plik bez
+wersji (upstream) zgodny dzięki wartości domyślnej, wersja wyższa — błąd. Slajd live nadal ma
+klip bazowy: walidator upstreamu (`config.py:291`) zostaje, tło slajdu daje Manim.
+
+**D25. Kompozycja: jedna `QGraphicsScene` na slajd, dwa widoki.** Okno główne i bieżący widok
+Info to `QGraphicsView` tej samej sceny, więc Info pokazuje to samo z konstrukcji (runda 6, p. 7).
+Ochrona przed czarną klatką zostaje mechanizmem upstreamu, przeniesionym na sink
+`QGraphicsVideoItem`. Podgląd następnego slajdu — osobna scena tego samego typu.
+
+**D26. Próg fps z tolerancją granic okna, nie ułamkiem.** _Po rundzie 8._ Pierwsza propozycja
+(≥ 97% żądanego fps) dopuszczała 54 zgubione klatki, żeby wytłumaczyć jedną — codex wskazał, że
+licznik zmian pikseli i wyzerowanie po pierwszej klatce okna dają błąd granic, nie stratę. Próg:
+„różne odebrane klatki ≥ próg·T − 2” (960×540: próg 60, 1920×1080: 30). Pomiar zamraża liczniki
+z końcem okna i zapisuje surowe liczby: opublikowane, odebrane, różne.
+
+---
+
 ## Zakres, którego nie wolno rozszerzyć bez decyzji
 
-**Synchronizacja wielu strumieni wideo.** Osobna sprawa, dni pracy, realne ryzyko (dryf, różne
-długości klipów, seek). **I nie jest potrzebna** do czterowidokowej sceny w seminarium: jedna scena
-Manima z czterema panelami renderuje się do **jednego klipu**, zsynchronizowanego z konstrukcji.
-Multi-video ma sens tylko dla naprawdę niezależnych źródeł — np. żywe okno manimgl obok nagranego
-decku.
+**Synchronizacja co do klatki.** Warstwy startują i pauzują razem (D17) — i na tym koniec.
+Zegar główny, seek i frame-lock to dni pracy i realne ryzyko (dryf, różne długości klipów, seek).
+Do czterowidokowej sceny seminarium wystarczy jedna scena Manima z czterema panelami albo warstwy
+o równej długości.
 
 **Odrzucone kierunki, z powodami:** łatanie trzech równolegle żyjących wersji Manima (CE 0.22,
 manimgl 1.7.2, manimgx 0.1.1) — scena nad istniejącym API daje ten sam efekt bez trzech upstreamów
-do utrzymania. Przechwytywanie przez OBS jako architektura — kompozytuje niezależne źródła, więc nie
-daje jednego punktu sterowania (był przykładem, nie celem).
+do utrzymania; fork manim-slides (D13) tego nie zmienia, bo manim-slides to nie Manim.
+Przechwytywanie przez OBS jako architektura — kompozytuje niezależne źródła, więc nie daje jednego
+punktu sterowania (był przykładem, nie celem).
 
 ---
 
@@ -334,11 +549,15 @@ Identyfikatory **po angielsku** (`build_objects`, `next_command`, `PRESETS`, `po
 Docstringi i komentarze po polsku. Projekt macierzysty ma dziś stan mieszany i to jest uznane
 za błąd — nie powtarzać go tutaj.
 
+**Wyjątek: kod z forka (`src/manimcue/slides/`).** Komentarze i docstringi upstreamu zostają po
+angielsku, żeby diff z kolejnym wydaniem manim-slides dał się nałożyć. Nasze zmiany w tym kodzie —
+po polsku.
+
 ---
 
 ## Punkt integracji z seminarium
 
-Gdy projekt będzie gotowy do podłączenia, wchodzi **przez klasy bazowe** z decyzji D10
-(`SeminarScene` / `SeminarScene3D` w `deck/base.py`), nie przez sceny treściowe. Wtedy panel NV⁻
-w scenie czterowidokowej (D9) można podmienić z sześciu kadrów PNG na żywy render — ale **do tego
-czasu nic w S1 od tego nie zależy** (R8).
+Gdy projekt będzie gotowy do podłączenia, wchodzi **przez klasy bazowe** z decyzji D10 tamtego
+planu (`SeminarScene` / `SeminarScene3D` w `deck/base.py`), nie przez sceny treściowe. Wtedy panel
+NV⁻ w scenie czterowidokowej (D9 tamtego planu) można podmienić z sześciu kadrów PNG na warstwę
+live — ale **do tego czasu nic w S1 od tego nie zależy** (R8 tamtego planu).

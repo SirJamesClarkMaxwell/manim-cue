@@ -2,6 +2,7 @@ from __future__ import annotations
 
 __all__ = ["BaseSlide"]
 
+import hashlib
 import platform
 import shutil
 from abc import abstractmethod
@@ -17,6 +18,7 @@ from tqdm import tqdm
 
 from ..config import (
     BaseSlideConfig,
+    LiveLayer,
     PresentationConfig,
     PreSlideConfig,
     SlideConfig,
@@ -671,11 +673,13 @@ class BaseSlide:
                         disable=not self._show_progress_bar,
                     )
 
-            slides.append(
-                SlideConfig.from_pre_slide_config_and_files(
-                    pre_slide_config, dst_file, rev_file
-                )
+            slide_config = SlideConfig.from_pre_slide_config_and_files(
+                pre_slide_config, dst_file, rev_file
             )
+            # F3 (D24): każda warstwa live dostaje miniaturę — pierwszą klatkę swojej sceny.
+            for layer in slide_config.layers:
+                layer.thumbnail = self._live_thumbnail(layer, scene_files_folder, use_cache)
+            slides.append(slide_config)
 
         logger.info(
             f"Generated {len(slides)} slides to '{scene_files_folder.absolute()}'"
@@ -692,6 +696,28 @@ class BaseSlide:
         logger.info(
             f"Slide '{scene_name}' configuration written in '{slide_path.absolute()}'"
         )
+
+    def _live_thumbnail(self, layer: LiveLayer, folder: Path, use_cache: bool) -> Path:
+        """PNG pierwszej klatki sceny live, z procesu headless (spawn: render CE nie importuje GL).
+
+        Klucz cache to ścieżka i bajty pliku sceny, klasa, rozmiar i wersja generatora. Zmiana
+        w module importowanym przez scenę (albo w danych) wymaga ``--flush-cache``.
+        """
+        from PIL import Image
+
+        from manimcue.live_session import LiveSpec, capture_first_frame
+
+        width, height = layer.size(self._resolution)
+        scene_file = Path(layer.scene_file).resolve()
+        key = hashlib.sha256(scene_file.read_bytes())
+        key.update(f"{scene_file}|{layer.scene_name}|{width}x{height}|thumbnail-v1".encode())
+        path = folder / f"live_{key.hexdigest()[:16]}.png"
+        if not use_cache or not path.exists():
+            frame = capture_first_frame(
+                LiveSpec(str(scene_file), layer.scene_name, width, height, layer.fps)
+            )
+            Image.frombytes("RGBA", (width, height), frame.pixels).save(path)
+        return path
 
     def start_skip_animations(self) -> None:
         """
