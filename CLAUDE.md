@@ -6,7 +6,7 @@
    trzy pułapki, na których szkic już padł, kryteria akceptacji fazy 0 i decyzje D1-D19.
    Fazy 0 dotyczyło pięć rund adwersaryjnej recenzji; **nie wyprowadzaj tych faktów od nowa i nie
    zmieniaj decyzji bez powodu.**
-2. **`PLAN.md`** — fazy. Aktywna jest faza 3 (model danych slajdu + minimalna kompozycja).
+2. **`PLAN.md`** — fazy. Aktywna jest faza 4 (warstwa live w playerze).
 3. **`REVIEW-LOG.md`** — rundy recenzji codex; runda 7 zawiera kontrakt fazy 2.
 
 ## Zasady

@@ -7,8 +7,9 @@
 Co sprawdzić w oknie (kryterium 5 fazy 1): notatki w oknie Info, podgląd następnego slajdu,
 slajd 2 zapętlony do naciśnięcia `→`, cofanie (`←`).
 
-Faza 3 (kryterium 8): slajd 3 ma warstwę live `examples/live_panel.py` w prawym górnym rogu —
-w F3 widać jej miniaturę (pierwszą klatkę sceny), w oknie głównym, w Info i w podglądzie.
+Faza 3/4: slajd 3 ma warstwę live `Panel` w prawym górnym rogu, slajd 4 — scenę 3D `Panel3D`.
+Przed startem procesu widać miniaturę (pierwszą klatkę sceny), potem obraz live. Klik w warstwę
+daje jej strzałki (żółta obwódka), Esc oddaje je slajdom. Na `Panel3D` mysz obraca kamerę.
 """
 
 from pathlib import Path
@@ -19,6 +20,7 @@ from manimcue.slides.slide import MANIM
 if MANIM:
     from manim import (
         BLUE,
+        DL,
         ORIGIN,
         PI,
         RED,
@@ -33,6 +35,7 @@ if MANIM:
 else:
     from manimlib import (
         BLUE,
+        DL,
         ORIGIN,
         PI,
         RED,
@@ -53,8 +56,15 @@ PANEL = LiveLayer(
 )
 
 
+PANEL_3D = LiveLayer(
+    scene_file=Path(__file__).with_name("live_panel.py"),
+    scene_name="Panel3D",
+    rect=(0.1, 0.1, 0.8, 0.8),
+)
+
+
 class Demo(Slide):
-    """Trzy slajdy: wzrost, pętla, obrót; na trzecim warstwa live."""
+    """Cztery slajdy: wzrost, pętla, obrót z panelem live, scena 3D."""
 
     def construct(self) -> None:
         circle = Circle(radius=2, color=BLUE)
@@ -77,3 +87,10 @@ class Demo(Slide):
         self.remove(dot)
         self.add(square)
         self.play(Rotate(square, PI / 2))
+
+        self.next_slide(
+            notes="**4/4** — scena 3D live: klik, potem przeciąganie obraca kamerę, Shift "
+            "przesuwa, kółko przybliża, dwuklik wraca; strzałki: spin, lift. Esc — slajdy.",
+            layers=[PANEL_3D],
+        )
+        self.play(square.animate.scale(0.5).to_corner(DL))

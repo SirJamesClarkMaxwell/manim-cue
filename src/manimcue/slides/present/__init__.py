@@ -360,4 +360,9 @@ def present(  # noqa: C901
     player.show(screens)
 
     signal.signal(signal.SIGINT, signal.SIG_DFL)
-    sys.exit(app.exec())
+    try:
+        code = app.exec()
+    finally:
+        # F4 (D27): po pętli Qt timer warstw już nie tyka — końcowy odbiór procesów live.
+        player.live.shutdown()
+    sys.exit(code)

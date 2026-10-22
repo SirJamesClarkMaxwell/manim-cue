@@ -6,7 +6,7 @@ pokazuje ten sam obraz z konstrukcji. Podgląd następnego slajdu ma własną ko
 
 from pathlib import Path
 
-from qtpy.QtCore import QRectF, QSizeF, Qt
+from qtpy.QtCore import QPointF, QRectF, QSizeF, Qt, Signal
 from qtpy.QtGui import QColor, QImage, QPainter, QPixmap, QTransform
 from qtpy.QtMultimediaWidgets import QGraphicsVideoItem
 from qtpy.QtWidgets import QFrame, QGraphicsPixmapItem, QGraphicsScene, QGraphicsView
@@ -37,6 +37,8 @@ class SlideComposition(QGraphicsScene):
         self.image_item.hide()
         self.addItem(self.image_item)
         self.layer_items: list[QGraphicsPixmapItem] = []
+        self.layer_rects: list[QRectF] = []
+        self.layers: list[LiveLayer] | None = None
 
     def set_resolution(self, resolution: tuple[int, int]) -> None:
         """Kadr innej prezentacji (`present A B` z różnymi rozdzielczościami)."""
@@ -65,12 +67,21 @@ class SlideComposition(QGraphicsScene):
         self.image_item.show()
 
     def set_layers(self, layers: list[LiveLayer]) -> None:
-        """Warstwy live w ich prostokątach, z miniaturą; kolejność listy to z-order."""
+        """Warstwy live w ich prostokątach, z miniaturą; kolejność listy to z-order.
+
+        Ta sama lista (replay, reverse, pętla slajdu) zostaje: przebudowa wstawiłaby miniaturę
+        nad obraz live, a scena w bezczynności nie publikuje nowej klatki (F4).
+        """
+        if layers is self.layers:
+            return
+        self.layers = layers
         for item in self.layer_items:
             self.removeItem(item)
         self.layer_items = []
+        self.layer_rects = []
         for z, layer in enumerate(layers, start=1):
             rect = self.layer_rect(layer)
+            self.layer_rects.append(rect)
             if layer.thumbnail is not None:
                 pixmap = QPixmap(str(layer.thumbnail))
             else:
@@ -84,13 +95,14 @@ class SlideComposition(QGraphicsScene):
             self.layer_items.append(item)
 
     def set_layer_image(self, index: int, image: QImage) -> None:
-        """Nowy obraz warstwy w jej dotychczasowym prostokącie (miniatura → klatki live w F4).
+        """Nowy obraz warstwy w jej prostokącie (miniatura → klatki live w F4).
 
-        ``QPixmap.fromImage`` kopiuje piksele, więc obraz może potem zniknąć.
+        Prostokąt z `set_layers`, nie z obrysu elementu: obrys po transformacji (F5) nie jest
+        pierwotnym prostokątem (runda 9, p. 10). Wywołujący trzyma bajty obrazu do powrotu.
         """
-        item = self.layer_items[index]
-        rect = item.sceneBoundingRect()
-        self.set_layer_pixmap(item, QPixmap.fromImage(image), rect)
+        self.set_layer_pixmap(
+            self.layer_items[index], QPixmap.fromImage(image), self.layer_rects[index]
+        )
 
     def layer_rect(self, layer: LiveLayer) -> QRectF:
         """Prostokąt warstwy we współrzędnych sceny (piksele prezentacji)."""
@@ -112,6 +124,15 @@ class SlideComposition(QGraphicsScene):
 class SlideView(QGraphicsView):
     """Widok kompozycji dopasowany do rozmiaru, czarne pasy poza kadrem."""
 
+    layer_clicked = Signal(int)
+    """Klik w widoku: indeks warstwy live pod kursorem albo -1 poza warstwami (F4)."""
+    layer_double_clicked = Signal(int)
+    pointer_dragged = Signal(QPointF, bool)
+    """Przeciąganie lewym przyciskiem: punkt we współrzędnych sceny i czy wciśnięty Shift (D28)."""
+    pointer_released = Signal()
+    wheel_turned = Signal(float)
+    """Obrót kółka w ząbkach (120 jednostek Qt = 1), dodatni od użytkownika."""
+
     def __init__(
         self,
         composition: SlideComposition,
@@ -127,6 +148,41 @@ class SlideView(QGraphicsView):
         # Bez fokusu: QAbstractScrollArea zjadłby strzałki na przewijanie, a klawisze
         # mają trafiać do okna (Player.keyPressEvent, Info.keyPressEvent).
         self.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+
+    def layer_at(self, point) -> int:
+        """Indeks warstwy live pod punktem viewportu albo -1.
+
+        items(), nie itemAt(): obwódka aktywnej warstwy leży wyżej i przesłoniłaby warstwę.
+        """
+        layer_items = self.scene().layer_items
+        for item in self.items(point):
+            for index, layer_item in enumerate(layer_items):
+                if layer_item is item:
+                    return index
+        return -1
+
+    def mousePressEvent(self, event) -> None:
+        self.layer_clicked.emit(self.layer_at(event.position().toPoint()))
+        super().mousePressEvent(event)
+
+    def mouseDoubleClickEvent(self, event) -> None:
+        self.layer_double_clicked.emit(self.layer_at(event.position().toPoint()))
+        super().mouseDoubleClickEvent(event)
+
+    def mouseMoveEvent(self, event) -> None:
+        if event.buttons() & Qt.MouseButton.LeftButton:
+            shift = bool(event.modifiers() & Qt.KeyboardModifier.ShiftModifier)
+            self.pointer_dragged.emit(self.mapToScene(event.position().toPoint()), shift)
+        super().mouseMoveEvent(event)
+
+    def mouseReleaseEvent(self, event) -> None:
+        self.pointer_released.emit()
+        super().mouseReleaseEvent(event)
+
+    def wheelEvent(self, event) -> None:
+        # Bez przewijania widoku: kadr zawsze mieści się w oknie (fitInView).
+        self.wheel_turned.emit(event.angleDelta().y() / 120)
+        event.accept()
 
     def resizeEvent(self, event) -> None:
         super().resizeEvent(event)

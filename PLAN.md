@@ -1,6 +1,7 @@
 # manim-cue — plan rozwoju
 
-Stan (2026-10-22): **fazy 0, 1 i 2 zamknięte. Aktywna: faza 3.** Kierunek zmieniony 2026-10-21 decyzjami D13-D19 w `SPEC.md`:
+Stan (2026-10-22): **fazy 0, 1 i 2 zamknięte; faza 3 zaimplementowana (próba w oknie: miniatura
+widoczna). Aktywna: faza 4.** Kierunek zmieniony 2026-10-21 decyzjami D13-D19 w `SPEC.md`:
 projekt staje się forkiem manim-slides 5.7.0, rozszerzonym o warstwy i wstrzykiwany live.
 Rundy 6-7 recenzji (codex) przebudowały fazy 2-9; decyzje D20-D22.
 
@@ -194,7 +195,7 @@ Przegląd, uruchomienie testów i pomiar: Claude.
 
 ---
 
-## Faza 3 — model danych slajdu + minimalna kompozycja (aktywna)
+## Faza 3 — model danych slajdu + minimalna kompozycja (zamknięta)
 
 **Cel:** slajd deklaruje warstwę live; JSON jest wersjonowany; player rysuje slajd w
 `QGraphicsView`, a okno Info pokazuje tę samą kompozycję. Warstwa live pokazuje w F3 miniaturę
@@ -267,7 +268,12 @@ Obraz zastępczy odrzucony: wymagałby kompozycji w każdym konwerterze (HTML, P
 **Budżet (po rundzie 8):** ~6 h (model i miniatura ~2 h, player i akceptacja ~4 h), stop
 i raport przy 12 h. Start pracy: 2026-10-22 ~14:00.
 
-## Faza 4 — warstwa live w playerze
+**Wynik (2026-10-22):** kryteria 1-7 — testy `tests/test_layers.py` (19, w tym 4 `gpu`), pełny
+zestaw 340 passed + 2 skip. Kryterium 8: prelegent widział miniaturę w prostokącie warstwy;
+nieruchomość warstwy była zgodna z zakresem F3 („jeśli miało się coś zmienić, to nie wyszło”) —
+ożywienie to F4. Czas pracy ~1 h zegarowo (14:00-15:00), w budżecie.
+
+## Faza 4 — warstwa live w playerze (aktywna)
 
 **Cel:** D20 w jednym oknie. Wejście na slajd z warstwą uruchamia proces, pierwsza klatka
 zastępuje miniaturę, kliknięcie warstwy daje jej strzałki, Esc oddaje je playerowi, wyjście ze
@@ -304,20 +310,75 @@ naraz w aktywnym sterowaniu (F5).
    Esc, potem `→` zmienia slajd. To samo dla klawiszy przekazanych z Info. Klik poza warstwą
    zwalnia. (`LiveLayerFocus` z korpusu rundy 7.)
 4. Klik i `→` przed READY nie wykonują cue po READY.
-5. Wyjątek w cue (`LiveGLCueRaises`): czerwona obwódka, błąd w logu, player przechodzi dalej
-   strzałkami; zamknięcie bez pozostawionego procesu.
-6. Utrata aktywności aplikacji zwalnia warstwę.
-7. Testy F0-F3 i upstreamu zielone.
-8. **Próba prelegenta:** demo deck, slajd 3 — klik w panel, strzałki sterują rotate → pulse →
+5. Wyjątek w cue (`LiveGLCueRaises`) i w `build_objects` (`LiveGLBuildRaises`): czerwona
+   obwódka, błąd w logu i w tytule Info, player przechodzi dalej strzałkami; zamknięcie bez
+   pozostawionego procesu.
+6. Utrata aktywności aplikacji zwalnia warstwę (D27); autorepeat strzałek nie wysyła cue.
+7. Szybkie wyjście i powrót (A → B → A przed odbiorem): stara sesja nie dotyka nowej warstwy.
+8. Nawigacja (D28): przeciąganie po aktywnej warstwie 3D zmienia obraz, dwuklik przywraca kadr
+   z ostatniej klatki granicznej.
+9. Ścieżka GUI: aktualizacje obrazu warstwy ≥ 80% z 60 fps w 5-sekundowym cue.
+10. Testy F0-F3 i upstreamu zielone.
+11. **Próba prelegenta:** demo deck, slajd 3 — klik w panel, strzałki sterują rotate → pulse →
    sweep i cofaniem, Esc wraca do slajdów, wyjście i powrót na slajd restartuje panel, płynność
-   na ekranie i w Info.
+   na ekranie i w Info; slajd 4 — nawigacja myszą po scenie 3D.
 
 **Budżet:** ~4 h, stop i raport przy 8 h.
 
 ## Faza 5 — warstwy pełne
 
-Pozycja, skala, z-order, animowane przesuwanie; gotowość wszystkich źródeł przed wspólnym
-startem i pauzą (D17); walidacja równych efektywnych długości.
+**Cel:** „scena jako obiekt w innej scenie” po stronie prezentacji (wizja, p. 2). Slajd ma
+oprócz live także warstwy z gotowych plików — klip albo obraz, np. render innej sceny — w swoim
+prostokącie, z animowanym ruchem i skalą, wspólnym startem i pauzą (D17). **Bez** zegara
+głównego, seeka i synchronizacji co do klatki (poza zakresem projektu).
+
+**Projekt (propozycja do rundy 11):**
+- **Model (D29):** `ClipLayer(kind="clip", file, rect, loop=False, playback_rate=1.0,
+  keyframes=[], thumbnail)`; `LiveLayer` dostaje `kind="live"`, a `layers` to unia obu
+  (rozpoznanie po wymaganych polach, `kind` jawnie w JSON). `FORMAT_VERSION = 3`: plik v2 czyta
+  się bez zmian, starszy fork odrzuci v3 komunikatem o nowszym formacie. Kolejność listy to
+  z-order dla obu rodzajów. Pomocnik autora `slide_file(json, index)` zwraca plik slajdu innego
+  wyrenderowanego decku — tak render innej sceny staje się warstwą.
+- **Ruch (D30):** `keyframes: list[(t, rect)]` — prostokąt w czasie slajdu (sekundy od wspólnego
+  startu), liniowo między klatkami kluczowymi, przed pierwszą i po ostatniej — stała. Dotyczy
+  obu rodzajów warstw; warstwa live zachowuje rozdzielczość renderu z początkowego `rect`
+  i jest tylko skalowana (runda 8, p. 6). Czas slajdu: pozycja klipu bazowego (`position()`),
+  więc pauza i replay działają bez osobnego zegara; slajd-obraz bez klipu — zegar monotoniczny
+  od startu, wstrzymywany pauzą.
+- **Wspólny start i pauza (D17, runda 6 p. 8):** wejście na slajd ładuje źródło bazy i każdej
+  warstwy-klipu; `play()` wszystkich dopiero, gdy każdy `QMediaPlayer` ma `LoadedMedia`
+  (albo błąd warstwy → warstwa wypada, reszta startuje). `PLAY_PAUSE` pauzuje i wznawia
+  wszystkie; replay — `setPosition(0)` wszystkich i wspólny start; pętla — każda warstwa
+  według własnego `loop`.
+- **Koniec slajdu i reverse:** koniec wyznacza klip bazowy (`auto_next`, pętla, `next` jak
+  dotąd). Reverse odtwarza `rev_file` bazy; warstwy-klipy stoją na ostatniej klatce, ruch
+  zatrzymany w stanie końcowym — reverse kompozycji ograniczony jawnie (decyzja 4).
+- **Walidacja długości:** warstwa-klip bez `loop` musi mieć efektywną długość
+  (`długość / playback_rate`) równą efektywnej długości bazy z tolerancją jednej klatki;
+  inaczej błąd renderu i błąd wczytania w `present`, z nazwą pliku i obu długościami.
+- **Miniatury i podgląd:** render zapisuje pierwszą klatkę każdego klipu jako `thumbnail`
+  (tak jak live); podgląd następnego slajdu i JSON-y bez klipów działają bez dekodowania.
+- **Kompozycja:** warstwa-klip to `QGraphicsVideoItem` z własnym `QMediaPlayer` (bez dźwięku),
+  warstwa-obraz — pixmapa; geometria i `layer_rects` aktualizowane przez ruch, klik w live
+  liczony na aktualnym prostokącie.
+
+**Kryteria akceptacji:**
+1. Model: v2 czyta się bez zmian; v3 z klipem i obrazem zapisuje i czyta `kind`; unia odrzuca
+   warstwę bez `scene_file` i bez `file`; `keyframes` z rosnącym `t` i poprawnymi `rect`.
+2. Kompozycja offscreen: piksele trzech nakładających się warstw (obraz, klip, live-miniatura)
+   zgodne z z-order i prostokątami; Info pokazuje to samo.
+3. Ruch: dla zadanych czasów slajdu prostokąt warstwy zgodny z interpolacją; pauza zatrzymuje
+   ruch, replay go cofa.
+4. Wspólny start: żaden `QMediaPlayer` nie gra przed `LoadedMedia` wszystkich; start i pauza
+   wszystkich w jednym przebiegu pętli zdarzeń; warstwa z błędnym plikiem nie blokuje reszty.
+5. Walidacja: nierówne długości (`LayerUnequalDuration` z korpusu rundy 7) → błąd z nazwami;
+   klip z `loop` zwolniony z walidacji.
+6. Reverse slajdu z warstwami: baza cofa się, warstwy stoją w stanie końcowym.
+7. Testy F0-F4 i upstreamu zielone.
+8. **Próba prelegenta:** demo deck ze slajdem, na którym render innej sceny wjeżdża
+   i powiększa się obok live; start i pauza razem.
+
+**Budżet:** ~6 h, stop i raport przy 12 h.
 
 ## Faza 6a — `SceneView` z gotowych klatek
 

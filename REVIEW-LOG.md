@@ -609,3 +609,224 @@ Poniżej nowe ustalenia; nie traktuję rozstrzygnięć D1–D22 jako ponownie ot
    **Poprawka planu:** oszacować osobno model/miniaturę i player/akceptację. Roboczo przyjąłbym **6–10 h**, z raportem nadal po 6 h zgodnie z obecną regułą. To szacunek recenzencki, nie wynik pomiaru pracy.
 
 **Werdykt: tak, F3 można implementować po poprawkach**, przede wszystkim po dopisaniu kontraktu ścieżek, timeoutu i sprzątania generatora miniatur, unieważniania cache oraz pełnego przełączania kompozycji. F2 można domknąć z jawnym skipem TeX; zmianę progu fps należy poprzedzić naprawą i doprecyzowaniem pomiaru.
+
+---
+
+## Runda 9 — codex, 2026-10-22: kontrakt F4 (warstwa live w playerze)
+
+Pytania: `codex-round9-prompt` (cykl życia sesji, pompowanie i zamykanie, fokus i klawisze,
+koszt obrazu, błędy i stany brzegowe, granica F4/F5). codex-cli 0.160.0, `-s read-only`,
+z małymi próbami Qt offscreen.
+
+**Co weszło:**
+- Sesje usuwane po `not running`, niezależnie od `state` (p. 1).
+- Zamykanie: `begin_shutdown()` w `Player.close()` (asynchronicznie, idempotentnie),
+  końcowe `shutdown()` z blokującym odbiorem w `finally` wokół `app.exec()` — po wyjściu
+  z pętli Qt (D27, p. 2).
+- `set_layers` pomija tę samą listę warstw — replay i reverse → normalny kierunek nie
+  przywracają miniatury nad obraz live (p. 3).
+- „Ten sam slajd” = klucz (prezentacja, indeks), nie tożsamość obiektu; reverse dotyczy bazy,
+  live startuje od początku przy wejściu (D27, p. 4).
+- Sesje zatrzymywane pompowane tylko do odbioru, bez klatek i błędów dla bieżącego slajdu;
+  test A → B → A (p. 5).
+- Router: strzałki przy aktywnej, niegotowej warstwie konsumowane bez wysłania; autorepeat
+  konsumowany bez wysłania; kody bez modyfikatorów jak `dispatch` (p. 6).
+- Aktywność: oba okna to wspólny obszar — zwolnienie przy `applicationStateChanged`, nie przy
+  przejściu główne ↔ Info (D27, p. 7).
+- Timeout przygotowania w GUI (60 s), błąd dotyczy tylko swojej warstwy, testy błędu przed
+  READY i w cue (p. 8). Zewnętrzne zabicie procesu i dwie warstwy na slajdzie — bez osobnych
+  testów: ta sama ścieżka `ERROR` z `LiveSession` (F2, `test_worker_dies_holding_lock`).
+- Pomiar ścieżki GUI: test przepustowości ≥ 80% z 60 fps przez 5 s cue (p. 9).
+- `set_layer_image` bierze prostokąt z `set_layers`, nie z obrysu (p. 10).
+- Obwódka w scenie (widoczna na projektorze) zaakceptowana na F4; do oceny prelegenta (p. 11).
+
+**Odpowiedź codex (bez zmian):**
+
+**F4 można implementować po poprawkach planu.** Najpoważniejsze luki dotyczą zakończenia aplikacji, rozróżnienia stanu sesji od zakończenia procesu oraz zachowania obrazu przy ponownym ładowaniu tego samego slajdu.
+
+Przegląd read-only. Wykonałem małe próby Qt offscreen; nie wykonywałem testu prezentacji na dwóch ekranach. Poniżej nowe ustalenia, bez ponownego otwierania rozstrzygnięć rund 6–8.
+
+1. **[KRYTYCZNE] B: „aż do STOPPED” musi oznaczać zdarzenie lub `running == False`, nie stan sesji.**
+
+   **Dowód:** po błędzie `poll()` sprząta zasoby i emituje `"STOPPED"`, ale pozostawia `state == "error"` (`src/manimcue/live_session.py:138–150`). To zachowanie jest jawnie sprawdzane w `tests/test_live_session.py:319–325`. Właściwość `running` oznacza proces jeszcze nieodebrany (`src/manimcue/live_session.py:177–180`).
+
+   **Konsekwencja:** kontroler oczekujący `state == "stopped"` nigdy nie usunie błędnej sesji; zamykanie może wisieć bez końca. Samo wywołanie `kill()` też nie kończy odbioru: Windows ustala kod zakończenia dopiero po potwierdzeniu zakończenia procesu (`C:/Users/Franek/AppData/Roaming/uv/python/cpython-3.13.2-windows-x86_64-none/Lib/multiprocessing/popen_spawn_win32.py:105–144`).
+
+   **Poprawka planu:** usuwać sesję po `not session.running`; zachowywać osobno diagnozę błędu. Po wymuszeniu zakończenia nadal pompować. Jeden timer wystarczy, dopóki działa pętla zdarzeń i kontroler pozostaje właścicielem wszystkich kończących się sesji.
+
+2. **[KRYTYCZNE] A/B: zamknięcie potrzebuje osobnego, idempotentnego protokołu i zabezpieczenia po `app.exec()`.**
+
+   **Dowód:** `Player.close()` zamyka Info i okno główne, `Player.closeEvent()` ponownie woła `close()`, a Info przekazuje swój `closeEvent` do playera (`src/manimcue/slides/present/player.py:268–269`, `:578–581`, `:672–673`, `:165–166`). CLI kończy przez `sys.exit(app.exec())`, bez końcowego odbioru sesji (`src/manimcue/slides/present/__init__.py:360–363`). Termin wymuszenia jest wykonywany wyłącznie przez `poll()` (`src/manimcue/live_session.py:131–150`).
+
+   **Konsekwencja:** dopisanie jedynie `request_stop()` do `close()` nie wystarczy. Po zakończeniu pętli Qt timer nie wykona wymuszenia. Przy normalnym końcu interpretera multiprocessing wykonuje `join()` aktywnych dzieci, więc objawem może być wiszący proces rodzica; przy gwałtownym zakończeniu rodzica pozostaje ryzyko osieroconego workera (`C:/Users/Franek/AppData/Roaming/uv/python/cpython-3.13.2-windows-x86_64-none/Lib/multiprocessing/util.py:342–349`).
+
+   Na Windows `SharedMemory.unlink()` niczego nie usuwa: konieczne jest zamknięcie wszystkich uchwytów (`C:/Users/Franek/AppData/Roaming/uv/python/cpython-3.13.2-windows-x86_64-none/Lib/multiprocessing/shared_memory.py:225–249`).
+
+   **Poprawka planu:** wspólne, odporne na ponowne wejście `begin_shutdown()` dla obu okien i `exit_after_last_slide`. Podczas zwykłego zamykania zatrzymać sesje asynchronicznie, pozostawiając pętlę Qt do ich odebrania. Dodać `finally` wokół `app.exec()` z końcowym pompowaniem bez Qt. Blokujące oczekiwanie w aktywnym GUI łamałoby zasadę nieblokowania; końcowe sprzątanie po wyjściu z pętli jest inną fazą działania i należy zapisać ten wyjątek jawnie.
+
+3. **[WAŻNE] A/D: zachowanie sesji dla tego samego slajdu nie zachowuje jego elementów graficznych.**
+
+   **Dowód:** `load_current_media()` zawsze wykonuje `composition.set_layers()` (`src/manimcue/slides/present/player.py:430–435`), które usuwa wszystkie elementy i tworzy je ponownie z miniatur (`src/manimcue/composition.py:67–84`). Powrót z reverse do kierunku normalnego zachowuje indeks slajdu i wywołuje ponowne ładowanie (`src/manimcue/slides/present/player.py:493–509`). Odbiornik nie zwraca ponownie niezmienionej klatki (`src/manimcue/frame_buffer.py:101–109`).
+
+   **Konsekwencja:** kontroler zachowa działającą sesję, lecz obraz może wrócić do miniatury i pozostać taki do następnej publikacji. Referencje do starych elementów i obwódki również przestaną odpowiadać kompozycji.
+
+   **Poprawka planu:** nie przebudowywać warstw przy zachowaniu tej samej sesji albo po przebudowie obowiązkowo przywrócić ostatnią posiadaną klatkę i stan aktywacji. Dodać test statycznego live podczas reverse → odtwarzanie normalne.
+
+4. **[WAŻNE] A: tożsamość obiektu nie definiuje całej semantyki reverse ani „tego samego slajdu”.**
+
+   **Dowód:** `reverse()` ustawia flagę reverse i przechodzi do poprzedniego slajdu; na pierwszym slajdzie przejście wraca bez ładowania (`src/manimcue/slides/present/player.py:481–491`, `:605–607`). Zwykłe ładowanie wybiera `rev_file` według tej flagi (`:463–468`). Rozdzielczość warstw zależy od prezentacji, nie tylko konfiguracji slajdu (`src/manimcue/composition.py:95–99`).
+
+   **Konsekwencja:** wejście reverse na poprzedni slajd z warstwą uruchomi świeżą, początkową scenę live nad cofanym filmem. Samo porównanie `is` tego nie rozstrzyga. Pomija też kontekst prezentacji, jeśli ten sam obiekt konfiguracji zostanie użyty ponownie.
+
+   **Poprawka planu:** klucz bieżącego miejsca określić jako prezentacja + indeks slajdu; kierunek traktować jako osobny stan. Dla F4 przyjąć jawnie np. „reverse dotyczy bazy; live pozostaje niezależny i zaczyna od początku przy wejściu”. Sprawdzić reverse na pierwszym slajdzie oraz reverse → next. Nie obiecywać cofania kompozycji.
+
+5. **[WAŻNE] A/E: sesje zatrzymywane muszą utracić prawo aktualizacji bieżącego slajdu.**
+
+   **Dowód:** zatrzymanie tylko kolejkuje `shutdown` i ustawia termin (`src/manimcue/live_session.py:172–175`); do odebrania procesu sesja nadal może dostarczać zdarzenia i klatki (`:104–152`, `:160–170`). Aktualizacja kompozycji wskazuje warstwę samym indeksem (`src/manimcue/composition.py:86–93`).
+
+   **Konsekwencja:** przy szybkim przejściu A → B spóźniona klatka warstwy 0 z A może zastąpić warstwę 0 w B. Spóźniony błąd A może zwolnić aktywację B albo zmienić tytuł Info.
+
+   **Poprawka planu:** rozdzielić sesje bieżące i odbierane po zatrzymaniu. Drugie pompować wyłącznie dla zakończenia i diagnostyki; nie kierować ich obrazu ani stanu aktywacji do aktualnej kompozycji. Dodać test A → B → A przed zakończeniem pierwszego workera.
+
+6. **[WAŻNE] C: router potrzebuje jawnej polityki autorepeat, modyfikatorów i klawiszy podczas startu.**
+
+   **Dowód:** obecny dispatcher otrzymuje wyłącznie `event.key()` (`src/manimcue/slides/present/player.py:675–678`), a konfiguracja dopasowuje sam kod klawisza (`src/manimcue/slides/config.py:70–76`, `:134–143`). PySide6 udostępnia `isAutoRepeat()` i `modifiers()` (`.venv/Lib/site-packages/PySide6/QtGui.pyi:3561–3565`). Worker kolejkuje kolejne `next`/`back`; nadejście komendy podczas cue może je przerwać (`src/manimcue/live_scene.py:468–469`, `:515–516`).
+
+   **Konsekwencja:** przytrzymana strzałka może szybko przerywać i przewijać cue. Niejasne pozostaje również, czy strzałka przy aktywnej, ale jeszcze niegotowej warstwie zostaje skonsumowana, czy przesuwa prezentację.
+
+   **Poprawka planu:** podczas startu konsumować `NEXT/PREVIOUS`, bez wysyłania i bez przejścia slajdu. Dla live ignorować autorepeat albo jawnie zaakceptować jego skutki. Modyfikatory obsługiwać zgodnie z dotychczasowym dopasowaniem kodów lub świadomie zmienić kontrakt. Testować również niestandardowe przypisania i zdarzenia przekazane przez Info.
+
+7. **[WAŻNE] C: plan zmienia „utratę aktywności okna” na „utratę aktywności aplikacji”; trzeba to nazwać decyzją.**
+
+   **Dowód:** D20 mówi o oknie (`SPEC.md:468–469`), plan o `applicationStateChanged` (`PLAN.md:287–290`). Lokalne API rozróżnia ten sygnał i `focusWindowChanged` (`.venv/Lib/site-packages/PySide6/QtGui.pyi:2514–2517`). Windows Qt próbuje przekazać bezpośrednio następne własne okno zamiast pośredniego braku fokusu; jest to warunkowe zachowanie backendu, nie gwarancja kolejności wszystkich zdarzeń ([Qt, `qwindowscontext.cpp`, linie 1123–1159](https://raw.githubusercontent.com/qt/qtbase/6.12/src/plugins/platforms/windows/qwindowscontext.cpp)).
+
+   **Konsekwencja:** przejście główne → Info powinno zachować aktywację, jeżeli ma działać kryterium sterowania live z Info. Dosłowne zwalnianie przy dezaktywacji każdego okna przeczyłoby temu.
+
+   **Poprawka planu:** przyjąć jawnie „oba okna tworzą wspólny obszar aktywności”. Dodać próbę Windows: główne → Info → główne oraz Alt-Tab na zewnątrz, także z przytrzymaną strzałką.
+
+   Sam mechanizm kliknięcia jest poprawny: lokalne sygnatury są w `.venv/Lib/site-packages/PySide6/QtWidgets.pyi:3455–3457`, `:3500`; współrzędne viewportu potwierdza [dokumentacja Qt](https://doc.qt.io/qt-6/qgraphicsview.html#itemAt). Próba offscreen potwierdziła kliknięcie przy ustawionym tutaj `NoFocus` (`src/manimcue/composition.py:127–129`). `NoFocus` nie dowodzi natomiast kolejności natywnych zdarzeń aktywacji Windows.
+
+8. **[WAŻNE] E: kryteria nie obejmują pełnego błędu przygotowania ani niezależności dwóch warstw.**
+
+   **Dowód:** brak klasy sceny trafia do raportowania błędu workera (`src/manimcue/live_worker.py:24–26`, `:46–50`), a `build_objects()` poprzedza READY (`src/manimcue/live_scene.py:402–404`). W GUI nie ma obecnie limitu czasu startu w `LiveSession`; termin jest ustawiany dopiero przez `request_stop()` (`src/manimcue/live_session.py:45–68`, `:172–175`). Model dopuszcza listę warstw (`src/manimcue/slides/config.py:220`), natomiast kryterium błędu F4 dotyczy wyjątku w cue (`PLAN.md:307–308`).
+
+   **Konsekwencja:** wiszące budowanie może pozostawić wiecznie „ładującą się” warstwę. Błąd nieaktywnej warstwy może niepotrzebnie odebrać sterowanie drugiej.
+
+   **Poprawka planu:** dopisać timeout przygotowania GUI oraz testy: nieistniejąca klasa, wyjątek przed READY, zewnętrzne zabicie procesu, dwie sesje z jedną aktywną i błąd każdej z nich osobno. Zwolnienie aktywacji powinno dotyczyć sesji, która ją posiada. Dodać start bezpośrednio na slajdzie z warstwą, `src=`, `start_paused` i zamknięcie przed READY.
+
+9. **[WAŻNE] D: brakuje mierzalnej akceptacji całej ścieżki GUI; nie ma dowodu, że konwersja będzie wąskim gardłem.**
+
+   **Dowód:** odbiornik kopiuje payload i następnie odwraca wiersze do kolejnego `bytes` (`src/manimcue/frame_buffer.py:103–109`); kompozycja wykonuje `QPixmap.fromImage()` (`src/manimcue/composition.py:86–93`). Konstruktor nad `bytes` jest dostępny lokalnie (`.venv/Lib/site-packages/PySide6/QtGui.pyi:3018–3020`). Wspólną scenę oglądają dwa widoki (`src/manimcue/slides/present/player.py:250`, `:265`, `:57`).
+
+   **Konsekwencja:** sam payload przy 60 fps to około **61 MB/s dla 672×378** albo **498 MB/s dla 1080p**, przed dodatkowymi kopiami i rysowaniem. Wspólna scena pozwala konwertować raz; dwa widoki nadal wymagają osobnego rysowania. Istotności kosztu nie da się ustalić ze statycznego przeglądu.
+
+   **Poprawka planu:** zmierzyć czas odczytu, konwersji, opóźnienie timera i responsywność klawiatury z Info widocznym oraz ukrytym. Pompować statusy wszystkich sesji przed kosztownymi aktualizacjami obrazu.
+
+   `OwnedFrame` trzymany lokalnie do zakończenia synchronicznego `fromImage()` zapewnia życie wejściowych bajtów; nie potrzeba profilaktycznej dodatkowej kopii `QImage`. Nie uzasadniać tego jednak uniwersalną obietnicą „`fromImage` zawsze kopiuje”: Qt opisuje konwersję i współdzielenie zależne od wariantu ([QImage](https://doc.qt.io/qt-6/qimage.html#QImage-3), [QPixmap](https://doc.qt.io/qt-6/qpixmap.html#fromImage)).
+
+10. **[WAŻNE] D/F: aktualizacja obrazu nie powinna ustalać geometrii na podstawie aktualnego obrysu sceny.**
+
+    **Dowód:** `set_layer_image()` pobiera `sceneBoundingRect()`, po czym ustawia pozycję i zastępuje transformację skalowaniem (`src/manimcue/composition.py:91–108`). Istniejący test sprawdza jedną aktualizację bez obrotu (`tests/test_layers.py:184–196`).
+
+    **Konsekwencja:** dla obecnej dodatniej skali nie wykazałem narastania błędu — również po 10 000 aktualizacji. Natomiast w F5 obrys po obrocie nie jest pierwotnym prostokątem: aktualizacja obrazu wyzeruje obrót i użyje powiększonej obwiedni.
+
+    **Poprawka planu:** zachowywać lokalny prostokąt obrazu niezależnie od transformacji elementu lub jego rodzica. Aktualizacja pikseli nie może zmieniać pozycji, skali animowanej ani z-order. F4 nie musi implementować wspólnego startu i pauzy F5; powinno jedynie pozostawić przygotowanie sesji oddzielone od wysyłania cue, zgodnie z obecnym READY przed pętlą komend (`src/manimcue/live_scene.py:402–409`).
+
+11. **[DROBNE] F: obwódka na projektorze jest wyborem interfejsu zgodnym z wcześniejszym kierunkiem D20.**
+
+    **Dowód:** plan świadomie umieszcza ją we wspólnej scenie (`PLAN.md:288–289`); widoczna aktywacja była już rekomendacją rundy 7 (`REVIEW-LOG.md:142`). Nie jest to nowa wada architektury.
+
+    **Konsekwencja:** publiczność zobaczy stan sterowania, a obwódka błędu może zostać zinterpretowana jako treść prezentacji.
+
+    **Poprawka planu:** jawnie zaakceptować ten efekt albo rysować oznaczenia osobno dla widoków. To preferencja produktu, nie blokada F4.
+
+**Werdykt: tak, F4 można implementować po poprawkach.** Wywołanie `show()` po zatwierdzonym ładowaniu i osobno w konstruktorze jest właściwym punktem integracji: normalne przejścia, przejścia między prezentacjami i automatyczne przejścia zbiegają się w `load_current_slide()`; replay i wznowienie pauzy go nie wymagają (`src/manimcue/slides/present/player.py:293–326`, `:481–509`, `:584–615`). Warunkiem jest domknięcie ustaleń 1–8, szczególnie zamykania oraz ponownego użycia sesji po przebudowie kompozycji.
+
+---
+
+## Runda 10 — codex, 2026-10-22: D28 (nawigacja kamerą) i przegląd kodu F4
+
+Pytania: `codex-round10-prompt` (spójność D28 z D3/D9/D10/D21, poprawność `live_layers.py`,
+zmian w kompozycji, playerze i scenie, jakość testów F4). Przegląd statyczny, `-s read-only`.
+
+**Co weszło:**
+- Bariera czeka na id ostatniej klatki **granicznej** (`live_boundary_id`), potwierdzenie
+  porównywane z nim; regresja „koniec sekwencji → klatka nawigacji → next” — sprawdzona, że
+  pada bez poprawki (p. 1).
+- D28 poprawione: kamera **należy** do `SceneState` (manimgl dodaje ją do `mobjects`), więc
+  `back` przywraca też widok sprzed cue, a nawigacja w trakcie cue animującego kamerę przegrywa
+  z animacją. Osobna transformacja widoku prelegenta — odrzucona jako niepotrzebna na F4 (p. 2).
+- Pan liczony jak w manimgl: wektor ekranu w stałym kadrze przez
+  `from_fixed_frame_point(..., relative=True)`, więc idzie po płaszczyźnie obróconej kamery (p. 3).
+- Zmiana slajdu i zamykanie zerują aktywację, przeciąganie i błędy bez odtwarzania starej
+  obwódki; test dwóch warstw (błędna + aktywna) → slajd bez warstw (p. 4).
+- Test przepustowości liczy aktualizacje w stałym oknie zegara w środku cue (p. 5).
+- Testy: asercja aktywacji po kliknięciu przed READY; nawigacja przez surowe zdarzenia
+  viewportu (press → move z lewym przyciskiem → release, dwuklik) (p. 6).
+- Reset opisany dosłownie: kadr zastany na ostatniej klatce granicznej (p. 7).
+
+**Odpowiedź codex (bez zmian):**
+
+**F4 nie jest jeszcze gotowa do zamknięcia samą próbą prelegenta.** Najpoważniejsze nowe problemy dotyczą bariery po nawigacji oraz nieprawdziwego założenia, że kamera pozostaje poza historią. Przegląd był statyczny i read-only; nie uruchamiałem testów ani prezentacji.
+
+1. **[KRYTYCZNE] Nawigacja w bezczynności może zakończyć poprawną sesję błędem bariery.**
+
+   **Dowód:** publikacja widoku zwiększa wspólny `live_frame_id` (`src/manimcue/live_scene.py:413–415`, `:531–532`), ale odbiornik potwierdza wyłącznie klatki `boundary` (`src/manimcue/live_session.py:168–169`). Gdy `next` dochodzi do końca sekwencji, gałąź `SEQUENCE_END` wraca bez publikacji granicznej (`src/manimcue/live_scene.py:423–427`), po czym bariera czeka na aktualny identyfikator i po dwóch sekundach rzuca wyjątek (`:410`, `:516–522`).
+
+   **Konsekwencja:** po ostatnim cue wystarczy obrócić kamerę, a potem nacisnąć →. Bariera czeka na potwierdzenie zwykłej klatki, którego sesja nigdy nie wysyła.
+
+   **Poprawka:** przechowywać osobno identyfikator ostatniej klatki granicznej i oczekiwać potwierdzenia właśnie jego. Dodać regresję: koniec sekwencji → `view` → `next`, bez błędu po dwóch sekundach.
+
+2. **[WAŻNE] D28 opiera się na błędnym założeniu: kamera należy do `SceneState`, więc `back` cofa widok.**
+
+   **Dowód:** manimgl inicjalizuje `mobjects` kamerą (`.venv/Lib/site-packages/manimlib/scene/scene.py:111–116`), a `SceneState` kopiuje wszystkie `scene.mobjects` (`:875–887`). Live zapisuje ten stan przed cue (`src/manimcue/live_scene.py:429`), a cofanie tworzy transformacje zapisanych obiektów i wywołuje `undo()` (`:327–337`). Przeczy to komentarzowi „kadr kamery nie należy do SceneState” (`:490–491`).
+
+   **Konsekwencja:** cue → ręczny obrót → `back` przywróci również wcześniejszą kamerę. Ponadto nawigacja podczas animacji kamery konkuruje z jej `interpolate()` wykonywanym po odczytaniu komend (`src/manimcue/live_scene.py:556`, `:575–577`).
+
+   **Poprawka:** rozstrzygnąć osobno kamerę autora i nawigację prelegenta. Jeśli utrzymać D28, nakładać nawigację jako niezależną transformację widoku; samo wykluczenie kamery z historii zepsułoby cofanie autorskich cue kamery, takich jak `LiveGLThreeD.cue_orbit` (`tests/scenes/live_gl.py:198–200`).
+
+3. **[WAŻNE] Pan przesuwa po osiach świata, a nie po płaszczyźnie ekranu obróconej kamery.**
+
+   **Dowód:** obecne przesunięcie używa bezpośrednio `LEFT` i `UP` (`src/manimcue/live_scene.py:501–503`). Manimgl najpierw przelicza ruch przez `from_fixed_frame_point(..., relative=True)` (`.venv/Lib/site-packages/manimlib/window.py:129–137`), następnie przesuwa kamerę o `-d_point` (`.venv/Lib/site-packages/manimlib/scene/scene.py:751–752`).
+
+   **Konsekwencja:** Shift+drag po obrocie sceny 3D nie podąża za kursorem; przy odpowiedniej orientacji ruch trafia częściowo w głąb sceny.
+
+   **Poprawka:** przeliczać wektor ekranowy przez odwrotną macierz widoku. Sam wzór orbity ma właściwe znaki i skalę: manimgl przelicza ten wektor z powrotem do stałego kadru przed zmianą theta/phi (`.venv/Lib/site-packages/manimlib/scene/scene.py:745–749`).
+
+4. **[WAŻNE] Zmiana slajdu może użyć indeksu błędnej warstwy w nowej, krótszej liście.**
+
+   **Dowód:** player najpierw przebudowuje warstwy kompozycji, następnie woła `live.show()` (`src/manimcue/slides/present/player.py:448–454`). `show()` wykonuje `release()` przed wyczyszczeniem `failed` (`src/manimcue/live_layers.py:66–68`). `release()` przy aktywnej warstwie odtwarza obwódkę dla starego `min(failed)` (`:171–178`), indeksując już nowe `layer_rects` (`:186`).
+
+   **Konsekwencja:** slajd ma dwie warstwy: jedna błędna, druga aktywna. Przejście na slajd bez warstw powoduje `IndexError` podczas ładowania.
+
+   **Poprawka:** przy zmianie slajdu wyzerować aktywację, przeciąganie i błędy bez odtwarzania starej obwódki. Dodać test tego konkretnego przejścia.
+
+5. **[WAŻNE] Test przepustowości może wisieć aż do timeoutu mimo poprawnych 60 fps.**
+
+   **Dowód:** warunek zakończenia wymaga aktualizacji ponad `MOVE_RUN_TIME + 0.5` od pierwszej aktualizacji (`tests/test_live_layers.py:314`). Cue wykonuje tylko pięciosekundowy ruch (`tests/scenes/live_gl.py:88–93`), a po klatce granicznej bezczynność publikuje ponownie wyłącznie przy `live_view_dirty` (`src/manimcue/live_scene.py:440`, `:411–415`).
+
+   **Konsekwencja:** po ostatniej klatce nie przychodzi aktualizacja potrzebna do zakończenia pomiaru. Test nie daje wiarygodnego dowodu kryterium wydajności.
+
+   **Poprawka:** kończyć pomiar zdarzeniem `CUE_DONE` albo niezależnym zegarem; liczyć aktualizacje w ustalonym oknie cue.
+
+6. **[WAŻNE] Test przed READY może przejść bez trafienia kliknięciem w warstwę, a test D28 omija obsługę ruchu myszy.**
+
+   **Dowód:** test przed READY nie sprawdza `active == 0`; sprawdza tylko niezmieniony indeks i brak wysłania `next` (`tests/test_live_layers.py:212–218`). Na ostatnim slajdzie? Nie — pozostaje indeks 1, lecz błędny klik może też wynikać z niedopasowanego widoku; wymagana jest bezpośrednia asercja aktywacji. Test D28 wywołuje `player.live.drag()` i `double_click()` bez zdarzeń viewportu (`:281–289`).
+
+   **Konsekwencja:** brak dowodu, że rzeczywisty drag i dwuklik docierają przez `SlideView.mouseMoveEvent`/`mouseDoubleClickEvent` (`src/manimcue/composition.py:166–174`).
+
+   **Poprawka:** po kliknięciu sprawdzać aktywację; D28 testować przez press → move z lewym przyciskiem → release oraz dwuklik viewportu. `recorded_sends` przechwytuje właściwy obiekt sesji w obecnych testach, bo podmienia metodę konkretnej instancji (`tests/test_live_layers.py:132–140`, `:213`, `:226`).
+
+7. **[DROBNE] Reset utrwala nawigację prelegenta jako nowy punkt powrotu.**
+
+   **Dowód:** każda klatka graniczna bezwarunkowo kopiuje aktualną kamerę (`src/manimcue/live_scene.py:533–534`), a reset odtwarza tę kopię (`:507–508`). Zatem orbit → cue bez ruchu kamery → reset zachowuje orbitę.
+
+   **Konsekwencja:** komentarz „widok autora” (`src/manimcue/live_scene.py:488`) obiecuje więcej niż implementacja. Reset oznacza faktycznie widok zastany na ostatniej granicy.
+
+   **Poprawka:** nazwać tę semantykę dosłownie albo przechowywać osobno widok autora. Samo `become()` odtwarza punkty i uniforms (`.venv/Lib/site-packages/manimlib/mobject/mobject.py:727–729`), czyli centrum, rozmiar, orientację i ogniskową wynikającą z `fovy` (`.venv/Lib/site-packages/manimlib/camera/camera_frame.py:38–49`, `:245–246`). Nie znalazłem podstaw do uznania pojedynczej kopii kamery na granicy za istotny koszt; `copy()` kopiuje jej dane, a nie całą scenę (`.venv/Lib/site-packages/manimlib/mobject/mobject.py:665–699`).
+
+D28 jako komendy niebędące cue jest wykonalne: `view` nie trafia do kolejki przerywającej animację (`src/manimcue/live_scene.py:475–478`, `:560–562`). Statyczny `wait` bez nawigacji nadal nie publikuje klatek wewnętrznych; istniejący test sprawdza właśnie taki przypadek (`tests/test_live_session.py:350–358`). Po nawigacji publikacja jest świadomym wyjątkiem (`src/manimcue/live_scene.py:588–591`). Niespójności wymagające naprawy to punkty 1–2.
+
+Nie wykazałem nowego błędu własności bajtów `QImage`: `frame` pozostaje lokalnie żywy przez synchroniczną aktualizację obrazu (`src/manimcue/live_layers.py:106–116`). Info nie ma podłączonych sygnałów myszy do kontrolera; połączenia dotyczą głównego widoku (`src/manimcue/slides/present/player.py:254–258`, `:59`). `exit_after_last_slide` prowadzi przez `close()` (`:521–522`), a ponowne zatrzymywanie sesji nie przesuwa terminu wymuszenia (`src/manimcue/live_session.py:172–175`).
+
+**Werdykt:** najpierw poprawić 1–5 i uzupełnić testy z punktu 6. Następnie próba dwóch ekranów powinna objąć rzeczywisty drag i reset, pan po obrocie, nawigację po końcu sekwencji oraz `back` po ręcznej zmianie kamery. Sama udana demonstracja obecnego testu D28 nie wystarczy, ponieważ omija on zdarzenia myszy (`tests/test_live_layers.py:282–289`).

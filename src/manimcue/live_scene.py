@@ -24,7 +24,7 @@ from typing import ClassVar
 
 from manimlib.animation.rotation import Rotate
 from manimlib.animation.transform import Transform
-from manimlib.constants import BLUE, LEFT, PI, RED, RIGHT
+from manimlib.constants import BLUE, FRAME_HEIGHT, FRAME_WIDTH, LEFT, PI, RED, RIGHT, UP
 from manimlib.logger import log
 from manimlib.mobject.geometry import Circle, Square
 from manimlib.scene.scene import EndScene, Scene
@@ -38,6 +38,9 @@ POLL_TIMEOUT = 1 / 60
 RECV_SIZE = 4096
 
 REWIND_TIME = 0.6
+
+ZOOM_STEP = 0.9
+"""Skala kadru kamery na jeden ząbek kółka myszy (D28): <1 przybliża."""
 """Czas animowanego cofania [s]."""
 
 KEY_NEXT = "__next__"
@@ -395,7 +398,11 @@ class LiveScene(Scene):
         self.live_commands = deque()
         self.live_seen = 0
         self.live_frame_id = 0
+        # Runda 10: bariera czeka na ostatnią klatkę graniczną, nie na ostatnią w ogóle —
+        # zwykłe klatki (nawigacja D28 w bezczynności) nie są potwierdzane.
+        self.live_boundary_id = 0
         self.live_loop = False
+        self.live_view_dirty = False
         self.live_outgoing = bytearray()
         self.live_metrics = {name: [0.0, 0] for name in ("render", "readback", "publish")}
         try:
@@ -406,6 +413,9 @@ class LiveScene(Scene):
                 self.live_barrier()
                 while not self.live_commands:
                     self.live_poll(POLL_TIMEOUT)
+                    if self.live_view_dirty:
+                        # D28: zmiana widoku w bezczynności to zwykła klatka, bez bariery.
+                        self.live_publish()
                 command = self.live_commands.popleft()
                 if command == "back":
                     self.live_cue = "back"
@@ -461,19 +471,60 @@ class LiveScene(Scene):
             if command.startswith("frame_seen "):
                 try:
                     frame_id = int(command.split()[1])
-                    if frame_id == self.live_frame_id:
+                    if frame_id == self.live_boundary_id:
                         self.live_seen = frame_id
                 except (ValueError, IndexError):
                     log.warning(f"Niepoprawne potwierdzenie: {command!r}")
             elif command in ("next", "back") or command in self.PRESETS:
                 self.live_commands.append(command)
+            elif command.startswith("view "):
+                self.live_view(command)
             else:
                 log.warning(f"Nieznana komenda: {command!r}")
         self.live_flush()
 
+    def live_view(self, command: str) -> None:
+        """Nawigacja kamerą z playera (D28) — jak mysz w oknie manimgl, ale bez okna.
+
+        `view orbit dx dy` obraca (jak `d` + ruch), `view pan dx dy` przesuwa (jak `f` + ruch):
+        przesunięcie myszy w ułamkach warstwy, y w dół, przeliczane jak w
+        `Window.pixel_coords_to_space_coords` manimgl. `view zoom kroki` — kółko, dodatnie
+        przybliża. `view reset` — kadr kamery zastany na ostatniej klatce granicznej (READY,
+        koniec cue, `back`), nie domyślny kadr `Scene`, bo scena może ustawić kamerę w
+        `build_objects`.
+
+        Nie jest cue: nie przerywa animacji i nie rusza sekwencji. Kamera należy jednak do
+        `SceneState` (manimgl dodaje ją do `mobjects`), więc `back` przywraca także widok sprzed
+        cue, a w trakcie cue animującego kamerę nawigacja przegrywa z animacją (runda 10).
+        """
+        name, *args = command.split()[1:] or [""]
+        frame = self.frame
+        try:
+            values = [float(arg) for arg in args]
+            if name in ("orbit", "pan"):
+                dx, dy = values
+                fixed = dx * FRAME_WIDTH * RIGHT - dy * FRAME_HEIGHT * UP
+                if name == "orbit":
+                    frame.increment_theta(-fixed[0] * self.pan_sensitivity)
+                    frame.increment_phi(fixed[1] * self.pan_sensitivity)
+                else:
+                    # Płaszczyzna ekranu obróconej kamery, nie osie świata (runda 10, p. 3).
+                    frame.shift(-frame.from_fixed_frame_point(fixed, relative=True))
+            elif name == "zoom":
+                (steps,) = values
+                frame.scale(ZOOM_STEP**steps)
+            elif name == "reset" and not values:
+                frame.become(self.live_view_home)
+            else:
+                raise ValueError(name)
+        except ValueError:
+            log.warning(f"Niepoprawna komenda widoku: {command!r}")
+            return
+        self.live_view_dirty = True
+
     def live_barrier(self) -> None:
         deadline = time.monotonic() + 2
-        while self.live_seen < self.live_frame_id:
+        while self.live_seen < self.live_boundary_id:
             remaining = deadline - time.monotonic()
             if remaining <= 0:
                 raise RuntimeError("Odbiornik nie potwierdził klatki granicznej w 2 s")
@@ -481,12 +532,16 @@ class LiveScene(Scene):
 
     def live_publish(self, boundary: bool = False, dt: float = 0) -> None:
         began = time.monotonic()
+        self.live_view_dirty = False
         self.update_frame(dt, force_draw=True)
         rendered = time.monotonic()
         pixels = self.camera.get_raw_fbo_data(dtype="f1")
         read = time.monotonic()
         self.live_frame_id += 1
         self.live_buffer.publish(pixels, self.live_frame_id, boundary)
+        if boundary:
+            self.live_boundary_id = self.live_frame_id
+            self.live_view_home = self.frame.copy()
         published = time.monotonic()
         for name, elapsed in (
             ("render", rendered - began),
@@ -540,7 +595,7 @@ class LiveScene(Scene):
         duration = self.default_wait_time if duration is None else duration
         self.pre_play()
         for _, dt in self.live_times(duration):
-            if self.should_update_mobjects():
+            if self.should_update_mobjects() or self.live_view_dirty:
                 self.live_publish(dt=dt)
             else:
                 self.increment_time(dt)

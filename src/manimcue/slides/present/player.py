@@ -5,6 +5,7 @@ from qtpy.QtCore import Qt, QTimer, QUrl, Signal, Slot
 from qtpy.QtGui import QCloseEvent, QIcon, QKeyEvent, QScreen
 from qtpy.QtMultimedia import QAudioOutput, QMediaPlayer, QVideoFrame
 from qtpy.QtWidgets import (
+    QApplication,
     QHBoxLayout,
     QLabel,
     QMainWindow,
@@ -13,6 +14,7 @@ from qtpy.QtWidgets import (
 )
 
 from manimcue.composition import SlideComposition, SlideView
+from manimcue.live_layers import LiveLayerController
 
 from ..config import Config, PresentationConfig, SlideConfig, SlideType
 from ..logger import logger
@@ -248,6 +250,17 @@ class Player(QMainWindow):
         self.preview = SlideComposition(resolution, aspect_ratio_mode)
         self.video_sink = self.composition.video_item.videoSink()
         self.view = SlideView(self.composition, aspect_ratio_mode)
+        # F4 (D20): sesje warstw live bieżącego slajdu; klik w widoku głównym wybiera warstwę,
+        # widok Info jest tylko podglądem.
+        self.live = LiveLayerController(self.composition)
+        self.view.layer_clicked.connect(self.live.click)
+        self.view.layer_double_clicked.connect(self.live.double_click)
+        self.view.pointer_dragged.connect(self.live.drag)
+        self.view.pointer_released.connect(self.live.end_drag)
+        self.view.wheel_turned.connect(self.live.wheel)
+        QApplication.instance().applicationStateChanged.connect(
+            self.application_state_changed
+        )
 
         self.setCentralWidget(self.view)
 
@@ -267,6 +280,7 @@ class Player(QMainWindow):
         )
         self.info.close_event.connect(self.closeEvent)
         self.info.key_press_event.connect(self.keyPressEvent)
+        self.live.error.connect(self.info.setWindowTitle)
         self.video_sink.videoFrameChanged.connect(self.frame_changed)
         self.hide_info_window = hide_info_window
 
@@ -433,6 +447,11 @@ class Player(QMainWindow):
         # przy reverse, replay i pętli).
         self.composition.set_resolution(self.current_presentation_config.resolution)
         self.composition.set_layers(self.current_slide_config.layers)
+        self.live.show(
+            (self.current_presentation_index, self.current_slide_index),
+            self.current_slide_config,
+            self.current_presentation_config.resolution,
+        )
         if self.current_slide_config.type == SlideType.Video or (
             self.current_slide_config.type == SlideType.Image
             and self.current_file.suffix.lower() == ".gif"
@@ -577,6 +596,7 @@ class Player(QMainWindow):
     @Slot()
     def close(self) -> None:
         logger.info("Closing gracefully...")
+        self.live.begin_shutdown()
         self.info.close()
         super().close()
 
@@ -674,5 +694,12 @@ class Player(QMainWindow):
 
     def keyPressEvent(self, event: QKeyEvent) -> None:  # noqa: N802
         key = event.key()
-        self.dispatch(key)
+        # F4 (D20): router przed dispatch — tędy idą też klawisze przekazane z okna Info.
+        if not self.live.handle_key(event, self.config.keys):
+            self.dispatch(key)
         event.accept()
+
+    def application_state_changed(self, state: Qt.ApplicationState) -> None:
+        # D20: przejście do innej aplikacji oddaje klawiaturę playerowi.
+        if state != Qt.ApplicationState.ApplicationActive:
+            self.live.release()

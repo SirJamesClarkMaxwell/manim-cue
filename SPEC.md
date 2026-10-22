@@ -528,6 +528,31 @@ z końcem okna i zapisuje surowe liczby: opublikowane, odebrane, różne.
 
 ---
 
+## Decyzje fazy 4 (2026-10-22, runda 9)
+
+**D27. Cykl życia warstw live w playerze.** Sesje warstw należą do `LiveLayerController`
+(`src/manimcue/live_layers.py`); start w `load_current_media` po kluczu (prezentacja, indeks
+slajdu) — replay, pętla i powrót z reverse na tym samym slajdzie zostawiają sesje, każde wejście
+na slajd (także od tyłu) startuje live od początku; reverse dotyczy tylko klipu bazowego.
+Zamykanie dwufazowe: `begin_shutdown()` w `Player.close()` bez blokowania GUI, potem blokujący
+odbiór (≤ 3 s) po wyjściu z `app.exec()` — po pętli Qt nie ma już GUI do zablokowania.
+Okno główne i Info to jeden obszar aktywności: warstwę zwalnia przejście do innej aplikacji
+(`applicationStateChanged`), nie przejście między naszymi oknami — inaczej sterowanie z Info
+byłoby niemożliwe. Doprecyzowuje D20 („utrata aktywności okna”).
+
+**D28. Nawigacja kamerą w warstwie live.** _Na wniosek prelegenta po próbie F3 („nawigacja w 3D
+… jej nie ma”); recenzja w rundzie 10._ Proces live nie ma okna, więc obsługa myszy manimgl
+(`d`/`f` + ruch, kółko — `scene.py:730-808`) nie działa. Player tłumaczy mysz na aktywnej
+warstwie na komendy `view orbit|pan dx dy` (ułamki warstwy, y w dół), `view zoom kroki`,
+`view reset`; scena przelicza je jak `Window.pixel_coords_to_space_coords` manimgl (stały kadr,
+`pan_sensitivity`, pan przez `from_fixed_frame_point`). Widok nie jest cue: nie przerywa
+animacji, nie rusza sekwencji, w bezczynności publikuje zwykłą klatkę — bariera czeka tylko na
+klatki graniczne. Kamera należy do `SceneState`, więc `back` przywraca widok sprzed cue, a
+w trakcie cue animującego kamerę nawigacja przegrywa z animacją. Reset wraca do kadru z ostatniej
+klatki granicznej (READY, koniec cue, `back`), nie do domyślnego kadru `Scene`.
+
+---
+
 ## Zakres, którego nie wolno rozszerzyć bez decyzji
 
 **Synchronizacja co do klatki.** Warstwy startują i pauzują razem (D17) — i na tym koniec.
