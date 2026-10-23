@@ -45,6 +45,11 @@
 presentera i nie jest potrzebny. W renderze offline (`-w`, `-o`) scena ma rzucić czytelny
 `RuntimeError`.
 
+**Testy:** zwykły `pytest` pomija znacznik `slow` (powtórzenia wytrzymałościowe z kryteriów odbioru
+i render wideo w `tests/slides/test_slide.py`, lista w `tests/conftest.py`). **Pełny przebieg przed
+odbiorem fazy: `pytest -m ""`.** `-n 8` (xdist, próba 2026-10-23) dał masowe F/E — progi czasowe
+i okna GPU pękają pod obciążeniem; bez osobnej diagnozy nie używać.
+
 ## Projekt macierzysty
 
 `C:\Users\fzabi\Desktop\STUDIA\scientific-student-seminaries\group-theory` (ścieżka z innej maszyny;

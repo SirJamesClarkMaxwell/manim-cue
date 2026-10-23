@@ -25,6 +25,24 @@ def write_manim_config(directory: Path) -> Path:
 def temporary_manim_config(tmp_path):
     write_manim_config(tmp_path)
 
+
+# Powtórzenia wytrzymałościowe z kryteriów odbioru i renderujące wideo testy upstreamu
+# manim-slides: dowód odbioru fazy, nie regresja na każdy przebieg (ok. 190 s z 685 s).
+# Domyślnie pomijane (addopts w pyproject.toml); pełny przebieg: `pytest -m ""`.
+SLOW = (
+    "test_thirty_restore_trials",
+    "test_rapid_twenty_roundtrips",
+    "test_twenty_restarts",
+    "test_three_scene_one_click_ten_trials",
+)
+
+
+def pytest_collection_modifyitems(config, items):
+    for item in items:
+        if item.name.startswith(SLOW) or item.path == ROOT / "tests" / "slides" / "test_slide.py":
+            item.add_marker(pytest.mark.slow)
+
+
 # Qt bez ekranu, zanim cokolwiek zaimportuje qtpy. Nie daje kontekstu GL — ten manimgl tworzy
 # sam (standalone ModernGL); testy z prawdziwym GL mają znacznik `gpu`.
 os.environ.setdefault("QT_API", "pyside6")

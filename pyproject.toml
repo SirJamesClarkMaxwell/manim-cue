@@ -68,7 +68,9 @@ dev = [
 markers = [
     "gpu: wymaga prawdziwego kontekstu OpenGL (manimgl headless); bez sterownika skip",
     "tex: wymaga instalacji LaTeX; bez niej skip",
+    "slow: wytrzymałość i render wideo upstreamu; domyślnie pomijane, pełny przebieg -m \"\"",
 ]
+addopts = ["-m", "not slow"]
 # Z upstreamu manim-slides: ostrzeżenia z zależności Manima, nie z naszego kodu.
 filterwarnings = [
     '''ignore:'audioop' is deprecated:DeprecationWarning''',
