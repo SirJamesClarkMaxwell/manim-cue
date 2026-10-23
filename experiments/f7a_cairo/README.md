@@ -1,7 +1,7 @@
 # Pomiar przed kontraktem 7a
 
 Pełny pomiar po implementacji: `uv run --frozen python experiments/f7a_cairo/measure_live.py`.
-Wynik: `MEASUREMENT-7a.json` w korzeniu. Trzy niezależne przebiegi ze zmienną kolejnością
+Wynik: `reports/MEASUREMENT-7a.json` (lokalnie, poza repo). Trzy niezależne przebiegi ze zmienną kolejnością
 rozmiarów, 2 s idle i 2 s rozgrzewki ruchu, następnie dokładnie 30 s próbek: porównanie
 bajtów kolejnych obrazów całej treści, pełny payload SHM, OwnedFrame, QImage i QPixmap
 jak w playerze (bez dodatkowej kopii QImage). Qt pompowane przez processEvents + sleep
@@ -12,9 +12,9 @@ CPU idle jako procent jednego rdzenia; render/update/publikacja z sum liczników
 dla całej sesji, osobno kopia odbiornika i Qt dla okna. Normalizacja alfy: brak (0 ms),
 gwarancja obejmuje wyłącznie puste tło i pasy. Maksymalne odstępy i licznik >25 ms w JSON.
 Koszt historii: `uv run --frozen python experiments/f7a_cairo/measure_snapshot.py`, wynik
-`MEASUREMENT-7a-snapshot.json`, 200 zapisów z limitem 50, zmiana liczby dzieci/wspólny
+`reports/MEASUREMENT-7a-snapshot.json`, 200 zapisów z limitem 50, zmiana liczby dzieci/wspólny
 członek, osobno zapis/przygotowanie/odtworzenie i tracemalloc (z narzutem pomiaru).
-Wyniki i ograniczenia końcowe: `../../REPORT-7a.md`.
+Wyniki i ograniczenia końcowe: `../../reports/REPORT-7a.md`.
 
 Z korzenia repozytorium, PowerShell (bez okna):
 

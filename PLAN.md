@@ -1035,7 +1035,7 @@ Próba człowieka osobno. Odroczone: D28 CE, animowana kamera, dowolne grafy spo
 
 **Wynik (2026-10-23, Windows 11, CE 0.22.0):**
 - Kryteria 1–8 w części automatycznej zaliczone; pełny `uv run --frozen pytest -q -p no:cacheprovider`:
-  **506 passed, 3 skipped, 57 warnings in 470.60s (0:07:50)**. Dowody test po teście w `REPORT-7a.md`.
+  **506 passed, 3 skipped, 57 warnings in 470.60s (0:07:50)**. Dowody test po teście w `reports/REPORT-7a.md`.
 - 18 okien 30 s (dwie geometrie × trzy rozmiary × trzy przebiegi): 1799–1800 różnych
   odebranych klatek, 59,967–60 fps. Dodatkowa próba końcowej ścieżki 960×540:
   1798 klatek, 59,933 fps; wszystkie 19 okien spełniają ≥60T−2. CPU idle ≤0,8% rdzenia,
@@ -1044,7 +1044,7 @@ Próba człowieka osobno. Odroczone: D28 CE, animowana kamera, dowolne grafy spo
   oba polecenia z kodem 0. README/API po angielsku; `.venv` bez zmian źródeł.
 - Próba człowieka: **otwarta** (projektor, dwa monitory, fizyczny fokus i płynność);
   D28 CE, animowana kamera i dowolny graf spoza korpusu odroczone jawnie D38.
-  Czas i odstępstwa w `REPORT-7a.md`; budżet 16 h / stop 32 h nieprzekroczony.
+  Czas i odstępstwa w `reports/REPORT-7a.md`; budżet 16 h / stop 32 h nieprzekroczony.
 
 ## Faza 8 — integracja z seminarium
 

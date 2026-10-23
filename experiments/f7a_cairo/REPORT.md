@@ -61,7 +61,7 @@ próbę przerwano. Niezależna recenzja nie została wykonana; runda 19 pozostaj
 REVIEW-LOG.md nie zmieniono, zgodnie z ograniczeniem zakresu plików użytkownika.
 
 **Aktualizacja po rundzie 19 (2026-10-23):** powyżej zachowano raport historycznego PoC;
-domknięty kontrakt i implementacja są w PLAN.md, D36–D38 oraz REPORT-7a.md. Pan/zoom/reset
+domknięty kontrakt i implementacja są w PLAN.md, D36–D38 oraz reports/REPORT-7a.md. Pan/zoom/reset
 CE odroczono; historia zachowuje graf standardowych paneli 2D, bez dowolnego stanu Pythona.
 Pełna dostarczona recenzja rundy 19 jest zapisana w REVIEW-LOG.md.
 
