@@ -4,7 +4,9 @@ Stan (2026-10-23): **fazy 0–3 i 7.0 zamknięte; F5d-f oraz F7a mają wdrożeni
 i zaliczone kryteria automatyczne, F5g także. F4–F6a, F5d-f, F5g i F7a czekają na próbę
 człowieka; faza 8 dopiero po próbie w oknie na komputerze prelegenta.**
 **Decyzje prelegenta (2026-10-23):** D37 zatwierdzone; `greenlet` przyjęty (F6b idzie dalej jako
-API); kolejne etapy: ruch warstw w podglądzie Info, F6b, F7b. Podział na dwie biblioteki
+API); kolejne etapy: ruch warstw w podglądzie Info, F6b, F7b. Po pomiarze kryterium 8 fazy 5
+(zawieszenie Qt przy 2–3 klipach) prelegent wybrał **fazę 10 — player ImGui (PC i przeglądarka)**;
+ruch w podglądzie Info wchodzi do niej. Podział na dwie biblioteki
 (osadzanie scen / prezentacje) i serwer prezentacji — task finalny po zamknięciu projektu:
 komputer prelegenta przez Tailscale, live w przeglądarce w obu trybach (nagrany przebieg
 domyślnie, interaktywny strumień, gdy serwer ma zasoby), hosting `.pptx` przez DeckCraft (web). Kierunek zmieniony 2026-10-21 decyzjami D13-D19 w `SPEC.md`: projekt staje się forkiem
@@ -1289,6 +1291,110 @@ Do tego czasu nic w seminarium od tego projektu nie zależy (R8 tamtego planu).
 ## Faza 9 — manimgx (warunkowa)
 
 Wchodzi, gdy manimgx dostanie udokumentowany tryb interaktywny (warunek z D12).
+
+## Faza 10 — player ImGui: jeden kod na PC i w przeglądarce (kontrakt, szkic przed rundą 21)
+
+**Powód.** Kryterium 8 fazy 5 ([raport](reports/REPORT-f5-crit8.md)): `QGraphicsVideoItem` w Qt 6
+maluje wideo na CPU (`QVideoFrame::map/toImage`, transfer D3D11 → CPU w wątku GUI); baza + 2–3 klipy
+1080p60 z widocznym Info zawieszają player, także reproduktor w samym Qt bez manim-cue. Prelegent
+(2026-10-23) chce jednego kodu UI na PC i w przeglądarce, w Pythonie, i wybrał ImGui.
+**PoC** ([experiments/f5i_imgui](experiments/f5i_imgui/README.md)): imgui-bundle 1.93 — jedyne
+wiązanie z Pyodide i mostem `imgui_bundle.webgl.register_texture` (pyimgui: ImGui 1.82, bez kół 3.13
+i webu; slimgui: bez Pyodide). Ten sam `stage.py` na PC (PyAV + `glTexSubImage2D`, prawdziwy
+`LiveSession`) i w przeglądarce (`<video>` → `texImage2D`). Wynik przy N=3 z Info (8 dekoderów
+1080p60): PC ~58 kl./s każdy strumień, live 58; web headless (ANGLE D3D11 RTX 4060) 48–56. Ekran był
+zablokowany — bez vsync i bez pomiaru Edge z oknem.
+
+**Cel.** Nowy player w `src/manimcue/player/` (bez Qt) z parytetem funkcji obecnego playera Qt,
+najpierw na PC (10a), potem ten sam kod w przeglądarce bez live (10b); live w przeglądarce (10c)
+zarys. Render, model decku (JSON v4), workery live, transport, checkpointy 5g, `SceneView` — bez
+zmian. Player Qt zostaje domyślny do próby człowieka 10a; usunięcie to osobna decyzja.
+
+**Proponowane decyzje (do SPEC po rundzie):**
+- **D42 — player ImGui.** imgui-bundle (pin wersji), PyOpenGL na PC; ImGui w jednym wątku kodu
+  aplikacji, poll workerów live raz na klatkę (bez `select`, bez wątków aplikacji). Kod współdzielony
+  nie importuje platformy; platforma dostarcza źródła tekstur i pętlę (hello_imgui na PC,
+  `requestAnimationFrame` w Pyodide). Wybór: `manim-cue present --player imgui|qt` (domyślnie `qt`).
+- **D43 — zegar.** Na PC dekodowanie bazy i klipów prowadzi wspólny zegar grupy (klatka =
+  floor(t · fps · rate), CFR jak w F5); bariera gotowości D31 i pauza bez zmian semantyki D17.
+  Zgodność co do klatki na PC jest skutkiem ubocznym, nie API (brak seek dla autora). W przeglądarce
+  `<video>` ma własne zegary: wspólny start i pauza, dryf zaakceptowany (D17 bez zmian).
+- **D44 — dźwięk.** Qt odtwarza dźwięk bazy (`QAudioOutput`). 10a: do rozstrzygnięcia — (a) brak
+  dźwięku na PC z ostrzeżeniem, gdy baza ma strumień audio, albo (b) zależność `sounddevice`
+  i dźwięk bazy prowadzony tym samym zegarem. W przeglądarce dźwięk bazy z `<video>` bez wyciszenia.
+
+**Projekt 10a (PC):**
+- `player/stage.py` — kompozycja z PoC: z-order warstw, `Rect`, ruch `rect_at(t)`, izotropowe
+  dopasowanie i pasy D34 w kolorze `camera.background_rgba`, obwódki `BorderStyle` (aktywna/błąd,
+  `None`), placeholder i ochrona przed czarną klatką (zostaje ostatnia dobra klatka), alfa live
+  (`background_opacity`) przez mieszanie ImGui z prostą alfą.
+- `player/clock.py` — grupa slajdu: bariera (pierwsze klatki bazy i klipów, READY/wejście live D31,
+  5g), start, pauza w przygotowaniu, `playback_rate`, replay od zera, reverse (`*_reversed.mp4`,
+  klipy na ostatniej klatce w prostokącie końcowym), pętle slajdu z zamówionym wyjściem po iteracji,
+  `auto_next`, `skip_all`, `exit_after_last_slide`, baza statyczna (obraz) i GIF.
+- `player/sources_av.py` — PyAV: wideo (wątki FFmpeg, pętla przez seek, konwersja RGBA w rozmiarze
+  tekstury — opcjonalnie rozmiar prostokąta), obraz/GIF (PIL); pomiar opcjonalnego `hwaccel`
+  (d3d11va/cuda) bez gwarancji.
+- `player/live.py` — kontroler live bez Qt: przeniesienie logiki `live_layers.py` 1:1 (sesje D33 i
+  ich przejmowanie, `enter_cue`, `EntryHistory` 5g z `live_entry.py`, ACK granicy po narysowaniu
+  klatki, rezerwacja cue/view, fokus D20 klik/Esc, przekazywanie klawiszy, gesty kamery D28 z myszy
+  ImGui, błędy i komunikaty, miniatury live w podglądzie).
+- `player/app.py` — nawigacja i klawisze z `Config.keys` (identyfikatory Qt → `ImGuiKey`, jawna tabela
+  z testem; nieznany klawisz → czytelny błąd), stan prelegenta 5c (Info i nakładka `S`), Info:
+  scena, slajd, zegar, czas od startu, notatki Markdown (`imgui_md`), bieżący widok, podgląd
+  następnego **z ruchem warstw** (`rect_at(t)` — zamyka odroczony ruch podglądu 5d), ukryte Info nie
+  dekoduje podglądu.
+- `player/desktop.py` — hello_imgui: okno główne i Info jako osobne okno systemowe (multi-viewport)
+  na ekranie `--info-window-screen`; `--screen`, pełny ekran `F`, `--hide-mouse`/`H`, vsync,
+  `--start-paused`, `--start-at*`, `--aspect-ratio`, `--playback-rate`, `--next-terminates-loop`,
+  `--hide-info-window`/`--show-info-window`, wiele prezentacji w jednym wywołaniu.
+- Testy bez okna: logika (`clock`, `app`, `live`) w czystym Pythonie; kompozycja na kontekście ImGui
+  bez renderera (komendy `ImDrawList`: tekstury, współrzędne ±0,5 px); kilka testów dymnych
+  w prawdziwym oknie (znacznik `gpu`); integracja z prawdziwymi workerami GL i CE.
+
+**Projekt 10b (przeglądarka, bez live):** `manim-cue present --player web` uruchamia lokalny serwer
+(jeden wątek, `Range`, tylko pliki decku i strony) i otwiera Edge/Chrome w trybie `--app`. Strona
+ładuje Pyodide i imgui-bundle, te same moduły `player/` (bez `desktop.py`, `sources_av.py`,
+`live.py`) oraz `player/web.py` (`<video>`/`<img>` → tekstury WebGL). Info: drugie okno przeglądarki
+z tym samym kodem, synchronizacja `BroadcastChannel` (indeks slajdu, zegar, pauza); pełny ekran przez
+Fullscreen API. Warstwa live: miniatura (`thumbnail`) z oznaczeniem „live tylko na PC”. Tryb offline:
+Pyodide i koło imgui-bundle z lokalnej kopii w cache (`--offline`), bo sala może nie mieć sieci.
+
+**10c (zarys, kontrakt po 10b):** klatki live przez WebSocket (RGBA lokalnie, kompresja przy
+zdalnym), komendy cue/view/fokus i checkpointy 5g przez ten sam kanał; nagrany przebieg cue jako
+tryb domyślny dla serwera z taska finalnego.
+
+**Kryteria akceptacji 10a:**
+1. Nawigacja i zegar: next/previous/replay/reverse/pauza, pętle z zamówionym wyjściem, auto_next,
+   skip_all, start_at, exit_after_last_slide, playback_rate — testy logiki bez okna odpowiadające
+   semantyce testów Qt (`test_clip_layers`, `test_layers`, `test_presenter_state`).
+2. Bariera D31: żadne źródło nie rusza przed gotowością wszystkich; pauza w przygotowaniu zachowana;
+   błędny plik nie blokuje reszty; pierwsze klatki po starcie w tej samej klatce renderu.
+3. Kompozycja: z-order, prostokąty, ruch, D34, obwódki, placeholder, czarna klatka — test komend
+   `ImDrawList` bez okna; zrzut prawdziwego okna zgodny z Qt na demo (slajdy 1–11) w tolerancji.
+4. Live: scenariusze `test_live_layers`, `test_persistent_live`, `test_live_ce_player`,
+   `test_live_checkpoint` (poziom playera) na kontrolerze bez Qt, z prawdziwymi workerami GL i CE.
+5. Info: notatki Markdown, czas, podgląd z ruchem; programowo okno Info na zadanym monitorze.
+6. Wydajność w prawdziwym oknie przy odblokowanym ekranie i vsync: scenariusz `measure_clips`
+   N=1..3 z Info i live — mediana każdego strumienia wideo ≥ 55 kl./s, p95 ≤ 34 ms, brak zawieszeń;
+   CPU raportowane z `hwaccel` i bez.
+7. Klawisze `.manim-slides.toml` przez mapowanie Qt → ImGui; nieznany → błąd z nazwą.
+8. Pełny pytest zielony; player Qt bez regresji jako domyślny.
+9. **Próba człowieka:** demo w prawdziwym oknie, dwa monitory, klik/Esc, gesty, ←/V/R z live.
+
+**Kryteria akceptacji 10b:**
+1. Te same testy logiki co 10a przechodzą w Pyodide (uruchomione w headless Edge przez Playwright).
+2. Demo bez live w przeglądarce: nawigacja klawiszami, pauza, Info w drugim oknie zsynchronizowane.
+3. Wydajność Edge z oknem, scenariusz N=1..3 z Info: mediana ≥ 50 kl./s, odrzucone klatki ≤ 10 %.
+4. `--offline` działa bez sieci (Pyodide i koło z cache).
+
+**Poza zakresem fazy 10:** live w przeglądarce (10c), serwer z logowaniem i hosting (task finalny),
+eksport decków z warstwami, usunięcie playera Qt, kreator kluczy (`wizard`, zostaje w Qt).
+
+**Budżet:** 10a ~30 h (kontroler live 8 h, zegar i nawigacja 6 h, kompozycja i Info 6 h, okna
+i monitory 4 h, testy i pomiar 6 h), stop i raport przy 60 h; 10b ~12 h, stop przy 24 h.
+Wykonawca (prelegent, 2026-10-23): **Haiku** (podagent Claude) etapami według rozpisanych zadań;
+Claude rozpisuje zadania, przegląda, mierzy i commituje.
 
 ---
 
