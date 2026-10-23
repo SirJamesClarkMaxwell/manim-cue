@@ -2323,3 +2323,61 @@ Każde zadanie powinno mieć zamkniętą listę plików, sygnatury wejść/wyjś
 Z 10a można wyciąć bez utraty celu: **ruch podglądu**, eksperymenty `hwaccel`, adaptacyjne skalowanie dekodowanych tekstur i implementację audio inną niż uzgodnione ostrzeżenie. 10c pozostawić poza zakresem. Nie wycinać testów bariery, shutdown, dwóch okien ani polityki przeciążenia — one bezpośrednio chronią cel „brak zawieszeń”.
 
 **Werdykt końcowy: kierunek zaakceptować, kontrakt odesłać do poprawy. Najpierw bramki Windows/Pyodide oraz precyzyjny kontrakt zegara i live, potem małe zadania Haiku.**
+
+## Runda 22 — codex, 2026-10-23: kontrakt 10d po próbie prelegenta
+
+**Przedmiot:** niezacommitowany kontrakt „10d — poprawki po próbie prelegenta” w PLAN.md i D45–D47 w SPEC.md; zgodność z kodem i zamkniętym zakresem przyszłych zadań. Claude uruchomił `codex exec -s read-only`; recenzja statyczna diffu i kodu, bez zmian implementacji i testów GPU.
+
+**Ustalenia i rozstrzygnięcia:**
+
+1. **[BLOKUJĄCE] Krok uruchamiający LOOPS może blokować następny press.** Przyjęto rozdzielenie kroku wykonywanego i jednego oczekującego FIFO. Drugi fizyczny press po key-up dociera do workera i domyka/przerywa pierwszy według D9/D10; repeat nadal konsumowany. Dodano odbiór `step → cue zapętlone → key-up → step` w zadaniu 1.
+2. **[ISTOTNE] Protokół nie wskazuje początku timeoutu pętli.** Przyjęto skorelowane STEP_STATUS waiting/running/looping, deadline’y przyjęcia, oczekiwania, wykonania i ACK oraz watchdog statusów pętli. Powtarzanie może trwać ponad 5 s, ale brak statusów lub wyniku po domknięciu zatrzymuje niepewną sesję według D41 i utrwala degradację bez skoku. Dodano test długiego powtórzenia i braku postępu po jego zakończeniu; CUE_DONE nie steruje deadline’em.
+3. **[BLOKUJĄCE] Zakres pomija odcięcie historii po miniaturze.** Przyjęto p/live.py i m/live_entry.py w zadaniu 2: odcięcie stosu EntryHistory, starych oczekiwań i checkpointów, nowy has_predecessor=False. Zachowany socket nie resetuje generacji ani monotonicznych liczników; nowe entry_id odrzuca późne statusy/wyniki/ACK. Odbiór obejmuje miniaturę podczas restore, późne statusy i previous/V/R bez starej historii.
+4. **[ISTOTNE] Zakres pomija reducer start_at.** Przyjęto p/controller.py w zadaniu 2 i no-op bieżącego celu po normalizacji indeksu, przed _enter(). Test sprawdza niezmienione entry_id, pauzę, reverse, trwające przygotowanie i brak efektów.
+5. **[ISTOTNE] Globalny limit czterech procesów przeczy puli i odbiorowi preview.** Przyjęto niezależny limit jednego procesu ekstrakcji miniatur, obejmujący kończenie do potwierdzonego exit. Pula czterech oznacza bezczynny ciepły zapas, uzupełniany po pobraniu; proces obsługuje jedno źródło do końca życia. Osobno liczyć aktywne scena/preview/miniatura, bezczynne i kończące się oraz sumę żywych. Odbiór zadań 3 i 6 obejmuje bazę+3 klipy+ruchome preview+miniatury i anulowanie; zadanie 3 przeszacowano 4 → 6 h, etap 31 → 33 h, stop 62 → 66 h. Bez globalnego schedulera.
+
+**Co weszło:** wszystkie pięć ustaleń do PLAN.md/SPEC.md; usunięto nieaktualną uwagę o blokadzie recenzji przez sieć. W akapicie „Stan poprawek Claude” odnotowano przekazany stan show_at/slotów, wyboru klatki bez zapisu w toku, ponownego glTexImage2D i bezczynnej puli; nie jest to nowy zakres projektowania ani zaliczenie odbioru.
+
+**Weryfikacja:** spójność dokumentów i diff; bez zmian src/, tests/, experiments/, bez uruchamiania testów GPU i bez commita. Testy wymienione w kontrakcie są planowane, nie zaliczone.
+
+**Werdykt:** ustalenia rozstrzygnięte w kontrakcie; przed implementacją przegląd Claude poprawionego kontraktu, odbiór wykonania pozostaje otwarty.
+
+## Runda 23 — codex, 2026-10-23: kontrola rundy 22
+
+**Przedmiot:** kontrola rundy 22 — niezacommitowany kontrakt 10d w PLAN.md i D45–D47 w SPEC.md. Claude uruchomił `codex exec -s read-only`.
+
+**Ustalenie i rozstrzygnięcie:**
+
+1. **[ISTOTNE] Timeout przerywa poprawne długie cue.** Running wymagał wyniku w 5 s, choć zwykłe cue nie mają limitu długości; `MeasurePanel2D.motion` trwa 35 s (`tests/scenes/live_ce_extra.py:128`). NEXT zatrzymałby zdrowego workera i utrwalił degradację. Przyjęto skorelowany heartbeat running/looping co ≤1 s, wyłącznie przy potwierdzonym postępie wykonania (także wait), oraz watchdog 5 s braku postępu zamiast limitu całego cue. Waiting odnawia tylko potwierdzony postęp poprzednika; żywy transport nie wystarcza. Od żądania przerwania/domknięcia pozostaje nieodnawialny deadline 5 s na wynik, także przy dalszych heartbeat; ACK 2 s. Do zadania 1 dodano test zwykłego cue >5 s i zatrzymania jego postępu oraz deadline’u przerwania mimo heartbeat.
+
+**Weryfikacja:** spójność PLAN.md/SPEC.md i diff; bez zmian implementacji, testów ani eksperymentów, bez uruchamiania testów GPU i bez commita. Testy zadania 1 pozostają planowane.
+
+**Werdykt:** ustalenie przyjęte i rozstrzygnięte w kontrakcie; odbiór implementacji pozostaje otwarty.
+
+## Runda 24 — codex, 2026-10-23: kontrakt D48
+
+**Przedmiot:** niezacommitowany D48 w SPEC.md i zadania 6–8 etapu 10d w PLAN.md. Claude uruchomił `codex exec -s read-only`; recenzja statyczna, bez testów i okna.
+
+**Ustalenia i rozstrzygnięcia:**
+
+1. **[BLOKUJĄCE] Hold bez wyjścia dla zwykłego live bez cue.** Przyjęto jawne adopt_prefetch skorelowane session/generation/entry_id/request_id także bez session_id: granica wejścia, kompozycja/ACK i release w D31 z zachowaniem pauzy. Bez sztucznego cue/historii. Dodano planowany test GL/CE: next bez session_id/cue oraz wejście podczas pauzy.
+2. **[ISTOTNE] Pierwsza granica prefetcha wygasa przed next.** Przyjęto techniczny ACK READY w 2 s, osobny od granicy wejścia D41 z nowym frame_id i ACK po kompozycji. Deadline spekulacji 5 s kończy się po przygotowaniu z technicznym ACK; gotowy cel czeka do przyjęcia/anulowania. Dodano test GL/CE: hold >5 s, następnie checkpoint/kompozycja/ACK właściwego wejścia.
+3. **[ISTOTNE] Lista plików pomija właściciela decku Qt.** Dodano m/slides/present/player.py do zadania 6: konfiguracja silników całego decku, poll także bez live, zamykanie zapasu po zmianie decku i końcowy shutdown. Dodano test offscreen decku zaczynającego się slajdem plikowym.
+4. **[ISTOTNE] Admisja nie określa bezpiecznego oczekiwania.** Przyjęto take → worker albo None i waiting_slot pompowany przez poll dla LiveSession i Source, bez blokowania GUI i spawnu poza B. Deadline od nawigacji obejmuje czekanie; nowe entry_id anuluje stare żądanie, prefetch wiąże token. Dodano testy pełnego B, opóźnionego exit i ponownej nawigacji.
+
+**Budżet:** zadanie 6: 8 → 10 h (Qt/admisja), zadanie 7: 9 → 11 h (hold/ACK/Source); 10d: 50 → 54 h, stop 100 → 108 h, nadal 2× zadania. Zadanie 8 bez zmiany budżetu. Bootstrap Lock/Pipe przy spawn, późniejsze LiveSpec/SHM i decyzja pula → prefetch pozostają przyjęte.
+
+**Weryfikacja:** spójność dokumentów i diff; zmieniono wyłącznie PLAN.md, SPEC.md i REVIEW-LOG.md, bez implementacji, uruchamiania testów ani commita. Testy są planowane, nie zaliczone.
+
+**Werdykt:** wszystkie cztery ustalenia przyjęte i rozstrzygnięte w kontrakcie; odbiór implementacji pozostaje otwarty.
+
+## Runda 25 — codex, 2026-10-23: kontrola rundy 24
+
+**Przedmiot:** niezacommitowany diff PLAN.md/SPEC.md/REVIEW-LOG.md — etap 10d z zadaniami D48 i wpis rundy 24.
+Claude uruchomił `codex exec -s read-only`: czy każde z 4 ustaleń rundy 24 jest rozwiązane, czy poprawki
+nie wprowadziły sprzeczności z kodem i D9/D10/D20/D28/D31/D39–D48, spójność list plików i budżetu.
+
+**Wynik:** brak blokujących; brak dalszych ustaleń.
+
+**Werdykt:** kontrakt 10d (D45–D48, budżet 54 h, stop 108 h) zamknięty rundami 22–25; implementacja codex
+zadaniami po kolei, przegląd Claude i próba człowieka.

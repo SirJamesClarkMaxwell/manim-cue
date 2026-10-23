@@ -1294,8 +1294,10 @@ Wchodzi, gdy manimgx dostanie udokumentowany tryb interaktywny (warunek z D12).
 
 ## Faza 10 — player ImGui: jeden kod na PC i w przeglądarce (kontrakt)
 
-**Stan 2026-10-23:** kontrakt po rundzie 21; implementacja 10a zablokowana na bramce 1,
-nie jest ukończonym playerem. Dowody i ograniczenia: `reports/REPORT-10a.md`.
+**Stan 2026-10-23:** bramki i zadania 3–10 etapu 10a wykonane, player eksperymentalny;
+zadanie 11 (pomiar z vsync przy odblokowanym ekranie i odbiór człowieka) pozostaje otwarte.
+Pierwsza próba prelegenta na Demo dała decyzje D45–D47 i etap 10d poniżej.
+Dowody wcześniejszego przeglądu: ostatnia sekcja `reports/REPORT-10a.md`.
 
 **Powód i cel.** Qt QGraphicsVideoItem zawiesza UI przy bazie i 2–3 klipach 1080p60
 z Info (`reports/REPORT-f5-crit8.md`). ImGui ma dać parytet PC z uzgodnionym wyjątkiem
@@ -1305,7 +1307,9 @@ Qt pozostaje domyślny, nie usuwamy go. JSON v4, render, SceneView, EntryHistory
 LiveSession, protokół transportu i workery Manima pozostają źródłem istniejącej semantyki.
 Nie forkujemy ani nie łatamy Manima; jeden wątek aplikacji na proces.
 
-**Decyzje:** D42–D44 w SPEC. Wykonawca całej F10: **codex**, zadaniami po kolei,
+**Decyzje:** D42–D48 w SPEC; D45–D48 mają pierwszeństwo nad starszym opisem 10a
+w zakresie granic cue, Info i gestów. Kolejność: 10a → 10d → 10b → 10c.
+Wykonawca całej F10: **codex**, zadaniami po kolei,
 także kontroler live i odbiór techniczny przypisane w recenzji Claude'owi.
 Claude przegląda po każdym etapie, wykonuje próby człowieka i pomiar przy odblokowanym ekranie.
 Bez commita/stash/reset/checkout i bez zmian .venv w tej sesji.
@@ -1502,6 +1506,315 @@ Niepowodzenie/brak dowodu bramki oznacza STOP, nie skip zaliczający i nie obej�
 7. Pełne `uv run --frozen pytest -q -p no:cacheprovider` zielone; testy prawdziwych okien oznaczone gpu.
 8. Próba człowieka: DPI, wygląd, fokus/Info, dwa monitory, F/H, klik/Esc, gesty i ←/V/R z live.
    Automatyczna geometria okien nie zastępuje tej próby; PoC nie zalicza wydajności finalnego playera.
+
+### 10d — poprawki po próbie prelegenta
+
+**Kontrakt, bez implementacji w tej sesji.** Decyzje prelegenta z 2026-10-23 są wiążące.
+Rozszerzenie D48 zmienia wyłącznie PLAN.md, SPEC.md i dziennik REVIEW-LOG.md.
+Tabela wyznacza pliki przyszłego wykonania;
+nie upoważnia do ingerencji w równoległe poprawki Claude. Wykonawca **codex**,
+przegląd **Claude** po każdym zadaniu, następnie próba **człowieka**; bez commita.
+Skróty `p/`, `t/`, `e/` jak w 10a; `m/` oznacza `src/manimcue/`.
+
+**Stan poprawek Claude (poza projektowaniem 10d):** wyłączenie okna cienia workera
+`pyglet.options["shadow_window"]=False`; zachowanie ostatniej kompozycji poprzedniego
+slajdu do gotowości nowego wejścia; pula 4 **bezczynnych** ciepłych procesów (start
+~350 → ~70 ms), uzupełniana po pobraniu; każdy obsługuje jedno źródło do końca życia.
+Dekoder publikuje `show_at` z wyprzedzeniem pół klatki (slot 32 B, HEADER 96); UI wybiera
+najnowszą klatkę po show_at zgodnie z D43 `floor(t·fps·rate)`, pomijając zapis w toku.
+Tekstura plików aktualizowana przez ponowne `glTexImage2D` tego samego obiektu
+(`SubImage` dawało p95 14 ms stall); snapshot bez kopii manifestu;
+`PyOpenGL.ERROR_CHECKING` wyłączone, jawne `glGetError` po uploadzie; merge Inconsolata
+ze strzałkami w Markdown. To stan prac przekazany przez prelegenta, nie zaliczenie odbioru.
+**Otwarte osobno:** parytet prefetcha Qt (pula LiveSession wspólna już w D48),
+prefetch reverse/skoków i między deckami oraz dobór parametrów poza sprzętem odbioru.
+Start live i prefetch normalnego N+1 w ImGui wchodzą teraz do 10d jako D48.
+
+**D45 — źródło prawdy i routing.** Dziś `advance()` wysyła nieskorelowane `SEQUENCE_END`,
+a odmowa `step_back()` tylko loguje „Jestes na poczatku sekwencji; nie ma czego cofac”.
+`EntryHistory.cue_state` śledzi enter cue (`prepared/sent/started/completed/...`),
+nie cursor SEQUENCE ani undo_stack. Nie parsować logu i nie wnioskować z tej historii.
+Rozszerzyć wspólny transport GL/CE o opt-in komendę `step <request_id> next|back`
+i odpowiedź `STEP_RESULT <request_id> <done|start|end|error> <frame_id>` oraz
+`STEP_STATUS <request_id> <waiting|running|looping>` z tą samą korelacją co wynik.
+Waiting przy przyjęciu do FIFO, running przy rozpoczęciu wykonania i po domknięciu
+pętli, looping podczas powtarzania. Worker wysyła running/looping co ≤1 s tylko przy
+potwierdzonym postępie wykonania cue/pętli (także wait), oraz waiting dla kroku
+czekającego na tego poprzednika; sam żywy transport nie potwierdza postępu.
+Nieskorelowany CUE_DONE nie steruje deadline’ami.
+ID monotoniczne w obrębie socketu; player wiąże oczekiwanie z session/generation/entry_id
+i aktywną warstwą. Stare `next/back` i statusy pozostają kompatybilne dla Qt.
+Worker sprawdza granicę przy wykonaniu w FIFO: end gdy cursor >= len(SEQUENCE),
+start gdy cursor == 0 **lub** undo_stack pusty (również po presetach/restore).
+Pusta sekwencja ma obie granice. `done` dopiero po wykonaniu kroku i publikacji granicy;
+`start/end` bez mutacji publikuje także granicę, z jej frame_id. BOUNDARY/ACK według D41;
+nie mylić granicy sekwencji z klatką graniczną. Błąd nie uruchamia nawigacji.
+
+Jedno fizyczne NEXT/PREVIOUS: blokada repeat aż do key-up, także po oddaniu fokusu.
+Przy rezerwacji wejścia albo przygotowaniu: konsumuj bez kolejki. Przy cue w locie zachowaj
+D9/D10: pojedynczy nowy krok FIFO może przerwać/domknąć cue, lecz nigdy nie przeskakuje
+na podstawie kursora wyprzedzającego animację. Osobno krok wykonywany i najwyżej jeden
+oczekujący `step` FIFO: drugi fizyczny press po key-up musi dotrzeć do workera,
+aby domknąć/przerwać pierwszy krok z LOOPS według D9/D10. Pełne FIFO konsumuje
+kolejny press bez wysyłki; oczekujący krok zaczyna wykonanie po poprzednim.
+Po aktualnym `start/end`, skomponowaniu i ACK wskazanej klatki zwolnij fokus i wywołaj
+**raz** zwykły reducer previous/next. Obowiązują jego pauza, pętla, koniec decku i exit;
+„następny slajd” to zwykła semantyka next, bez obejścia tych reguł. Przyjęcie/status
+w 5 s od wysłania; waiting ma 5 s od statusu, odnawiane tylko przy potwierdzonym postępie
+poprzednika. Running i looping mają watchdog 5 s braku postępu, bez limitu długości cue
+ani powtarzania. Od żądania przerwania/domknięcia obowiązuje nieodnawialny deadline
+5 s na wynik, także przy dalszych heartbeat; ACK 2 s. Timeout zatrzymuje niepewną sesję według D41
+i utrwala degradację, bez skoku.
+Zmiana wejścia/fokusu unieważnia oczekiwanie; późny wynik nie nawiguje.
+Klik nadal aktywuje, hover nie. Granica dotyczy całej sekwencji workera, nie slajdu ani
+checkpointu. Przy trwałym live zachować sesję i before(N), barierę, enter_cue i gałęzie
+D39–D41; oddanie fokusu nie czyści historii. V/reverse i R pozostają akcjami playera,
+nie testują granic cue; V odtwarza checkpoint, nie odwraca live. W reverse zwykły next
+może najpierw wrócić do normalnego pliku tego samego indeksu (tabela 10a).
+**Qt: jawny wyjątek D45**, zachowuje przechwycenie strzałek także na granicy.
+Rekomendacja: wyjątek teraz; późniejszy parytet szacowany 3 h, stop 6 h, osobny kontrakt
+routera Qt i testów. D47 ma parytet obu playerów już w 10d.
+
+**D46 — Info i zasoby.** Dwie kolumny, orientacyjnie 60/40 szerokości dostępnej ponad
+paskiem miniatur: lewa duża bieżąca kompozycja z tego samego snapshotu/tekstur co scena,
+nad nią zegar lokalny, elapsed, pauza/wznowienie i restart **czasu prelegenta**.
+Timer monotoniczny startuje z aplikacją; restart zeruje i zachowuje stan pauzy;
+pauza timera nie pauzuje mediów ani live. Prawa: normalny następny slajd, pod nim
+przewijane notatki. Dotychczasowy niezależny ruch preview zostaje. Notatki domyślnie
+24 logiczne px, A+/A− krok 2 px, zakres 16–48; tylko notatki i ich matematyka,
+bez zmiany reszty UI. Ustawienie sesji, wspólne dla slajdów, uwzględnia DPI.
+Stan/degradacja nadal widoczne i zgodne z S. Brak następnego celu ma czytelny pusty podgląd.
+
+Na dole przewijany poziomo pasek **wszystkich slajdów bieżącego decku**, indeks i zaznaczenie
+bieżącego. Klik wysyła `start_at` z jawnym indeksem decku/slajdu, nie symuluje serii next.
+Nowe entry_id anuluje stare przygotowanie; ta sama bariera/ACK/deadline co nawigacja.
+Klik bieżącego slajdu jest no-op w `p/controller.py` po normalizacji indeksu, przed
+`_enter()`: bez zmiany entry_id, pauzy, reverse, przygotowania i bez efektów.
+Skok niesąsiedni nie rekonstruuje historii live:
+zimna sesja, bez enter_cue jak initial; sąsiedni start_at zachowuje zgodną sesję,
+ale ustanawia nowy lokalny początek bez odgrywania cue i bez deklaracji ciągłości historii.
+`p/live.py` i `m/live_entry.py` odcinają stos EntryHistory, stare oczekiwania
+i checkpointy (także restore w locie); nowy checkpoint ma has_predecessor=False.
+Zachowany socket nie resetuje generacji ani monotonicznych liczników; nowe entry_id
+odrzuca późne statusy/wyniki/ACK. Previous/V/R korzystają wyłącznie z nowej historii.
+Nie rozszerzać D39 o odtwarzanie całej drogi do celu. Kontrolki Info konsumują klik
+i nie nadają fokusu live; klawiatura w obu oknach nadal przechodzi przez router.
+
+Miniatura to statyczna kompozycja w t=0: dostępne `thumbnail`, inaczej pierwsza klatka
+normalnego pliku; live wyłącznie zapisany thumbnail, nigdy nowy worker. Bez obrazu:
+placeholder z numerem, nawigacja dostępna. Zachować rect_at(0), alfa, border i proporcje.
+Ładować widoczne pozycje plus po jednej obok, najwyżej jedno zadanie ekstrakcji naraz,
+niższy priorytet niż scena/live/preview. Limit miniatur: jeden proces ekstrakcji,
+niezależnie od dekoderów sceny i obowiązkowego ruchomego preview; bez globalnego limitu 4.
+Pula 4 to zapas bezczynnych ciepłych procesów, uzupełniany po pobraniu; każdy obsługuje
+jedno źródło do końca życia. Liczyć osobno aktywne scena/preview/miniatura, bezczynne
+(≤4) i kończące się (od stop do potwierdzonego exit) oraz sumę żywych. Nowa ekstrakcja
+dopiero po exit poprzedniej, także anulowanej; kończące się nadal wliczać do limitu
+miniatur i sumy żywych. Maks. 256×144 RGBA/miniaturę; LRU 64 obrazy i 16 MiB łącznie CPU+GPU
+(wliczyć kopie robocze, zwalniać tekstury w kontekście). Przy 20 obrazach to ok. 5,6 MiB
+CPU+GPU; metadane O(N), dekodowanie tylko potrzebnych, nie N procesów. Ukryte Info
+nie uruchamia ekstrakcji ani dekoderów preview; zmiana decku anuluje stare wyniki.
+
+Markdown zachowany; matematyka `$...$` i `$$...$$`, bez wykonywania TeX, plików i makr
+systemowych. PC: najpierw natywny MicroTeX (`AddOnsParams.with_latex` oraz
+`MarkdownOptions.with_latex`), fonty lokalne. Offline w .venv: imgui-bundle 1.93.0,
+`has_latex()` False przed inicjalizacją, True po init MicroTeX i Markdown; raster
+`\\frac{1}{2}+x^2` uzyskany bez okna. Upload i skład inline pozostają do odbioru GPU.
+Wheel ma latinmodern-math.clm1/.otf (889927 B razem), matplotlib **3.11.2**.
+Fallback PC przy niedostępnym MicroTeX: mathtext/Agg w adapterze PC, inline z baseline
+i display jako blok; import matplotlib wyłącznie tam, raster do tekstury, bez subprocessu
+TeX. Obsługiwany podzbiór mathtext; błąd wzoru pokazuje źródło i komunikat, nie crash.
+Cache kluczowany wzorem/stylem/rozmiarem/DPI/kolorem, LRU maks. 128 wzorów i 16 MiB
+CPU+GPU, maks. 4096 znaków i 2048×2048 px/wzór; bez rasteryzacji co klatkę.
+Roboto pozostaje bazą Markdown; `MarkdownOptions.font_options.merge_fonts` z Inconsolata
+uzupełnia ←→, również po A+/A− i zmianie DPI; bez globalnej zamiany fontu.
+
+D42: układ, timer, A+/A−, pasek i routing wspólne; adaptery dają obrazy/tekstury.
+Lokalny `_pyodide_latex_fonts.py` i `pyodide_patch_runners.py` potwierdzają ścieżkę MicroTeX
+w Pyodide: slim wheel pomija fonty i pobiera je przy with_latex. **Nie jest to test
+przypiętego wheelu wasm**: brak lokalnego runtime/wheelu do uruchomienia offline.
+Bramka 10b musi potwierdzić has_latex po init i inline/display; fonty z licencją
+muszą być w eksporcie offline, bez wymaganego CDN. Wspólny kod nie importuje matplotlib;
+fallback web: przygotowane na PC rastry wzorów wraz z metrykami, nieznany wzór jako źródło
+z komunikatem. Miniatury web eksportowane na PC, lazy img/tekstury bez N video/dekoderów.
+
+**D47 — wejście kamery.** MMB orbit, Shift+MMB pan, wheel zoom; równolegle skróty touchpada
+Alt+LMB orbit, Alt+Shift+LMB pan, Alt+RMB zoom; bez przełącznika trybu w tej fazie.
+Zwykły LMB-drag nie porusza kamerą; dwuklik LMB reset. Gest wymaga istniejącego fokusu
+z kliknięcia i początku nad aktywnym kontenerem; samo wheel/hover go nie nadaje.
+Pierwszy klik może nadać fokus, lecz nie generuje delty. Capture do release, anulowanie
+przy utracie aktywności/fokusu, zmianie wejścia albo rezerwacji; po anulowaniu nowy press.
+Pan ma pierwszeństwo nad orbit; niejednoznaczne wieloprzyciskowe kombinacje ignorować.
+Δx/width, Δy/height kontenera w jednostkach logicznych, y w dół, bez mnożenia przez dt
+(referencja Defect-Studio mnoży przez dt×60; nie kopiujemy zależności od fps).
+Czułość orbit/pan ×1 jak D28, backend zachowuje FRAME_WIDTH/HEIGHT i pan_sensitivity;
+wheel kroki ciągłe (Qt angleDelta.y/120, pixelDelta.y/40 gdy brak angleDelta), dodatnie
+przybliża; touchpad zoom = −20×Δy/height kroków. Zoom workera nadal 0.9**steps.
+Progi/znaki identyczne Qt/ImGui, DPI nie mnoży delty drugi raz; zerowy kontener daje no-op.
+`view orbit|pan|zoom|reset` pozostaje poza cue; reset ostatniej granicy, kamera w historii,
+rezerwacja blokuje view, CE Cairo nadal no-op (D38). Referencja ViewportInput.cpp tylko odczyt.
+
+**D48 — najpierw pula, potem prefetch (decyzja 2026-10-23).** Pomiar Claude na Windows,
+i7-13700KF: live GL 1,6–1,8 s, import manimlib ~1,4 s po wyłączeniu shadow_window,
+spawn ~0,15 s, scena i pierwsza klatka ~0,2–0,3 s; import CE ~0,9 s.
+Pliki z istniejącej puli: 83–130 ms. To dane wejściowe, nie odbiór implementacji D48.
+
+Pula osobna dla `manimgl` i `ce-cairo`, docelowo **2 bezczynne workery na użyty silnik**.
+Silniki zbiera adapter PC z manifestu bieżącego decku (Qt z tych samych pól modelu;
+brak engine oznacza manimgl); bez importów backendów w procesie UI. Po zmianie decku
+zamykać zapas nieużywanych silników. Rozgrzewanie asynchroniczne po załadowaniu decku,
+uzupełnianie po pobraniu, maks. jeden start uzupełnienia naraz; priorytet wejścia nad zapasem.
+Import zakończony potwierdza osobny `POOL_READY`, nie sceniczne READY.
+`run_worker` dziś zeruje argv, wyłącza shadow_window i importuje GL przed importem pliku sceny;
+`live_scene_ce` importuje manim już na poziomie modułu, a run_ce_worker ustawia tempconfig
+dopiero dla spec. Ten porządek zachować w bootstrapie: argv/shadow_window przed importem,
+bez importu pliku autora, sceny ani kontekstu GPU w bezczynnym workerze.
+
+`LiveSession.start` dziś tworzy SharedMemory, ctx.Lock i Pipe i przekazuje je przy spawn.
+W puli **Lock (SemLock) oraz oba kanały control/bootstrap tworzyć przed spawn**; nie wysyłać
+Lock zwykłym Pipe po starcie. Rodzic zachowuje lock danego slotu; po take tworzy bufor
+o rozmiarze spec i wysyła `(spec, shm_name)` po istniejącym control. SharedMemory otwierane
+po nazwie, LiveSpec jako dane są przekazywalne później; bootstrap_sender pozostaje w dziecku.
+Nie przesyłać sceny, FrameBuffer ani nowych prymitywów synchronizacji. Po przydziale worker
+wywołuje dotychczasowy run_worker/run_ce_worker raz i nigdy nie wraca do puli: jedna scena
+przez całe życie, bez podmiany globalnego stanu GL/config/cache shaderów. Dwie równoczesne
+sesje trwałego live 5g nadal dozwolone; pula nie jest limitem aktywnych sesji.
+Wspólny LiveSession daje pulę obu playerom; adaptery posiadają pulę i jawnie przekazują ją
+do start. capture_first_frame bez puli zachowuje zimny start i dotychczasowy lifecycle.
+Brak gotowego slotu: dotychczasowy zimny start w limicie zasobów, bez blokowania GUI;
+brak wolnego slotu oznacza oczekiwanie do deadline D41, nigdy nadmiarowy spawn.
+`take` zwraca worker albo None natychmiast. LiveSession.start oraz Source.prepare/start
+tylko zgłaszają żądanie; stan waiting_slot ponawia admisję przez poll, który nadal odbiera
+exit i zwalnia sloty. Bez blokującego sleep/join w GUI. Żądanie wiąże entry_id (prefetch
+token); nowe wejście anuluje stare oczekiwanie przed startem. Deadline D41 od przyjętej
+nawigacji obejmuje oczekiwanie, nie zaczyna się ponownie po zwolnieniu slotu.
+Qt: właściciel decku w m/slides/present/player.py przekazuje konfigurację całego decku
+do LiveLayerController, pompuje pulę także bez aktywnego live i obejmuje ją końcowym
+shutdown; zmiana decku zamyka nieużywany zapas. Dotyczy także decku zaczynającego się plikiem.
+
+Worker czekający sprawdza co ≤0,25 s EOF control i parent_process().is_alive(); wszystkie
+zbędne końce Pipe zamknięte po spawn. Śmierć rodzica kończy czekanie w ≤1 s, bez spec/sceny.
+Import ma deadline 5 s; awaria nie uruchamia nieskończonej pętli restartów (maks. jedna
+ponowna próba na slot, potem komunikat i zimna ścieżka). Shutdown obu UI zamyka przydział
+i uzupełnianie, wysyła stop/zamyka control; poll odbiera exit/join, po 2 s kill, potem reap.
+Zasoby sesji sprząta dotychczasowy właściciel LiveSession dopiero po exit; brak SHM dla
+bezczynnych. Nie polegać na daemon/atexit jako jedynym sprzątaniu.
+
+**Prefetch wyłącznie ImGui PC**, bez zmian web/Qt poza wspólną pulą. Po gotowości N
+przygotuj jeden normalny cel N+1 w tym samym decku, niezależnie od widoczności Info.
+Token = rewizja manifestu/deck + źródłowe entry_id + indeks celu + pełne spec plików/live
+(w tym rozmiar, silnik, fps, alfa/session_id). Żadnego przewidywania ←/V/R/start_at ani
+przekroczenia decku. Zwykły next w reverse nie przejmuje prefetcha. Sąsiednie przejęcie D39
+sprawdzać **przed** prefetchem każdej warstwy; zgodnego trwałego live nie budować drugi raz.
+Zmiana spec unieważnia token. Przy częściowym trafieniu przejmować zgodne warstwy,
+resztę przygotować zwyczajnie; nie utrzymywać dwóch właścicieli procesu/SHM/tekstury.
+
+Pliki: osobne Source, pierwsza normalna klatka w t=0, potwierdzone hold w dekoderze,
+bez postępu, EOF, pętli i watchdogów odtwarzania podczas hold. Po przejęciu przestawić
+entry_id/generation i kotwicę show_at/zegara dopiero na wspólny start D31, zachować pauzę;
+nie dekodować od początku drugi raz. Preview Info **nie przejmujemy**: ma osobne źródła,
+pętle i ruch, może być w dowolnym t; live w nim nadal tylko thumbnail. Miniatury D46
+też nie są prefetchem i nie uruchamiają live.
+
+Live z puli buduje obiekty i pierwszą klatkę READY; potem brak cue/view i odtwarzania
+updaterów do przyjęcia (odrzucać późniejsze klatki jałowe, nie przesuwać stanu sceny).
+`LiveSpec.prefetch:bool=False` wybiera ten tryb. Po READY pętla transportu GL/CE nie
+wywołuje update_mobjects/update_frame nawet z dt=0; nadal obsługuje stop, ACK i FIFO.
+Techniczna granica READY prefetcha dostaje ACK w 2 s bez postępu sceny i zwolnienia
+bariery D31. Późniejsza granica wejścia D41 ma nowy frame_id i osobny ACK po kompozycji.
+Pierwsza właściwa rezerwacja/enter/release D41 kończy hold przed operacjami wejścia.
+Dla live bez session_id, także bez cue, przyjęty next wysyła jawne adopt_prefetch
+skorelowane session/generation/entry_id/request_id: granica wejścia → kompozycja/ACK
+→ release na wspólnym starcie D31. Release kończy hold, zachowując pauzę do resume;
+stare komendy/ACK ignorować. Bez enter_cue ani syntetycznej historii do obudzenia sceny.
+Samo build_objects jest kodem autora i może mieć efekty I/O — prefetch tego nie izoluje.
+Nie tworzy EntryHistory, before(N+1), entry_id wejścia ani rezerwacji, nie wysyła enter_cue.
+Dopiero zatwierdzony normalny next (także efekt granicy D45) nadaje nowe entry_id,
+przekazuje własność i uruchamia dotychczasowe przygotowanie D39–D41: rezerwacja,
+before/cue właściwe dla zimnego next, granica, kompozycja, ACK i release. READY prefetcha
+nie zwalnia bariery; nie ACK-ować granicy wejścia z wyprzedzeniem. Deadline D41 5 s
+liczyć od rzeczywistego wejścia, ACK 2 s; prefetch ma własne 5 s do przygotowania
+wraz z technicznym ACK. Potem deadline spekulacji wygasa: gotowy cel może czekać
+dowolnie długo do przyjęcia/anulowania, bez timeoutu pierwszej granicy transportowej.
+
+←/V/R, start_at (poza no-op bieżącego celu), inny cel, zmiana decku, błąd i timeout
+anulują prefetch, unieważniają token i zamykają procesy; wyniki starego tokenu ignorować
+i sprzątać, bez historii/degradacji aktywnej sesji. Nie ponawiać błędnego celu do zmiany
+źródłowego wejścia. Nietrafienie nie zmienia semantyki wejścia ani checkpointów.
+Pętla slajdu nie konsumuje prefetcha i nie resetuje go przy każdym obrocie; auto_next
+i skip_all przejmują tylko gdy reducer faktycznie wybierze normalny N+1. Końcowy slajd,
+wrap do początku/decku i exit_after_last_slide nie mają prefetcha; exit zamyka także pule.
+
+**Budżet procesów D48 (doprecyzowuje D46, nie globalny limit 4).** Na deck wyliczyć
+S = maks. liczba źródeł procesowych jednego slajdu (pliki + live), P = maks. liczba
+plikowych źródeł preview, F = maks. liczba źródeł N+1 (F≤S), E = liczba użytych silników ≤2.
+Twardy pułap żywych dzieci playera: **B = 2S + P + F + 1 + 4 + 2E**;
+2S obejmuje bieżący i poprzedni/kończący slajd, 1 ekstrakcję miniatur, 4 zapas dekoderów,
+2E zapas live. W każdej kategorii kończący proces zajmuje slot aż do exit; bez podwojenia
+budżetu przy wielokrotnym anulowaniu. Przykład S=4, P=4, F=4, E=2: maks. 25 dzieci.
+Importujące/uruchamiane procesy też zajmują slot zapasu. Przy zmianie decku obowiązuje
+max(B starego, B nowego) do odebrania starych procesów, potem B nowego; bez sumowania pul.
+Współdzielone liczniki/admisja PC obejmują również zimne starty; po anulowaniu czekać na
+zwolnienie slotu, bez spawnu poza B. Priorytety: scena/restore 5g → ruchome preview Info
+→ prefetch → miniatury → bezczynny zapas. Przy braku zwalniać od końca tej listy,
+prefetch może być częściowy albo pominięty; wymagane wejście czeka najwyżej D41.
+To rozszerzenie ponad brak globalnej admisji w rundzie 22, bez zmiany znaczenia puli 4.
+Właściciel licznika w m/live_pool.py: `ProcessBudget.try_acquire(role:str)->bool` oraz
+`release_after_exit(pid:int)->None`; adapter PC podaje go pulom/źródłom, wspólny kod UI
+nie importuje multiprocessing. Zwolnienie slotu nigdy nie wynika z samego request_stop.
+
+Zapas live ma koszt RSS importów, lecz zero SHM klatek i brak własnego kontekstu GPU;
+prefetch live ma pełną scenę/kontekst i nieograniczony kod autora. Limit dodatkowych
+buforów klatek/tekstur prefetcha **128 MiB CPU+GPU** (rozliczać także kopie robocze;
+przekroczenie pomija warstwę), pamięć checkpointów nadal D40. RSS/VRAM backendu/sceny
+nie są objęte tym limitem: mierzyć osobno aktywne, zapas, prefetch i kończące; przy błędzie
+alokacji zwolnić spekulację, nie degradować bieżącej sceny. Nie obiecywać limitu całego RAM/GPU.
+
+Odbiór D48: Windows/i7-13700KF, docelowe rozdzielczości Demo, GL i CE osobno,
+10 wejść rozgrzewki + 100 nowych scen/silnik, 3 serie, raport p50/p95/max i trafień puli.
+**≤0,5 s p95** od zaakceptowanego next do skomponowanej pierwszej klatki/ACK nowego live
+bez enter_cue (długiego cue nie wliczać do tego benchmarku); pula rozgrzana, prefetch
+wyłączony, zimny fallback raportowany osobno. Powtórzyć z prefetchem i pełnym obciążeniem
+D46, nie zastępować pomiaru wejścia samym READY. Testy historii/ACK i osierocenia przez
+subprocess również offline; rzeczywisty obraz, fokus, VRAM i p95 wymagają okna człowieka.
+Kolejność zadań **6 → 7 → 8**, stop 2× obejmuje też nieosiągnięcie progu: raport/przegląd,
+bez automatycznego zwiększenia puli lub osłabienia progu. Cache wyrenderowanych animacji
+live odrzucony: zależy od czasu cue i kamery; deterministyczne treści jako pliki.
+
+| Zadanie / budżet (stop 2×) | Zamknięta lista plików | Sygnatury wejścia → wyjścia | Testy odbioru (planowane) |
+|---|---|---|---|
+| 0. Kontrakt / 4 h | PLAN.md, SPEC.md, REVIEW-LOG.md | próba + odczyt protokołu/API → D45–D48 | spójność ze stanem 10a i D39–D44, przegląd Claude; rozszerzenie D48 PLAN/SPEC + REVIEW-LOG |
+| 1. Granice cue / 6 h | m/live_transport.py, p/live.py, p/input.py, p/app.py, t/test_live_scene.py, t/test_live_ce.py, t/test_imgui_input.py, t/test_imgui_live.py, t/test_imgui_live_checkpoint.py | LiveController.step(direction:str, entry_id:int)->None; poll(now:float)->list[dict]; step_result(request_id:int,result:str,frame_id:int)->dict | test_sequence_start_end_empty; test_no_log_parsing; test_stale_step_result; test_step_repeat_until_keyup; test_busy_reserved_step; test_step_loop_keyup_step; test_loop_over_5s_then_stall; test_cue_over_5s_then_stall; test_interrupt_deadline_despite_heartbeat; test_persistent_boundary_restore; test_reverse_boundary; GL i CE, ACK przed jednym reducer effect, błąd/timeout bez skoku |
+| 2. Info / 5 h | p/info.py, p/state.py, p/controller.py, p/live.py, m/live_entry.py, p/app.py, p/desktop.py, t/test_imgui_info.py, t/test_imgui_navigation.py, t/test_imgui_live_checkpoint.py, t/test_live_entry.py | render_info(snapshot:dict,preview:dict)->list[dict]; update_timer(state:dict,action:str,now:float)->dict | test_presenter_columns; test_timer_pause_restart; test_notes_scale_limits; test_thumbnail_start_at_barrier; test_jump_live_history; test_thumbnail_during_restore_stale_status_previous_v_r; test_current_thumbnail_noop_entry_pause_reverse_preparing_no_effects; test_info_widgets_consume_click; screenshot dwóch kolumn i pustego preview |
+| 3. Miniatury / 6 h | p/info.py, p/app.py, p/sources_av.py, p/decoder_worker.py, p/textures.py, p/manifest.py, t/test_imgui_info.py, t/test_imgui_sources.py | request_thumbnail(index:tuple,size:tuple)->None; poll_thumbnails(now:float)->list[dict] | test_thumbnails_24_slides_bounded; test_thumbnail_composition; test_hidden_info_no_extract; test_stale_thumbnail; 24 slajdy, baza+3 klipy+ruchome preview+miniatury; jeden proces ekstrakcji wraz z kończącym się, ≤4 bezczynne; osobne liczniki aktywnych/bezczynnych/kończących się i suma żywych, LRU/limity CPU+GPU, responsywność podczas przewijania |
+| 4. Matematyka / 4 h | p/info.py, p/desktop.py, p/notes_math.py (nowy adapter PC), p/textures.py, t/test_imgui_info.py, t/test_imgui_shared_imports.py | render_formula(text:str,size:float,dpi:float,style:str)->dict; formula dict: rgba,width,height,baseline,error | test_latex_after_init; test_inline_display_baseline; test_mathtext_fallback; test_formula_cache_limits; test_markdown_arrow_merge; PC offline raster, gpu upload, oba font size/DPI; brak importu matplotlib w shared modules |
+| 5. Gesty obu playerów / 5 h | p/input.py, p/live.py, p/desktop.py, m/composition.py, m/live_layers.py, t/test_imgui_input.py, t/test_live_layers.py | route(event:dict,state:dict)->list[dict]; view(event:dict,container:tuple)->dict; LiveLayerController.drag(point:QPointF,shift:bool,button:str='middle',alt:bool=False)->None; sygnał pointer_dragged(point,shift,button,alt) | test_gesture_matrix parametrized Qt/ImGui; test_lmb_drag_no_orbit; test_gesture_focus_capture_cancel; test_dpi_fps_invariant; test_zoom_steps; test_reserved_ce_noop; test_reset_last_boundary |
+| 6. Pula live / 10 h | m/live_pool.py (nowy), m/live_session.py, m/live_worker.py, m/live_scene_ce.py, m/live_layers.py, m/slides/present/player.py, p/live.py, p/desktop.py, p/app.py, p/sources_av.py, t/test_imgui_sources.py, t/test_live_pool.py (nowy), t/test_live_session.py, t/test_live_ce_player.py, t/test_imgui_live.py | LivePool.configure(engines:set[str])->None; take(engine:str)->WarmWorker\|None; poll(now:float)->None; begin_shutdown()->None; run_pooled_live(engine:str,frame_lock,control,bootstrap_sender)->None; LiveSession.start(spec:LiveSpec,*,pool:LivePool\|None=None)->None | test_spawn_lock_late_spec_shm; test_pool_import_ready_gl_ce; test_engine_selection_refill; test_one_scene_per_process; test_pool_parent_death; test_pool_shutdown_reap_unlink; test_pool_budget_including_retiring; test_budget_wait_poll_delayed_exit_new_entry; test_qt_file_first_deck_pool_poll_shutdown (offscreen); regresje Qt/ImGui i dwóch sesji 5g; nowy live ≤0,5 s p95 po rozgrzaniu, bez prefetcha |
+| 7. Prefetch N+1 / 11 h | m/live_pool.py, m/live_session.py, m/live_worker.py, m/live_scene.py, m/live_scene_ce.py, m/live_transport.py, t/test_live_scene.py, t/test_live_ce.py, p/prefetch.py (nowy), p/app.py, p/desktop.py, p/controller.py, p/live.py, p/sources_av.py, p/decoder_worker.py, p/textures.py, t/test_imgui_prefetch.py (nowy), t/test_imgui_sources.py, t/test_imgui_live_checkpoint.py, t/test_imgui_navigation.py | Prefetch.prepare(token:tuple,slide:dict)->None; poll(now:float)->None; take(token:tuple,entry_id:int)->dict\|None; cancel(reason:str)->None; Source.prepare(entry_id:int,media:dict,*,hold_first:bool=False)->None; Source.poll(now:float)->None; Source.adopt(entry_id:int,now:float,paused:bool)->None; LiveController.enter(entry:dict,*,prefetched:dict\|None=None)->None | test_file_first_frame_held_rebase; test_preview_independent; test_prefetch_no_cue_history_reservation; test_hold_no_zero_dt_updaters_gl_ce; test_next_adopt_checkpoint_ack; test_adopt_no_session_no_cue_next_paused_gl_ce; test_ready_hold_over_5s_then_checkpoint_composition_ack_gl_ce; test_adjacent_wins; test_previous_v_jump_cancel_history_unchanged; test_stale_deck_error_timeout; test_loop_auto_skip_exit; test_budget_cancel_waits_exit; test_source_wait_poll_delayed_exit_new_entry; brak prefetcha Qt |
+| 8. Odbiór / 3 h | PLAN.md, SPEC.md, t/test_imgui_acceptance.py, e/measure.py | measure(options:dict)->dict | pełny pytest, regresje Qt i GL/CE/5g; 24 slajdy pod pełnym obciążeniem scena+preview+prefetch+miniatury+pule, także anulowanie i exit procesów; metryki 10a bez obniżania progów, pomiar D48 z/bez prefetcha, RSS/VRAM i liczniki procesów; Claude przegląd i próba człowieka |
+
+Budżet 10d **54 h** (33 + 10 + 11), stop **108 h** całości lub 2× zadania; nie podnosić automatycznie.
+Po rundzie 24 zadanie 6: 8 → 10 h (Qt i nieblokująca admisja), zadanie 7: 9 → 11 h
+(hold/ACK i oczekiwanie Source). Zadanie 8 obejmuje regresje tych scenariuszy bez zmiany 3 h.
+Zadanie 3 przeszacowane 4 → 6 h po rundzie 22: osobny limit ekstrakcji, lifecycle
+i pomiar pełnego obciążenia, bez globalnego schedulera.
+Czas przeglądu Claude i oczekiwania na człowieka raportować osobno. Brak okna nie zalicza gpu.
+Środowisko testów: `uv run --frozen`, UV_OFFLINE=1, UV_CACHE_DIR w `.cache/uv`, TMP/TEMP
+w `.tmp`, QT_QPA_PLATFORM=offscreen; .venv bez zmian. Wyniki obecnej sesji są dowodami
+kontraktu, nie zielonymi wynikami przyszłych testów. Odbiór człowieka: Demo i deck 24 slajdów,
+oba okna/monitory, ←→ przy granicy i trzymaniu klawisza, cue w locie, trwały live, V/R,
+skok miniaturą podczas przygotowania, czytelność wzorów/strzałek/A+/A− oraz gesty myszy
+i touchpada w Qt i ImGui. 10a zadanie 11 pozostaje odrębną obowiązującą bramką.
+
+**Recenzja kontraktu:** rundy 22–23 `codex exec -s read-only`, 2026-10-23: pięć ustaleń
+rundy 22 i poprawka watchdogu długiego cue z rundy 23 przyjęte do kontraktu;
+rozstrzygnięcia w REVIEW-LOG.md. Recenzja statyczna diffu
+i kodu, bez testów GPU; przed implementacją przegląd Claude poprawionego kontraktu.
+
+**Do potwierdzenia w próbie (bez renegocjacji decyzji):** wygoda proporcji 60/40 i fontu
+24 px, czułość touchpad zoom/pixelDelta, czytelność na DPI obu monitorów; bramka wasm
+i fonty offline przed 10b. Ryzyka: opóźnione wyniki po restore, skład baseline matematyki,
+podzbiór mathtext, zimna ekstrakcja miniatur przy zajętej puli, start live ~1,6 s.
 
 ### 10b i 10c — granice wspólnego kodu
 
