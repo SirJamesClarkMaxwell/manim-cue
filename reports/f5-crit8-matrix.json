@@ -1,0 +1,1252 @@
+{
+  "resolution": [
+    1920,
+    1080
+  ],
+  "seconds": 8,
+  "warmup": 1,
+  "timeout_seconds": 65,
+  "sequential": true,
+  "results": [
+    {
+      "clips": 2,
+      "status": "timeout65",
+      "elapsed": 65.05578480000258,
+      "id": "matrix-light-auto-info",
+      "probe": "lekka",
+      "hw": "auto",
+      "info": true,
+      "live": false,
+      "measurement": null,
+      "log": "f5-crit8-matrix-light-auto-info-2.log"
+    },
+    {
+      "clips": 3,
+      "status": "timeout65",
+      "elapsed": 65.05510849998973,
+      "id": "matrix-light-auto-info",
+      "probe": "lekka",
+      "hw": "auto",
+      "info": true,
+      "live": false,
+      "measurement": null,
+      "log": "f5-crit8-matrix-light-auto-info-3.log"
+    },
+    {
+      "clips": 2,
+      "status": "timeout65",
+      "elapsed": 65.046379300009,
+      "id": "matrix-pixel-auto-info",
+      "probe": "pikselowa",
+      "hw": "auto",
+      "info": true,
+      "live": false,
+      "measurement": null,
+      "log": "f5-crit8-matrix-pixel-auto-info-2.log"
+    },
+    {
+      "clips": 3,
+      "status": "timeout65",
+      "elapsed": 65.0567899000016,
+      "id": "matrix-pixel-auto-info",
+      "probe": "pikselowa",
+      "hw": "auto",
+      "info": true,
+      "live": false,
+      "measurement": null,
+      "log": "f5-crit8-matrix-pixel-auto-info-3.log"
+    },
+    {
+      "clips": 2,
+      "status": 0,
+      "elapsed": 13.844936199995573,
+      "id": "isolated-sw-info",
+      "probe": "lekka",
+      "hw": "off",
+      "info": true,
+      "live": false,
+      "measurement": {
+        "metric": "Odbiór w GUI, nie fizyczne odświeżenie monitora",
+        "platform": "offscreen",
+        "qt_ffmpeg_decoding_hw_device_types": ",",
+        "host": "Windows-11-10.0.26200-SP0",
+        "resolution": [
+          1920,
+          1080
+        ],
+        "source_fps": 60,
+        "clock": "time.perf_counter",
+        "change_detection": "startTime/endTime",
+        "live_change_detection": "CRC32 frame.pixels",
+        "pixel_probe": false,
+        "info": true,
+        "loss_estimate": "max(0, round(duration * source_fps) - changed_frames)",
+        "warmup_seconds": 1.0,
+        "requested_seconds": 8.0,
+        "live": false,
+        "live_cpu_note": "Nie mierzono CPU procesu potomnego; process_time obejmuje tylko player",
+        "results": [
+          {
+            "clips": 2,
+            "info_visible": true,
+            "duration_seconds": 8.001154700003099,
+            "streams": {
+              "base": {
+                "source_fps": 60,
+                "received_frames": 229,
+                "received_fps": 28.620868935318963,
+                "changed_frames": 229,
+                "changed_fps": 28.620868935318963,
+                "changed_interval_ms": {
+                  "p50": 27.63319999212399,
+                  "p95": 56.15590000525117,
+                  "max": 216.67860000161454
+                },
+                "estimated_lost_frames": 251,
+                "longest_silence_ms": 216.67860000161454
+              },
+              "clip_1": {
+                "source_fps": 60,
+                "received_frames": 210,
+                "received_fps": 26.2462116874104,
+                "changed_frames": 210,
+                "changed_fps": 26.2462116874104,
+                "changed_interval_ms": {
+                  "p50": 27.147600005264394,
+                  "p95": 74.12350000231527,
+                  "max": 352.98820000025444
+                },
+                "estimated_lost_frames": 270,
+                "longest_silence_ms": 352.98820000025444
+              },
+              "clip_2": {
+                "source_fps": 60,
+                "received_frames": 235,
+                "received_fps": 29.3707606978164,
+                "changed_frames": 235,
+                "changed_fps": 29.3707606978164,
+                "changed_interval_ms": {
+                  "p50": 27.790400010417216,
+                  "p95": 62.40019999677315,
+                  "max": 216.63100000296254
+                },
+                "estimated_lost_frames": 245,
+                "longest_silence_ms": 216.63100000296254
+              }
+            },
+            "first_changed_after_release_ms": {
+              "base": 74.94940000469796,
+              "clip_1": 74.95700000436045,
+              "clip_2": 38.47320000932086
+            },
+            "start_spread_ms": 36.48379999503959,
+            "qt_timer_gap_ms": {
+              "p50": 23.63799999875482,
+              "p95": 28.227799994056113,
+              "max": 43.46770000120159
+            },
+            "qt_timer_delay_ms": {
+              "p50": 22.63799999875482,
+              "p95": 27.227799994056113,
+              "max": 42.46770000120159
+            },
+            "qt_timer_samples": 396,
+            "player_cpu_seconds": 13.953125,
+            "player_cpu_percent_one_core": 174.3888916432849,
+            "live_cpu_percent_one_core": null,
+            "errors": [],
+            "live_states": []
+          }
+        ],
+        "elapsed_seconds": 13.248542999994243
+      },
+      "log": "f5-crit8-isolated-sw-info-2.log"
+    },
+    {
+      "clips": 3,
+      "status": 0,
+      "elapsed": 22.074707499996293,
+      "id": "isolated-sw-info",
+      "probe": "lekka",
+      "hw": "off",
+      "info": true,
+      "live": false,
+      "measurement": {
+        "metric": "Odbiór w GUI, nie fizyczne odświeżenie monitora",
+        "platform": "offscreen",
+        "qt_ffmpeg_decoding_hw_device_types": ",",
+        "host": "Windows-11-10.0.26200-SP0",
+        "resolution": [
+          1920,
+          1080
+        ],
+        "source_fps": 60,
+        "clock": "time.perf_counter",
+        "change_detection": "startTime/endTime",
+        "live_change_detection": "CRC32 frame.pixels",
+        "pixel_probe": false,
+        "info": true,
+        "loss_estimate": "max(0, round(duration * source_fps) - changed_frames)",
+        "warmup_seconds": 1.0,
+        "requested_seconds": 8.0,
+        "live": false,
+        "live_cpu_note": "Nie mierzono CPU procesu potomnego; process_time obejmuje tylko player",
+        "results": [
+          {
+            "clips": 3,
+            "info_visible": true,
+            "duration_seconds": 8.400894899998093,
+            "streams": {
+              "base": {
+                "source_fps": 60,
+                "received_frames": 5,
+                "received_fps": 0.5951746878777325,
+                "changed_frames": 5,
+                "changed_fps": 0.5951746878777325,
+                "changed_interval_ms": {
+                  "p50": 36.93030000431463,
+                  "p95": 8256.284500006586,
+                  "max": 8256.284500006586
+                },
+                "estimated_lost_frames": 499,
+                "longest_silence_ms": 8256.284500006586
+              },
+              "clip_1": {
+                "source_fps": 60,
+                "received_frames": 6,
+                "received_fps": 0.714209625453279,
+                "changed_frames": 6,
+                "changed_fps": 0.714209625453279,
+                "changed_interval_ms": {
+                  "p50": 37.34329999133479,
+                  "p95": 6289.815700001782,
+                  "max": 6289.815700001782
+                },
+                "estimated_lost_frames": 498,
+                "longest_silence_ms": 6289.815700001782
+              },
+              "clip_2": {
+                "source_fps": 60,
+                "received_frames": 5,
+                "received_fps": 0.5951746878777325,
+                "changed_frames": 5,
+                "changed_fps": 0.5951746878777325,
+                "changed_interval_ms": {
+                  "p50": 36.91320000507403,
+                  "p95": 8256.306700001005,
+                  "max": 8256.306700001005
+                },
+                "estimated_lost_frames": 499,
+                "longest_silence_ms": 8256.306700001005
+              },
+              "clip_3": {
+                "source_fps": 60,
+                "received_frames": 5,
+                "received_fps": 0.5951746878777325,
+                "changed_frames": 5,
+                "changed_fps": 0.5951746878777325,
+                "changed_interval_ms": {
+                  "p50": 36.912499999743886,
+                  "p95": 4849.658599996474,
+                  "max": 4849.658599996474
+                },
+                "estimated_lost_frames": 499,
+                "longest_silence_ms": 4849.658599996474
+              }
+            },
+            "first_changed_after_release_ms": {
+              "base": 28.321799996774644,
+              "clip_1": 64.59979999635834,
+              "clip_2": 28.335700000752695,
+              "clip_3": 28.289299996686168
+            },
+            "start_spread_ms": 36.310499999672174,
+            "qt_timer_gap_ms": {
+              "p50": 36.40110000560526,
+              "p95": 7540.8633000042755,
+              "max": 7540.8633000042755
+            },
+            "qt_timer_delay_ms": {
+              "p50": 35.40110000560526,
+              "p95": 7539.8633000042755,
+              "max": 7539.8633000042755
+            },
+            "qt_timer_samples": 6,
+            "player_cpu_seconds": 16.9375,
+            "player_cpu_percent_one_core": 201.6154255185819,
+            "live_cpu_percent_one_core": null,
+            "errors": [],
+            "live_states": []
+          }
+        ],
+        "elapsed_seconds": 21.516962399997283
+      },
+      "log": "f5-crit8-isolated-sw-info-3.log"
+    },
+    {
+      "clips": 2,
+      "status": 0,
+      "elapsed": 13.698863099998562,
+      "id": "matrix-pixel-sw-info",
+      "probe": "pikselowa",
+      "hw": "off",
+      "info": true,
+      "live": false,
+      "measurement": {
+        "metric": "Odbiór w GUI, nie fizyczne odświeżenie monitora",
+        "platform": "offscreen",
+        "qt_ffmpeg_decoding_hw_device_types": ",",
+        "host": "Windows-11-10.0.26200-SP0",
+        "resolution": [
+          1920,
+          1080
+        ],
+        "source_fps": 60,
+        "clock": "time.perf_counter",
+        "change_detection": "CRC32",
+        "live_change_detection": "CRC32 frame.pixels",
+        "pixel_probe": true,
+        "info": true,
+        "loss_estimate": "max(0, round(duration * source_fps) - changed_frames)",
+        "warmup_seconds": 1.0,
+        "requested_seconds": 8.0,
+        "live": false,
+        "live_cpu_note": "Nie mierzono CPU procesu potomnego; process_time obejmuje tylko player",
+        "results": [
+          {
+            "clips": 2,
+            "info_visible": true,
+            "duration_seconds": 8.015883100000792,
+            "streams": {
+              "base": {
+                "source_fps": 60,
+                "received_frames": 178,
+                "received_fps": 22.205912658579365,
+                "changed_frames": 178,
+                "changed_fps": 22.205912658579365,
+                "changed_interval_ms": {
+                  "p50": 34.362699996563606,
+                  "p95": 82.58669999486301,
+                  "max": 149.88219999941066
+                },
+                "estimated_lost_frames": 303,
+                "longest_silence_ms": 149.88219999941066
+              },
+              "clip_1": {
+                "source_fps": 60,
+                "received_frames": 187,
+                "received_fps": 23.328683523338995,
+                "changed_frames": 187,
+                "changed_fps": 23.328683523338995,
+                "changed_interval_ms": {
+                  "p50": 33.90890000446234,
+                  "p95": 97.41030000441242,
+                  "max": 265.7429999962915
+                },
+                "estimated_lost_frames": 294,
+                "longest_silence_ms": 265.7429999962915
+              },
+              "clip_2": {
+                "source_fps": 60,
+                "received_frames": 37,
+                "received_fps": 4.615835777345149,
+                "changed_frames": 37,
+                "changed_fps": 4.615835777345149,
+                "changed_interval_ms": {
+                  "p50": 201.14259999536444,
+                  "p95": 632.7056000009179,
+                  "max": 633.0554000014672
+                },
+                "estimated_lost_frames": 444,
+                "longest_silence_ms": 633.0554000014672
+              }
+            },
+            "first_changed_after_release_ms": {
+              "base": 224.04639999149367,
+              "clip_1": 102.56249998928979,
+              "clip_2": 159.92679999908432
+            },
+            "start_spread_ms": 121.48390000220388,
+            "qt_timer_gap_ms": {
+              "p50": 24.045600002864376,
+              "p95": 34.145199999329634,
+              "max": 52.578600007109344
+            },
+            "qt_timer_delay_ms": {
+              "p50": 23.045600002864376,
+              "p95": 33.145199999329634,
+              "max": 51.578600007109344
+            },
+            "qt_timer_samples": 313,
+            "player_cpu_seconds": 13.375,
+            "player_cpu_percent_one_core": 166.85622573511182,
+            "live_cpu_percent_one_core": null,
+            "errors": [],
+            "live_states": []
+          }
+        ],
+        "elapsed_seconds": 13.161859999992885
+      },
+      "log": "f5-crit8-matrix-pixel-sw-info-2.log"
+    },
+    {
+      "clips": 3,
+      "status": "timeout65",
+      "elapsed": 65.0236092999985,
+      "id": "matrix-pixel-sw-info",
+      "probe": "pikselowa",
+      "hw": "off",
+      "info": true,
+      "live": false,
+      "measurement": null,
+      "log": "f5-crit8-matrix-pixel-sw-info-3.log"
+    },
+    {
+      "clips": 2,
+      "status": 0,
+      "elapsed": 13.64986730000237,
+      "id": "matrix-light-auto-hidden",
+      "probe": "lekka",
+      "hw": "auto",
+      "info": false,
+      "live": false,
+      "measurement": {
+        "metric": "Odbiór w GUI, nie fizyczne odświeżenie monitora",
+        "platform": "offscreen",
+        "qt_ffmpeg_decoding_hw_device_types": null,
+        "host": "Windows-11-10.0.26200-SP0",
+        "resolution": [
+          1920,
+          1080
+        ],
+        "source_fps": 60,
+        "clock": "time.perf_counter",
+        "change_detection": "startTime/endTime",
+        "live_change_detection": "CRC32 frame.pixels",
+        "pixel_probe": false,
+        "info": false,
+        "loss_estimate": "max(0, round(duration * source_fps) - changed_frames)",
+        "warmup_seconds": 1.0,
+        "requested_seconds": 8.0,
+        "live": false,
+        "live_cpu_note": "Nie mierzono CPU procesu potomnego; process_time obejmuje tylko player",
+        "results": [
+          {
+            "clips": 2,
+            "info_visible": false,
+            "duration_seconds": 8.002601800006232,
+            "streams": {
+              "base": {
+                "source_fps": 60,
+                "received_frames": 370,
+                "received_fps": 46.23496323404619,
+                "changed_frames": 370,
+                "changed_fps": 46.23496323404619,
+                "changed_interval_ms": {
+                  "p50": 19.34620000247378,
+                  "p95": 40.02830000536051,
+                  "max": 56.04569999559317
+                },
+                "estimated_lost_frames": 110,
+                "longest_silence_ms": 56.04569999559317
+              },
+              "clip_1": {
+                "source_fps": 60,
+                "received_frames": 382,
+                "received_fps": 47.73447555515039,
+                "changed_frames": 382,
+                "changed_fps": 47.73447555515039,
+                "changed_interval_ms": {
+                  "p50": 19.446200007223524,
+                  "p95": 37.826800005859695,
+                  "max": 61.319900007219985
+                },
+                "estimated_lost_frames": 98,
+                "longest_silence_ms": 61.319900007219985
+              },
+              "clip_2": {
+                "source_fps": 60,
+                "received_frames": 382,
+                "received_fps": 47.73447555515039,
+                "changed_frames": 382,
+                "changed_fps": 47.73447555515039,
+                "changed_interval_ms": {
+                  "p50": 19.26449999155011,
+                  "p95": 39.798000012524426,
+                  "max": 53.157000002101995
+                },
+                "estimated_lost_frames": 98,
+                "longest_silence_ms": 53.157000002101995
+              }
+            },
+            "first_changed_after_release_ms": {
+              "base": 23.745300000882708,
+              "clip_1": 42.491700005484745,
+              "clip_2": 23.709200002485886
+            },
+            "start_spread_ms": 18.78250000299886,
+            "qt_timer_gap_ms": {
+              "p50": 16.876000008778647,
+              "p95": 19.22010000271257,
+              "max": 52.83869999402668
+            },
+            "qt_timer_delay_ms": {
+              "p50": 15.876000008778647,
+              "p95": 18.22010000271257,
+              "max": 51.83869999402668
+            },
+            "qt_timer_samples": 666,
+            "player_cpu_seconds": 9.03125,
+            "player_cpu_percent_one_core": 112.8539220831026,
+            "live_cpu_percent_one_core": null,
+            "errors": [],
+            "live_states": []
+          }
+        ],
+        "elapsed_seconds": 13.06940070001292
+      },
+      "log": "f5-crit8-matrix-light-auto-hidden-2.log"
+    },
+    {
+      "clips": 3,
+      "status": 0,
+      "elapsed": 14.689491500001168,
+      "id": "matrix-light-auto-hidden",
+      "probe": "lekka",
+      "hw": "auto",
+      "info": false,
+      "live": false,
+      "measurement": {
+        "metric": "Odbiór w GUI, nie fizyczne odświeżenie monitora",
+        "platform": "offscreen",
+        "qt_ffmpeg_decoding_hw_device_types": null,
+        "host": "Windows-11-10.0.26200-SP0",
+        "resolution": [
+          1920,
+          1080
+        ],
+        "source_fps": 60,
+        "clock": "time.perf_counter",
+        "change_detection": "startTime/endTime",
+        "live_change_detection": "CRC32 frame.pixels",
+        "pixel_probe": false,
+        "info": false,
+        "loss_estimate": "max(0, round(duration * source_fps) - changed_frames)",
+        "warmup_seconds": 1.0,
+        "requested_seconds": 8.0,
+        "live": false,
+        "live_cpu_note": "Nie mierzono CPU procesu potomnego; process_time obejmuje tylko player",
+        "results": [
+          {
+            "clips": 3,
+            "info_visible": false,
+            "duration_seconds": 8.016651100013405,
+            "streams": {
+              "base": {
+                "source_fps": 60,
+                "received_frames": 280,
+                "received_fps": 34.92730274859184,
+                "changed_frames": 280,
+                "changed_fps": 34.92730274859184,
+                "changed_interval_ms": {
+                  "p50": 24.760999993304722,
+                  "p95": 49.6117000002414,
+                  "max": 84.22729998710565
+                },
+                "estimated_lost_frames": 201,
+                "longest_silence_ms": 84.22729998710565
+              },
+              "clip_1": {
+                "source_fps": 60,
+                "received_frames": 270,
+                "received_fps": 33.67989907899928,
+                "changed_frames": 270,
+                "changed_fps": 33.67989907899928,
+                "changed_interval_ms": {
+                  "p50": 24.6880000049714,
+                  "p95": 50.019899994367734,
+                  "max": 88.19969999603927
+                },
+                "estimated_lost_frames": 211,
+                "longest_silence_ms": 88.19969999603927
+              },
+              "clip_2": {
+                "source_fps": 60,
+                "received_frames": 294,
+                "received_fps": 36.673667886021434,
+                "changed_frames": 294,
+                "changed_fps": 36.673667886021434,
+                "changed_interval_ms": {
+                  "p50": 24.492700002156198,
+                  "p95": 49.27190000307746,
+                  "max": 84.24709999235347
+                },
+                "estimated_lost_frames": 187,
+                "longest_silence_ms": 84.24709999235347
+              },
+              "clip_3": {
+                "source_fps": 60,
+                "received_frames": 284,
+                "received_fps": 35.42626421642887,
+                "changed_frames": 284,
+                "changed_fps": 35.42626421642887,
+                "changed_interval_ms": {
+                  "p50": 24.773900004220195,
+                  "p95": 49.02619999484159,
+                  "max": 84.25650000572205
+                },
+                "estimated_lost_frames": 197,
+                "longest_silence_ms": 84.25650000572205
+              }
+            },
+            "first_changed_after_release_ms": {
+              "base": 20.46989998780191,
+              "clip_1": 20.88969999749679,
+              "clip_2": 51.63649999303743,
+              "clip_3": 21.316999991540797
+            },
+            "start_spread_ms": 31.166600005235523,
+            "qt_timer_gap_ms": {
+              "p50": 22.836999996798113,
+              "p95": 25.052099997992627,
+              "max": 84.51420000346843
+            },
+            "qt_timer_delay_ms": {
+              "p50": 21.836999996798113,
+              "p95": 24.052099997992627,
+              "max": 83.51420000346843
+            },
+            "qt_timer_samples": 437,
+            "player_cpu_seconds": 9.328125,
+            "player_cpu_percent_one_core": 116.35937355418152,
+            "live_cpu_percent_one_core": null,
+            "errors": [],
+            "live_states": []
+          }
+        ],
+        "elapsed_seconds": 14.123281699998188
+      },
+      "log": "f5-crit8-matrix-light-auto-hidden-3.log"
+    },
+    {
+      "clips": 2,
+      "status": 0,
+      "elapsed": 13.747764500003541,
+      "id": "matrix-pixel-auto-hidden",
+      "probe": "pikselowa",
+      "hw": "auto",
+      "info": false,
+      "live": false,
+      "measurement": {
+        "metric": "Odbiór w GUI, nie fizyczne odświeżenie monitora",
+        "platform": "offscreen",
+        "qt_ffmpeg_decoding_hw_device_types": null,
+        "host": "Windows-11-10.0.26200-SP0",
+        "resolution": [
+          1920,
+          1080
+        ],
+        "source_fps": 60,
+        "clock": "time.perf_counter",
+        "change_detection": "CRC32",
+        "live_change_detection": "CRC32 frame.pixels",
+        "pixel_probe": true,
+        "info": false,
+        "loss_estimate": "max(0, round(duration * source_fps) - changed_frames)",
+        "warmup_seconds": 1.0,
+        "requested_seconds": 8.0,
+        "live": false,
+        "live_cpu_note": "Nie mierzono CPU procesu potomnego; process_time obejmuje tylko player",
+        "results": [
+          {
+            "clips": 2,
+            "info_visible": false,
+            "duration_seconds": 8.033968200004892,
+            "streams": {
+              "base": {
+                "source_fps": 60,
+                "received_frames": 43,
+                "received_fps": 5.352274110317466,
+                "changed_frames": 43,
+                "changed_fps": 5.352274110317466,
+                "changed_interval_ms": {
+                  "p50": 115.30269999639131,
+                  "p95": 633.7850999989314,
+                  "max": 832.4790000042412
+                },
+                "estimated_lost_frames": 439,
+                "longest_silence_ms": 832.4790000042412
+              },
+              "clip_1": {
+                "source_fps": 60,
+                "received_frames": 196,
+                "received_fps": 24.396412223772636,
+                "changed_frames": 196,
+                "changed_fps": 24.396412223772636,
+                "changed_interval_ms": {
+                  "p50": 32.95110000181012,
+                  "p95": 94.59470000001602,
+                  "max": 160.99439999379683
+                },
+                "estimated_lost_frames": 286,
+                "longest_silence_ms": 160.99439999379683
+              },
+              "clip_2": {
+                "source_fps": 60,
+                "received_frames": 250,
+                "received_fps": 31.11787273440387,
+                "changed_frames": 250,
+                "changed_fps": 31.11787273440387,
+                "changed_interval_ms": {
+                  "p50": 24.409100005868822,
+                  "p95": 68.06749998941086,
+                  "max": 82.55429999553598
+                },
+                "estimated_lost_frames": 232,
+                "longest_silence_ms": 82.55429999553598
+              }
+            },
+            "first_changed_after_release_ms": {
+              "base": 69.60640000761487,
+              "clip_1": 52.46600000828039,
+              "clip_2": 44.219300005352125
+            },
+            "start_spread_ms": 25.38710000226274,
+            "qt_timer_gap_ms": {
+              "p50": 22.88649999536574,
+              "p95": 27.467699997941963,
+              "max": 59.26490000274498
+            },
+            "qt_timer_delay_ms": {
+              "p50": 21.88649999536574,
+              "p95": 26.467699997941963,
+              "max": 58.26490000274498
+            },
+            "qt_timer_samples": 338,
+            "player_cpu_seconds": 9.734375,
+            "player_cpu_percent_one_core": 121.16521695958508,
+            "live_cpu_percent_one_core": null,
+            "errors": [],
+            "live_states": []
+          }
+        ],
+        "elapsed_seconds": 13.178366499996628
+      },
+      "log": "f5-crit8-matrix-pixel-auto-hidden-2.log"
+    },
+    {
+      "clips": 3,
+      "status": 0,
+      "elapsed": 14.758123599996907,
+      "id": "matrix-pixel-auto-hidden",
+      "probe": "pikselowa",
+      "hw": "auto",
+      "info": false,
+      "live": false,
+      "measurement": {
+        "metric": "Odbiór w GUI, nie fizyczne odświeżenie monitora",
+        "platform": "offscreen",
+        "qt_ffmpeg_decoding_hw_device_types": null,
+        "host": "Windows-11-10.0.26200-SP0",
+        "resolution": [
+          1920,
+          1080
+        ],
+        "source_fps": 60,
+        "clock": "time.perf_counter",
+        "change_detection": "CRC32",
+        "live_change_detection": "CRC32 frame.pixels",
+        "pixel_probe": true,
+        "info": false,
+        "loss_estimate": "max(0, round(duration * source_fps) - changed_frames)",
+        "warmup_seconds": 1.0,
+        "requested_seconds": 8.0,
+        "live": false,
+        "live_cpu_note": "Nie mierzono CPU procesu potomnego; process_time obejmuje tylko player",
+        "results": [
+          {
+            "clips": 3,
+            "info_visible": false,
+            "duration_seconds": 8.029344499998842,
+            "streams": {
+              "base": {
+                "source_fps": 60,
+                "received_frames": 213,
+                "received_fps": 26.52769475765185,
+                "changed_frames": 213,
+                "changed_fps": 26.52769475765185,
+                "changed_interval_ms": {
+                  "p50": 31.521900004008785,
+                  "p95": 69.7980999975698,
+                  "max": 98.53899999870919
+                },
+                "estimated_lost_frames": 269,
+                "longest_silence_ms": 98.53899999870919
+              },
+              "clip_1": {
+                "source_fps": 60,
+                "received_frames": 73,
+                "received_fps": 9.091651254969882,
+                "changed_frames": 73,
+                "changed_fps": 9.091651254969882,
+                "changed_interval_ms": {
+                  "p50": 83.03690000320785,
+                  "p95": 265.36920000216924,
+                  "max": 415.4312000027858
+                },
+                "estimated_lost_frames": 409,
+                "longest_silence_ms": 415.4312000027858
+              },
+              "clip_2": {
+                "source_fps": 60,
+                "received_frames": 149,
+                "received_fps": 18.556932013568666,
+                "changed_frames": 149,
+                "changed_fps": 18.556932013568666,
+                "changed_interval_ms": {
+                  "p50": 51.45769999944605,
+                  "p95": 100.2574000012828,
+                  "max": 169.76509999949485
+                },
+                "estimated_lost_frames": 333,
+                "longest_silence_ms": 169.76509999949485
+              },
+              "clip_3": {
+                "source_fps": 60,
+                "received_frames": 41,
+                "received_fps": 5.106269882928291,
+                "changed_frames": 41,
+                "changed_fps": 5.106269882928291,
+                "changed_interval_ms": {
+                  "p50": 150.3478999948129,
+                  "p95": 366.15709999750834,
+                  "max": 515.6428999907803
+                },
+                "estimated_lost_frames": 441,
+                "longest_silence_ms": 515.6428999907803
+              }
+            },
+            "first_changed_after_release_ms": {
+              "base": 68.79720000142697,
+              "clip_1": 38.4044999955222,
+              "clip_2": 107.76590000023134,
+              "clip_3": 76.91079999494832
+            },
+            "start_spread_ms": 69.36140000470914,
+            "qt_timer_gap_ms": {
+              "p50": 30.450999998720363,
+              "p95": 32.08279999671504,
+              "max": 78.04059999762103
+            },
+            "qt_timer_delay_ms": {
+              "p50": 29.450999998720363,
+              "p95": 31.08279999671504,
+              "max": 77.04059999762103
+            },
+            "qt_timer_samples": 269,
+            "player_cpu_seconds": 10.0625,
+            "player_cpu_percent_one_core": 125.32156267552664,
+            "live_cpu_percent_one_core": null,
+            "errors": [],
+            "live_states": []
+          }
+        ],
+        "elapsed_seconds": 14.184108200002811
+      },
+      "log": "f5-crit8-matrix-pixel-auto-hidden-3.log"
+    },
+    {
+      "clips": 2,
+      "status": 0,
+      "elapsed": 16.02882820001105,
+      "id": "matrix-light-sw-live",
+      "probe": "lekka",
+      "hw": "off",
+      "info": true,
+      "live": true,
+      "measurement": {
+        "metric": "Odbiór w GUI, nie fizyczne odświeżenie monitora",
+        "platform": "offscreen",
+        "qt_ffmpeg_decoding_hw_device_types": ",",
+        "host": "Windows-11-10.0.26200-SP0",
+        "resolution": [
+          1920,
+          1080
+        ],
+        "source_fps": 60,
+        "clock": "time.perf_counter",
+        "change_detection": "startTime/endTime",
+        "live_change_detection": "CRC32 frame.pixels",
+        "pixel_probe": false,
+        "info": true,
+        "loss_estimate": "max(0, round(duration * source_fps) - changed_frames)",
+        "warmup_seconds": 1.0,
+        "requested_seconds": 8.0,
+        "live": true,
+        "live_cpu_note": "Nie mierzono CPU procesu potomnego; process_time obejmuje tylko player",
+        "results": [
+          {
+            "clips": 2,
+            "info_visible": true,
+            "duration_seconds": 8.033167700006743,
+            "streams": {
+              "base": {
+                "source_fps": 60,
+                "received_frames": 179,
+                "received_fps": 22.282617105061775,
+                "changed_frames": 179,
+                "changed_fps": 22.282617105061775,
+                "changed_interval_ms": {
+                  "p50": 29.039899993222207,
+                  "p95": 118.83249999664258,
+                  "max": 221.18580000824295
+                },
+                "estimated_lost_frames": 303,
+                "longest_silence_ms": 221.18580000824295
+              },
+              "clip_1": {
+                "source_fps": 60,
+                "received_frames": 150,
+                "received_fps": 18.672584166252882,
+                "changed_frames": 150,
+                "changed_fps": 18.672584166252882,
+                "changed_interval_ms": {
+                  "p50": 39.88500000559725,
+                  "p95": 153.2982000062475,
+                  "max": 289.74429999652784
+                },
+                "estimated_lost_frames": 332,
+                "longest_silence_ms": 289.74429999652784
+              },
+              "clip_2": {
+                "source_fps": 60,
+                "received_frames": 173,
+                "received_fps": 21.53571373841166,
+                "changed_frames": 173,
+                "changed_fps": 21.53571373841166,
+                "changed_interval_ms": {
+                  "p50": 33.256700000492856,
+                  "p95": 95.75279999990016,
+                  "max": 273.57050000864547
+                },
+                "estimated_lost_frames": 309,
+                "longest_silence_ms": 273.57050000864547
+              },
+              "live": {
+                "source_fps": 60,
+                "received_frames": 319,
+                "received_fps": 39.7103623268978,
+                "changed_frames": 277,
+                "changed_fps": 34.48203876034699,
+                "changed_interval_ms": {
+                  "p50": 25.894399994285777,
+                  "p95": 41.37340000306722,
+                  "max": 164.36749999411404
+                },
+                "estimated_lost_frames": 205,
+                "longest_silence_ms": 164.36749999411404
+              }
+            },
+            "first_changed_after_release_ms": {
+              "base": 106.96030000690371,
+              "clip_1": 79.73329999367706,
+              "clip_2": 31.97830000135582
+            },
+            "start_spread_ms": 74.98200000554789,
+            "qt_timer_gap_ms": {
+              "p50": 24.824599997373298,
+              "p95": 28.950699997949414,
+              "max": 45.30959999829065
+            },
+            "qt_timer_delay_ms": {
+              "p50": 23.824599997373298,
+              "p95": 27.950699997949414,
+              "max": 44.30959999829065
+            },
+            "qt_timer_samples": 359,
+            "player_cpu_seconds": 13.984375,
+            "player_cpu_percent_one_core": 174.0829461332951,
+            "live_cpu_percent_one_core": null,
+            "errors": [],
+            "live_states": [
+              "ready"
+            ]
+          }
+        ],
+        "elapsed_seconds": 15.486944699994638
+      },
+      "log": "f5-crit8-matrix-light-sw-live-2.log"
+    },
+    {
+      "clips": 3,
+      "status": "timeout65",
+      "elapsed": 65.03121269999247,
+      "id": "matrix-light-sw-live",
+      "probe": "lekka",
+      "hw": "off",
+      "info": true,
+      "live": true,
+      "measurement": null,
+      "log": "f5-crit8-matrix-light-sw-live-3.log"
+    },
+    {
+      "clips": 2,
+      "status": 0,
+      "elapsed": 15.993924499998684,
+      "id": "matrix-light-auto-hidden-live",
+      "probe": "lekka",
+      "hw": "auto",
+      "info": false,
+      "live": true,
+      "measurement": {
+        "metric": "Odbiór w GUI, nie fizyczne odświeżenie monitora",
+        "platform": "offscreen",
+        "qt_ffmpeg_decoding_hw_device_types": null,
+        "host": "Windows-11-10.0.26200-SP0",
+        "resolution": [
+          1920,
+          1080
+        ],
+        "source_fps": 60,
+        "clock": "time.perf_counter",
+        "change_detection": "startTime/endTime",
+        "live_change_detection": "CRC32 frame.pixels",
+        "pixel_probe": false,
+        "info": false,
+        "loss_estimate": "max(0, round(duration * source_fps) - changed_frames)",
+        "warmup_seconds": 1.0,
+        "requested_seconds": 8.0,
+        "live": true,
+        "live_cpu_note": "Nie mierzono CPU procesu potomnego; process_time obejmuje tylko player",
+        "results": [
+          {
+            "clips": 2,
+            "info_visible": false,
+            "duration_seconds": 8.011499799991725,
+            "streams": {
+              "base": {
+                "source_fps": 60,
+                "received_frames": 353,
+                "received_fps": 44.0616624617983,
+                "changed_frames": 353,
+                "changed_fps": 44.0616624617983,
+                "changed_interval_ms": {
+                  "p50": 19.65480000944808,
+                  "p95": 41.2347000092268,
+                  "max": 75.95909999508876
+                },
+                "estimated_lost_frames": 128,
+                "longest_silence_ms": 75.95909999508876
+              },
+              "clip_1": {
+                "source_fps": 60,
+                "received_frames": 330,
+                "received_fps": 41.19078927023637,
+                "changed_frames": 330,
+                "changed_fps": 41.19078927023637,
+                "changed_interval_ms": {
+                  "p50": 20.153099991148338,
+                  "p95": 40.82959999504965,
+                  "max": 69.65629999467637
+                },
+                "estimated_lost_frames": 151,
+                "longest_silence_ms": 69.65629999467637
+              },
+              "clip_2": {
+                "source_fps": 60,
+                "received_frames": 341,
+                "received_fps": 42.563815579244256,
+                "changed_frames": 341,
+                "changed_fps": 42.563815579244256,
+                "changed_interval_ms": {
+                  "p50": 19.870499992975965,
+                  "p95": 40.75939999893308,
+                  "max": 97.5717999972403
+                },
+                "estimated_lost_frames": 140,
+                "longest_silence_ms": 97.5717999972403
+              },
+              "live": {
+                "source_fps": 60,
+                "received_frames": 399,
+                "received_fps": 49.80340884492216,
+                "changed_frames": 352,
+                "changed_fps": 43.93684188825213,
+                "changed_interval_ms": {
+                  "p50": 19.654599993373267,
+                  "p95": 23.50690000457689,
+                  "max": 158.0229999963194
+                },
+                "estimated_lost_frames": 129,
+                "longest_silence_ms": 158.0229999963194
+              }
+            },
+            "first_changed_after_release_ms": {
+              "base": 32.803600013721734,
+              "clip_1": 32.820600012200885,
+              "clip_2": 32.81450000940822
+            },
+            "start_spread_ms": 0.016999998479150236,
+            "qt_timer_gap_ms": {
+              "p50": 18.150499992771074,
+              "p95": 21.360099999583326,
+              "max": 47.89689999597613
+            },
+            "qt_timer_delay_ms": {
+              "p50": 17.150499992771074,
+              "p95": 20.360099999583326,
+              "max": 46.89689999597613
+            },
+            "qt_timer_samples": 531,
+            "player_cpu_seconds": 8.71875,
+            "player_cpu_percent_one_core": 108.82793756056769,
+            "live_cpu_percent_one_core": null,
+            "errors": [],
+            "live_states": [
+              "ready"
+            ]
+          }
+        ],
+        "elapsed_seconds": 15.420419500005664
+      },
+      "log": "f5-crit8-matrix-light-auto-hidden-live-2.log"
+    },
+    {
+      "clips": 3,
+      "status": 0,
+      "elapsed": 16.88168210000731,
+      "id": "matrix-light-auto-hidden-live",
+      "probe": "lekka",
+      "hw": "auto",
+      "info": false,
+      "live": true,
+      "measurement": {
+        "metric": "Odbiór w GUI, nie fizyczne odświeżenie monitora",
+        "platform": "offscreen",
+        "qt_ffmpeg_decoding_hw_device_types": null,
+        "host": "Windows-11-10.0.26200-SP0",
+        "resolution": [
+          1920,
+          1080
+        ],
+        "source_fps": 60,
+        "clock": "time.perf_counter",
+        "change_detection": "startTime/endTime",
+        "live_change_detection": "CRC32 frame.pixels",
+        "pixel_probe": false,
+        "info": false,
+        "loss_estimate": "max(0, round(duration * source_fps) - changed_frames)",
+        "warmup_seconds": 1.0,
+        "requested_seconds": 8.0,
+        "live": true,
+        "live_cpu_note": "Nie mierzono CPU procesu potomnego; process_time obejmuje tylko player",
+        "results": [
+          {
+            "clips": 3,
+            "info_visible": false,
+            "duration_seconds": 8.011247200003709,
+            "streams": {
+              "base": {
+                "source_fps": 60,
+                "received_frames": 247,
+                "received_fps": 30.8316537779393,
+                "changed_frames": 247,
+                "changed_fps": 30.8316537779393,
+                "changed_interval_ms": {
+                  "p50": 25.2862999914214,
+                  "p95": 50.84520000673365,
+                  "max": 150.75139999680687
+                },
+                "estimated_lost_frames": 234,
+                "longest_silence_ms": 150.75139999680687
+              },
+              "clip_1": {
+                "source_fps": 60,
+                "received_frames": 225,
+                "received_fps": 28.085514575045924,
+                "changed_frames": 225,
+                "changed_fps": 28.085514575045924,
+                "changed_interval_ms": {
+                  "p50": 25.916400001733564,
+                  "p95": 51.543699999456294,
+                  "max": 104.31769999559037
+                },
+                "estimated_lost_frames": 256,
+                "longest_silence_ms": 104.31769999559037
+              },
+              "clip_2": {
+                "source_fps": 60,
+                "received_frames": 239,
+                "received_fps": 29.83305770415989,
+                "changed_frames": 239,
+                "changed_fps": 29.83305770415989,
+                "changed_interval_ms": {
+                  "p50": 25.505099998554215,
+                  "p95": 51.14139999204781,
+                  "max": 119.61690000316594
+                },
+                "estimated_lost_frames": 242,
+                "longest_silence_ms": 119.61690000316594
+              },
+              "clip_3": {
+                "source_fps": 60,
+                "received_frames": 266,
+                "received_fps": 33.2033194531654,
+                "changed_frames": 266,
+                "changed_fps": 33.2033194531654,
+                "changed_interval_ms": {
+                  "p50": 25.068400005693547,
+                  "p95": 51.035500000580214,
+                  "max": 84.23929999116808
+                },
+                "estimated_lost_frames": 215,
+                "longest_silence_ms": 84.23929999116808
+              },
+              "live": {
+                "source_fps": 60,
+                "received_frames": 317,
+                "received_fps": 39.569369423509144,
+                "changed_frames": 281,
+                "changed_fps": 35.0756870915018,
+                "changed_interval_ms": {
+                  "p50": 24.7728999966057,
+                  "p95": 29.64599999540951,
+                  "max": 217.8734000044642
+                },
+                "estimated_lost_frames": 200,
+                "longest_silence_ms": 217.8734000044642
+              }
+            },
+            "first_changed_after_release_ms": {
+              "base": 28.16509999684058,
+              "clip_1": 28.137999994214624,
+              "clip_2": 28.173500002594665,
+              "clip_3": 28.17989999311976
+            },
+            "start_spread_ms": 0.04189999890513718,
+            "qt_timer_gap_ms": {
+              "p50": 24.22770000703167,
+              "p95": 26.345600010245107,
+              "max": 78.69890000438318
+            },
+            "qt_timer_delay_ms": {
+              "p50": 23.22770000703167,
+              "p95": 25.345600010245107,
+              "max": 77.69890000438318
+            },
+            "qt_timer_samples": 366,
+            "player_cpu_seconds": 9.25,
+            "player_cpu_percent_one_core": 115.46267103074435,
+            "live_cpu_percent_one_core": null,
+            "errors": [],
+            "live_states": [
+              "ready"
+            ]
+          }
+        ],
+        "elapsed_seconds": 16.298604099996737
+      },
+      "log": "f5-crit8-matrix-light-auto-hidden-live-3.log"
+    }
+  ]
+}

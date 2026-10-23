@@ -1,0 +1,2978 @@
+
+THREAD 28988 0x713c
+0x7ff843601dd4 ntdll.dll NtWaitForSingleObject + 0x14
+0x7ff8406abe9f KERNELBASE.dll WaitForSingleObjectEx + 0xaf
+0x7ff826ee87be nvwgf2umx.dll SetDependencyInfo + 0x69dde
+0x7ff826ee8aa1 nvwgf2umx.dll SetDependencyInfo + 0x6a0c1
+0x7ff826ee9300 nvwgf2umx.dll SetDependencyInfo + 0x6a920
+0x7ff826ee9762 nvwgf2umx.dll SetDependencyInfo + 0x6ad82
+0x7ff826eebd49 nvwgf2umx.dll SetDependencyInfo + 0x6d369
+0x7ff826ee18bf nvwgf2umx.dll SetDependencyInfo + 0x62edf
+0x7ff83ca91ea7 d3d11.dll D3DKMTOpenResource + 0xd2227
+0x7ff83ca91c4a d3d11.dll D3DKMTOpenResource + 0xd1fca
+0x7ff83ca81daa d3d11.dll D3DKMTOpenResource + 0xc212a
+0x7fffbfa136c1 avutil-61.dll av_hwframe_transfer_get_formats + 0xcc1
+0x7fffbfa13011 avutil-61.dll av_hwframe_transfer_get_formats + 0x611
+0x7fffd509b6d3 ffmpegmediaplugin.dll qt_plugin_query_metadata_v2 + 0x4a163
+0x7ff80b92504e Qt6Multimedia.dll QVideoFrame::map + 0xce
+0x7ff80b925682 Qt6Multimedia.dll QVideoFrame::paint + 0x342
+0x7ff8258f2993 Qt6MultimediaWidgets.dll QGraphicsVideoItem::paint + 0x53
+0x7ff80f67bdb7 QtMultimediaWidgets.pyd ? + 0xbdb7
+0x7fff705dcc44 Qt6Widgets.dll QGraphicsScene::dragMoveEvent + 0xaa4
+0x7fff705df56c Qt6Widgets.dll QGraphicsScene::drawItems + 0xd3c
+0x7fff705decca Qt6Widgets.dll QGraphicsScene::drawItems + 0x49a
+0x7fff705fbeaa Qt6Widgets.dll QGraphicsViewPrivate::~QGraphicsViewPrivate + 0x6aa
+0x7fff7060319f Qt6Widgets.dll QGraphicsView::paintEvent + 0x27f
+0x7ff80bc3f1cb QtWidgets.pyd PyInit_QtWidgets + 0x20e49b
+0x7fff7029852f Qt6Widgets.dll QWidget::event + 0x60f
+0x7fff702f72e3 Qt6Widgets.dll QFrame::event + 0x33
+0x7fff706086d0 Qt6Widgets.dll QGraphicsView::viewportEvent + 0x5b0
+0x7ff80bc42a43 QtWidgets.pyd PyInit_QtWidgets + 0x211d13
+0x7fff6d209a57 Qt6Core.dll QCoreApplicationPrivate::sendThroughObjectEventFilters + 0xd7
+0x7fff70252f8b Qt6Widgets.dll QApplicationPrivate::notify_helper + 0x13b
+0x7fff70251f8e Qt6Widgets.dll QApplication::notify + 0x161e
+0x7ff80bd56d9f QtWidgets.pyd PyInit_QtWidgets + 0x32606f
+0x7fff6d206e61 Qt6Core.dll QCoreApplication::notifyInternal2 + 0x101
+0x7fff70297815 Qt6Widgets.dll QWidgetPrivate::drawWidget + 0xcf5
+0x7fff702b9d30 Qt6Widgets.dll QWidgetRepaintManager::paintAndFlush + 0x11f0
+0x7fff70298919 Qt6Widgets.dll QWidget::event + 0x9f9
+0x7ff80ba6f373 QtWidgets.pyd PyInit_QtWidgets + 0x3e643
+0x7fff70252fa6 Qt6Widgets.dll QApplicationPrivate::notify_helper + 0x156
+0x7fff70251f8e Qt6Widgets.dll QApplication::notify + 0x161e
+0x7ff80bd56d9f QtWidgets.pyd PyInit_QtWidgets + 0x32606f
+0x7fff6d206e61 Qt6Core.dll QCoreApplication::notifyInternal2 + 0x101
+0x7fff6d209729 Qt6Core.dll QCoreApplicationPrivate::sendPostedEvents + 0x249
+0x7fff705d7989 Qt6Widgets.dll QGraphicsScene::~QGraphicsScene + 0x2039
+0x7fff6d256719 Qt6Core.dll QMetaCallEvent::placeMetaCall + 0x89
+0x7fff6d254055 Qt6Core.dll QObject::event + 0x185
+0x7fff705e0b09 Qt6Widgets.dll QGraphicsScene::event + 0x7e9
+0x7ff80bc36f14 QtWidgets.pyd PyInit_QtWidgets + 0x2061e4
+0x7fff70252fa6 Qt6Widgets.dll QApplicationPrivate::notify_helper + 0x156
+0x7fff70251f8e Qt6Widgets.dll QApplication::notify + 0x161e
+0x7ff80bd56d9f QtWidgets.pyd PyInit_QtWidgets + 0x32606f
+0x7fff6d206e61 Qt6Core.dll QCoreApplication::notifyInternal2 + 0x101
+0x7fff6d209729 Qt6Core.dll QCoreApplicationPrivate::sendPostedEvents + 0x249
+0x7fff6d3ad77e Qt6Core.dll QEventDispatcherWin32::processEvents + 0x9e
+0x7ff81dd178b2 qoffscreen.dll qt_plugin_query_metadata_v2 + 0x65e2
+0x7fff6d20d5a4 Qt6Core.dll QEventLoop::exec + 0x1d4
+0x7fff6d20539a Qt6Core.dll QCoreApplication::exec + 0x16a
+0x7ff80bd31fd3 QtWidgets.pyd PyInit_QtWidgets + 0x3012a3
+0x7fffd657fb59 python313.dll PyObject_Vectorcall + 0x839
+0x7fffd657f355 python313.dll PyObject_Vectorcall + 0x35
+0x7fffd6584806 python313.dll PyEval_EvalFrameDefault + 0x3786
+0x7fffd65e17a8 python313.dll PyEval_EvalCode + 0x1e4
+0x7fffd65e1671 python313.dll PyEval_EvalCode + 0xad
+0x7fffd65e1211 python313.dll PyAST_Compile + 0x955
+0x7fffd65e07ac python313.dll PyArena_Free + 0x134
+0x7fffd65ba997 python313.dll PyDict_PopString + 0x3c3
+0x7fffd65ba30c python313.dll PyImport_GetMagicNumber + 0x1c0
+0x7fffd65ba12d python313.dll PyEval_MakePendingCalls + 0xf1
+0x7fffd65b87be python313.dll Py_dup + 0x20a
+0x7fffd65b869f python313.dll Py_dup + 0xeb
+0x7fffd65705d9 python313.dll Py_RunMain + 0x241
+0x7fffd65703ad python313.dll Py_RunMain + 0x15
+0x7fffd6621501 python313.dll Py_Main + 0x25
+0x7ff7cb3e1230 python.exe ? + 0x1230
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 36348 0x8dfc
+0x7ff843605a24 ntdll.dll NtWaitForWorkViaWorkerFactory + 0x14
+0x7ff8434c4d0e ntdll.dll TpCallbackMayRunLong + 0x1a0e
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 18236 0x473c
+0x7ff843605a24 ntdll.dll NtWaitForWorkViaWorkerFactory + 0x14
+0x7ff8434c4d0e ntdll.dll TpCallbackMayRunLong + 0x1a0e
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 13956 0x3684
+0x7ff843605a24 ntdll.dll NtWaitForWorkViaWorkerFactory + 0x14
+0x7ff8434c4d0e ntdll.dll TpCallbackMayRunLong + 0x1a0e
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 4324 0x10e4
+0x7ff843601dd4 ntdll.dll NtWaitForSingleObject + 0x14
+0x7ff8406abe9f KERNELBASE.dll WaitForSingleObjectEx + 0xaf
+0x7fff6d396c7e Qt6Core.dll QWaitCondition::wait + 0x8e
+0x7fff6d2fd4b8 Qt6Core.dll QThreadPoolPrivate::reset + 0x838
+0x7fff6d3bbbd8 Qt6Core.dll QThread::start + 0x5b8
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 24952 0x6178
+0x7ff843601dd4 ntdll.dll NtWaitForSingleObject + 0x14
+0x7ff8406abe9f KERNELBASE.dll WaitForSingleObjectEx + 0xaf
+0x7fff6d396c7e Qt6Core.dll QWaitCondition::wait + 0x8e
+0x7fff6d2fd4b8 Qt6Core.dll QThreadPoolPrivate::reset + 0x838
+0x7fff6d3bbbd8 Qt6Core.dll QThread::start + 0x5b8
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 36492 0x8e8c
+0x7ff843601dd4 ntdll.dll NtWaitForSingleObject + 0x14
+0x7ff8406abe9f KERNELBASE.dll WaitForSingleObjectEx + 0xaf
+0x7fff6d396c7e Qt6Core.dll QWaitCondition::wait + 0x8e
+0x7fff6d2fd4b8 Qt6Core.dll QThreadPoolPrivate::reset + 0x838
+0x7fff6d3bbbd8 Qt6Core.dll QThread::start + 0x5b8
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 43164 0xa89c
+0x7ff843601dd4 ntdll.dll NtWaitForSingleObject + 0x14
+0x7ff8406abe9f KERNELBASE.dll WaitForSingleObjectEx + 0xaf
+0x7fff6d396c7e Qt6Core.dll QWaitCondition::wait + 0x8e
+0x7fff6d2fd4b8 Qt6Core.dll QThreadPoolPrivate::reset + 0x838
+0x7fff6d3bbbd8 Qt6Core.dll QThread::start + 0x5b8
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 44028 0xabfc
+0x7ff843601dd4 ntdll.dll NtWaitForSingleObject + 0x14
+0x7ff8406abe9f KERNELBASE.dll WaitForSingleObjectEx + 0xaf
+0x7fff6d396c7e Qt6Core.dll QWaitCondition::wait + 0x8e
+0x7fff6d2fd4b8 Qt6Core.dll QThreadPoolPrivate::reset + 0x838
+0x7fff6d3bbbd8 Qt6Core.dll QThread::start + 0x5b8
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 16072 0x3ec8
+0x7ff843601dd4 ntdll.dll NtWaitForSingleObject + 0x14
+0x7ff8406abe9f KERNELBASE.dll WaitForSingleObjectEx + 0xaf
+0x7fff6d396c7e Qt6Core.dll QWaitCondition::wait + 0x8e
+0x7fff6d2fd4b8 Qt6Core.dll QThreadPoolPrivate::reset + 0x838
+0x7fff6d3bbbd8 Qt6Core.dll QThread::start + 0x5b8
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 39288 0x9978
+0x7ff843601dd4 ntdll.dll NtWaitForSingleObject + 0x14
+0x7ff8406abe9f KERNELBASE.dll WaitForSingleObjectEx + 0xaf
+0x7fff6d396c7e Qt6Core.dll QWaitCondition::wait + 0x8e
+0x7fff6d2fd4b8 Qt6Core.dll QThreadPoolPrivate::reset + 0x838
+0x7fff6d3bbbd8 Qt6Core.dll QThread::start + 0x5b8
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 24288 0x5ee0
+0x7ff843601dd4 ntdll.dll NtWaitForSingleObject + 0x14
+0x7ff8406abe9f KERNELBASE.dll WaitForSingleObjectEx + 0xaf
+0x7fff6d396c7e Qt6Core.dll QWaitCondition::wait + 0x8e
+0x7fff6d2fd4b8 Qt6Core.dll QThreadPoolPrivate::reset + 0x838
+0x7fff6d3bbbd8 Qt6Core.dll QThread::start + 0x5b8
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 41304 0xa158
+0x7ff843605a24 ntdll.dll NtWaitForWorkViaWorkerFactory + 0x14
+0x7ff8434c4d0e ntdll.dll TpCallbackMayRunLong + 0x1a0e
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 33516 0x82ec
+0x7ff8436028a4 ntdll.dll ZwWaitForMultipleObjects + 0x14
+0x7ff8406b2773 KERNELBASE.dll WaitForMultipleObjectsEx + 0x123
+0x7ff841869abe combase.dll CoRegisterInitializeSpy + 0xd3e
+0x7ff84186231f combase.dll RoParameterizedTypeExtraGetTypeSignature + 0x56f
+0x7ff84186222f combase.dll RoParameterizedTypeExtraGetTypeSignature + 0x47f
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 27608 0x6bd8
+0x7ff843605a24 ntdll.dll NtWaitForWorkViaWorkerFactory + 0x14
+0x7ff8434c4d0e ntdll.dll TpCallbackMayRunLong + 0x1a0e
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 21116 0x527c
+0x7ff8436028a4 ntdll.dll ZwWaitForMultipleObjects + 0x14
+0x7ff8406b2773 KERNELBASE.dll WaitForMultipleObjectsEx + 0x123
+0x7ff84100b357 CRYPT32.dll I_CryptWalkAllLruCacheEntries + 0x147
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 43564 0xaa2c
+0x7ff843601dd4 ntdll.dll NtWaitForSingleObject + 0x14
+0x7ff8406abe9f KERNELBASE.dll WaitForSingleObjectEx + 0xaf
+0x7ff8272b7d70 nvwgf2umx.dll NVDEV_Thunk + 0x245f0
+0x7ff82780a2aa nvwgf2umx.dll NVDEV_Thunk + 0x576b2a
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 26424 0x6738
+0x7ff8436028a4 ntdll.dll ZwWaitForMultipleObjects + 0x14
+0x7ff8406b2773 KERNELBASE.dll WaitForMultipleObjectsEx + 0x123
+0x7ff8406b2641 KERNELBASE.dll WaitForMultipleObjects + 0x11
+0x7ff826aa2c36 nvwgf2umx.dll NVAPI_DirectMethods + 0x32d16
+0x7ff82780a2aa nvwgf2umx.dll NVDEV_Thunk + 0x576b2a
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 19652 0x4cc4
+0x7ff843601dd4 ntdll.dll NtWaitForSingleObject + 0x14
+0x7ff8406abe9f KERNELBASE.dll WaitForSingleObjectEx + 0xaf
+0x7ff82731ba4f nvwgf2umx.dll NVDEV_Thunk + 0x882cf
+0x7ff82780a2aa nvwgf2umx.dll NVDEV_Thunk + 0x576b2a
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 38876 0x97dc
+0x7ff843601dd4 ntdll.dll NtWaitForSingleObject + 0x14
+0x7ff8406abe9f KERNELBASE.dll WaitForSingleObjectEx + 0xaf
+0x7ff827293238 nvwgf2umx.dll OpenAdapter12 + 0x159d88
+0x7ff82729315f nvwgf2umx.dll OpenAdapter12 + 0x159caf
+0x7ff82780a2aa nvwgf2umx.dll NVDEV_Thunk + 0x576b2a
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 22380 0x576c
+0x7ff843601dd4 ntdll.dll NtWaitForSingleObject + 0x14
+0x7ff8406abe9f KERNELBASE.dll WaitForSingleObjectEx + 0xaf
+0x7ff827293238 nvwgf2umx.dll OpenAdapter12 + 0x159d88
+0x7ff82729315f nvwgf2umx.dll OpenAdapter12 + 0x159caf
+0x7ff82780a2aa nvwgf2umx.dll NVDEV_Thunk + 0x576b2a
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 42436 0xa5c4
+0x7ff843601dd4 ntdll.dll NtWaitForSingleObject + 0x14
+0x7ff8406abe9f KERNELBASE.dll WaitForSingleObjectEx + 0xaf
+0x7ff827293238 nvwgf2umx.dll OpenAdapter12 + 0x159d88
+0x7ff82729315f nvwgf2umx.dll OpenAdapter12 + 0x159caf
+0x7ff82780a2aa nvwgf2umx.dll NVDEV_Thunk + 0x576b2a
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 38128 0x94f0
+0x7ff843601dd4 ntdll.dll NtWaitForSingleObject + 0x14
+0x7ff8406abe9f KERNELBASE.dll WaitForSingleObjectEx + 0xaf
+0x7ff827293238 nvwgf2umx.dll OpenAdapter12 + 0x159d88
+0x7ff82729315f nvwgf2umx.dll OpenAdapter12 + 0x159caf
+0x7ff82780a2aa nvwgf2umx.dll NVDEV_Thunk + 0x576b2a
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 37676 0x932c
+0x7ff843601dd4 ntdll.dll NtWaitForSingleObject + 0x14
+0x7ff8406abe9f KERNELBASE.dll WaitForSingleObjectEx + 0xaf
+0x7ff827293238 nvwgf2umx.dll OpenAdapter12 + 0x159d88
+0x7ff82729315f nvwgf2umx.dll OpenAdapter12 + 0x159caf
+0x7ff82780a2aa nvwgf2umx.dll NVDEV_Thunk + 0x576b2a
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 9616 0x2590
+0x7ff843601dd4 ntdll.dll NtWaitForSingleObject + 0x14
+0x7ff8406abe9f KERNELBASE.dll WaitForSingleObjectEx + 0xaf
+0x7ff827293238 nvwgf2umx.dll OpenAdapter12 + 0x159d88
+0x7ff82729315f nvwgf2umx.dll OpenAdapter12 + 0x159caf
+0x7ff82780a2aa nvwgf2umx.dll NVDEV_Thunk + 0x576b2a
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 37400 0x9218
+0x7ff843601dd4 ntdll.dll NtWaitForSingleObject + 0x14
+0x7ff8406abe9f KERNELBASE.dll WaitForSingleObjectEx + 0xaf
+0x7ff827293238 nvwgf2umx.dll OpenAdapter12 + 0x159d88
+0x7ff82729315f nvwgf2umx.dll OpenAdapter12 + 0x159caf
+0x7ff82780a2aa nvwgf2umx.dll NVDEV_Thunk + 0x576b2a
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 644 0x284
+0x7ff843601dd4 ntdll.dll NtWaitForSingleObject + 0x14
+0x7ff8406abe9f KERNELBASE.dll WaitForSingleObjectEx + 0xaf
+0x7ff827293238 nvwgf2umx.dll OpenAdapter12 + 0x159d88
+0x7ff82729315f nvwgf2umx.dll OpenAdapter12 + 0x159caf
+0x7ff82780a2aa nvwgf2umx.dll NVDEV_Thunk + 0x576b2a
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 38124 0x94ec
+0x7ff843601dd4 ntdll.dll NtWaitForSingleObject + 0x14
+0x7ff8406abe9f KERNELBASE.dll WaitForSingleObjectEx + 0xaf
+0x7ff827293238 nvwgf2umx.dll OpenAdapter12 + 0x159d88
+0x7ff82729315f nvwgf2umx.dll OpenAdapter12 + 0x159caf
+0x7ff82780a2aa nvwgf2umx.dll NVDEV_Thunk + 0x576b2a
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 43132 0xa87c
+0x7ff843601dd4 ntdll.dll NtWaitForSingleObject + 0x14
+0x7ff8406abe9f KERNELBASE.dll WaitForSingleObjectEx + 0xaf
+0x7ff827293238 nvwgf2umx.dll OpenAdapter12 + 0x159d88
+0x7ff82729315f nvwgf2umx.dll OpenAdapter12 + 0x159caf
+0x7ff82780a2aa nvwgf2umx.dll NVDEV_Thunk + 0x576b2a
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 42608 0xa670
+0x7ff843601dd4 ntdll.dll NtWaitForSingleObject + 0x14
+0x7ff8406abe9f KERNELBASE.dll WaitForSingleObjectEx + 0xaf
+0x7ff827293238 nvwgf2umx.dll OpenAdapter12 + 0x159d88
+0x7ff82729315f nvwgf2umx.dll OpenAdapter12 + 0x159caf
+0x7ff82780a2aa nvwgf2umx.dll NVDEV_Thunk + 0x576b2a
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 38932 0x9814
+0x7ff843601dd4 ntdll.dll NtWaitForSingleObject + 0x14
+0x7ff8406abe9f KERNELBASE.dll WaitForSingleObjectEx + 0xaf
+0x7ff827293238 nvwgf2umx.dll OpenAdapter12 + 0x159d88
+0x7ff82729315f nvwgf2umx.dll OpenAdapter12 + 0x159caf
+0x7ff82780a2aa nvwgf2umx.dll NVDEV_Thunk + 0x576b2a
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 19184 0x4af0
+0x7ff843601dd4 ntdll.dll NtWaitForSingleObject + 0x14
+0x7ff8406abe9f KERNELBASE.dll WaitForSingleObjectEx + 0xaf
+0x7ff826ee898e nvwgf2umx.dll SetDependencyInfo + 0x69fae
+0x7ff826ee8305 nvwgf2umx.dll SetDependencyInfo + 0x69925
+0x7ff826edcb4d nvwgf2umx.dll SetDependencyInfo + 0x5e16d
+0x7ff8273f24da nvwgf2umx.dll NVDEV_Thunk + 0x15ed5a
+0x7ff82780a2aa nvwgf2umx.dll NVDEV_Thunk + 0x576b2a
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 7680 0x1e00
+0x7ff843601dd4 ntdll.dll NtWaitForSingleObject + 0x14
+0x7ff8406abe9f KERNELBASE.dll WaitForSingleObjectEx + 0xaf
+0x7ff827293238 nvwgf2umx.dll OpenAdapter12 + 0x159d88
+0x7ff82729315f nvwgf2umx.dll OpenAdapter12 + 0x159caf
+0x7ff82780a2aa nvwgf2umx.dll NVDEV_Thunk + 0x576b2a
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 39056 0x9890
+0x7ff8436059c4 ntdll.dll ZwWaitForAlertByThreadId + 0x14
+0x7ff8434f97be ntdll.dll RtlSleepConditionVariableSRW + 0x1de
+0x7ff8406b2a58 KERNELBASE.dll SleepConditionVariableSRW + 0x38
+0x7fff51035d00 avcodec-63.dll av_parser_iterate + 0x23c20
+0x7fff50cd7813 avcodec-63.dll avcodec_send_frame + 0xf4d3
+0x7fff513a38bf avcodec-63.dll avpriv_split_xiph_headers + 0x27d0f
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 21696 0x54c0
+0x7ff8436059c4 ntdll.dll ZwWaitForAlertByThreadId + 0x14
+0x7ff8434f97be ntdll.dll RtlSleepConditionVariableSRW + 0x1de
+0x7ff8406b2a58 KERNELBASE.dll SleepConditionVariableSRW + 0x38
+0x7fff51035d00 avcodec-63.dll av_parser_iterate + 0x23c20
+0x7fff50cd7813 avcodec-63.dll avcodec_send_frame + 0xf4d3
+0x7fff513a38bf avcodec-63.dll avpriv_split_xiph_headers + 0x27d0f
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 43516 0xa9fc
+0x7ff8436059c4 ntdll.dll ZwWaitForAlertByThreadId + 0x14
+0x7ff8434f97be ntdll.dll RtlSleepConditionVariableSRW + 0x1de
+0x7ff8406b2a58 KERNELBASE.dll SleepConditionVariableSRW + 0x38
+0x7fff51035d00 avcodec-63.dll av_parser_iterate + 0x23c20
+0x7fff50cd7813 avcodec-63.dll avcodec_send_frame + 0xf4d3
+0x7fff513a38bf avcodec-63.dll avpriv_split_xiph_headers + 0x27d0f
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 27132 0x69fc
+0x7ff8436059c4 ntdll.dll ZwWaitForAlertByThreadId + 0x14
+0x7ff8434f97be ntdll.dll RtlSleepConditionVariableSRW + 0x1de
+0x7ff8406b2a58 KERNELBASE.dll SleepConditionVariableSRW + 0x38
+0x7fff51035d00 avcodec-63.dll av_parser_iterate + 0x23c20
+0x7fff50cd7813 avcodec-63.dll avcodec_send_frame + 0xf4d3
+0x7fff513a38bf avcodec-63.dll avpriv_split_xiph_headers + 0x27d0f
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 580 0x244
+0x7ff8436059c4 ntdll.dll ZwWaitForAlertByThreadId + 0x14
+0x7ff8434f97be ntdll.dll RtlSleepConditionVariableSRW + 0x1de
+0x7ff8406b2a58 KERNELBASE.dll SleepConditionVariableSRW + 0x38
+0x7fff51035d00 avcodec-63.dll av_parser_iterate + 0x23c20
+0x7fff50cd7813 avcodec-63.dll avcodec_send_frame + 0xf4d3
+0x7fff513a38bf avcodec-63.dll avpriv_split_xiph_headers + 0x27d0f
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 39032 0x9878
+0x7ff8436059c4 ntdll.dll ZwWaitForAlertByThreadId + 0x14
+0x7ff8434f97be ntdll.dll RtlSleepConditionVariableSRW + 0x1de
+0x7ff8406b2a58 KERNELBASE.dll SleepConditionVariableSRW + 0x38
+0x7fff51035d00 avcodec-63.dll av_parser_iterate + 0x23c20
+0x7fff50cd7813 avcodec-63.dll avcodec_send_frame + 0xf4d3
+0x7fff513a38bf avcodec-63.dll avpriv_split_xiph_headers + 0x27d0f
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 39220 0x9934
+0x7ff8436059c4 ntdll.dll ZwWaitForAlertByThreadId + 0x14
+0x7ff8434f97be ntdll.dll RtlSleepConditionVariableSRW + 0x1de
+0x7ff8406b2a58 KERNELBASE.dll SleepConditionVariableSRW + 0x38
+0x7fff51035d00 avcodec-63.dll av_parser_iterate + 0x23c20
+0x7fff50cd7813 avcodec-63.dll avcodec_send_frame + 0xf4d3
+0x7fff513a38bf avcodec-63.dll avpriv_split_xiph_headers + 0x27d0f
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 42768 0xa710
+0x7ff8436059c4 ntdll.dll ZwWaitForAlertByThreadId + 0x14
+0x7ff8434f97be ntdll.dll RtlSleepConditionVariableSRW + 0x1de
+0x7ff8406b2a58 KERNELBASE.dll SleepConditionVariableSRW + 0x38
+0x7fff51035d00 avcodec-63.dll av_parser_iterate + 0x23c20
+0x7fff50cd7813 avcodec-63.dll avcodec_send_frame + 0xf4d3
+0x7fff513a38bf avcodec-63.dll avpriv_split_xiph_headers + 0x27d0f
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 37680 0x9330
+0x7ff8436059c4 ntdll.dll ZwWaitForAlertByThreadId + 0x14
+0x7ff8434f97be ntdll.dll RtlSleepConditionVariableSRW + 0x1de
+0x7ff8406b2a58 KERNELBASE.dll SleepConditionVariableSRW + 0x38
+0x7fff51035d00 avcodec-63.dll av_parser_iterate + 0x23c20
+0x7fff50cd7813 avcodec-63.dll avcodec_send_frame + 0xf4d3
+0x7fff513a38bf avcodec-63.dll avpriv_split_xiph_headers + 0x27d0f
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 42480 0xa5f0
+0x7ff8436059c4 ntdll.dll ZwWaitForAlertByThreadId + 0x14
+0x7ff8434f97be ntdll.dll RtlSleepConditionVariableSRW + 0x1de
+0x7ff8406b2a58 KERNELBASE.dll SleepConditionVariableSRW + 0x38
+0x7fff51035d00 avcodec-63.dll av_parser_iterate + 0x23c20
+0x7fff50cd7813 avcodec-63.dll avcodec_send_frame + 0xf4d3
+0x7fff513a38bf avcodec-63.dll avpriv_split_xiph_headers + 0x27d0f
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 42788 0xa724
+0x7ff8436059c4 ntdll.dll ZwWaitForAlertByThreadId + 0x14
+0x7ff8434f97be ntdll.dll RtlSleepConditionVariableSRW + 0x1de
+0x7ff8406b2a58 KERNELBASE.dll SleepConditionVariableSRW + 0x38
+0x7fff51035d00 avcodec-63.dll av_parser_iterate + 0x23c20
+0x7fff50cd7813 avcodec-63.dll avcodec_send_frame + 0xf4d3
+0x7fff513a38bf avcodec-63.dll avpriv_split_xiph_headers + 0x27d0f
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 40128 0x9cc0
+0x7ff8436059c4 ntdll.dll ZwWaitForAlertByThreadId + 0x14
+0x7ff8434f97be ntdll.dll RtlSleepConditionVariableSRW + 0x1de
+0x7ff8406b2a58 KERNELBASE.dll SleepConditionVariableSRW + 0x38
+0x7fff51035d00 avcodec-63.dll av_parser_iterate + 0x23c20
+0x7fff50cd7813 avcodec-63.dll avcodec_send_frame + 0xf4d3
+0x7fff513a38bf avcodec-63.dll avpriv_split_xiph_headers + 0x27d0f
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 29412 0x72e4
+0x7ff8436059c4 ntdll.dll ZwWaitForAlertByThreadId + 0x14
+0x7ff8434f97be ntdll.dll RtlSleepConditionVariableSRW + 0x1de
+0x7ff8406b2a58 KERNELBASE.dll SleepConditionVariableSRW + 0x38
+0x7fff51035d00 avcodec-63.dll av_parser_iterate + 0x23c20
+0x7fff50cd7813 avcodec-63.dll avcodec_send_frame + 0xf4d3
+0x7fff513a38bf avcodec-63.dll avpriv_split_xiph_headers + 0x27d0f
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 12220 0x2fbc
+0x7ff8436059c4 ntdll.dll ZwWaitForAlertByThreadId + 0x14
+0x7ff8434f97be ntdll.dll RtlSleepConditionVariableSRW + 0x1de
+0x7ff8406b2a58 KERNELBASE.dll SleepConditionVariableSRW + 0x38
+0x7fff51035d00 avcodec-63.dll av_parser_iterate + 0x23c20
+0x7fff50cd7813 avcodec-63.dll avcodec_send_frame + 0xf4d3
+0x7fff513a38bf avcodec-63.dll avpriv_split_xiph_headers + 0x27d0f
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 15672 0x3d38
+0x7ff8436059c4 ntdll.dll ZwWaitForAlertByThreadId + 0x14
+0x7ff8434f97be ntdll.dll RtlSleepConditionVariableSRW + 0x1de
+0x7ff8406b2a58 KERNELBASE.dll SleepConditionVariableSRW + 0x38
+0x7fff51035d00 avcodec-63.dll av_parser_iterate + 0x23c20
+0x7fff50cd7813 avcodec-63.dll avcodec_send_frame + 0xf4d3
+0x7fff513a38bf avcodec-63.dll avpriv_split_xiph_headers + 0x27d0f
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 7292 0x1c7c
+0x7ff8436059c4 ntdll.dll ZwWaitForAlertByThreadId + 0x14
+0x7ff8434f97be ntdll.dll RtlSleepConditionVariableSRW + 0x1de
+0x7ff8406b2a58 KERNELBASE.dll SleepConditionVariableSRW + 0x38
+0x7fff51035d00 avcodec-63.dll av_parser_iterate + 0x23c20
+0x7fff50cd7813 avcodec-63.dll avcodec_send_frame + 0xf4d3
+0x7fff513a38bf avcodec-63.dll avpriv_split_xiph_headers + 0x27d0f
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 32952 0x80b8
+0x7ff840ccaf04 win32u.dll NtUserMsgWaitForMultipleObjectsEx + 0x14
+0x7fff6d3add7f Qt6Core.dll QEventDispatcherWin32::processEvents + 0x69f
+0x7fff6d20d5a4 Qt6Core.dll QEventLoop::exec + 0x1d4
+0x7fff6d2f9c67 Qt6Core.dll QThread::exec + 0xc7
+0x7fff6d3bbbd8 Qt6Core.dll QThread::start + 0x5b8
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 42496 0xa600
+0x7ff840ccaf04 win32u.dll NtUserMsgWaitForMultipleObjectsEx + 0x14
+0x7fff6d3add7f Qt6Core.dll QEventDispatcherWin32::processEvents + 0x69f
+0x7fff6d20d5a4 Qt6Core.dll QEventLoop::exec + 0x1d4
+0x7fff6d2f9c67 Qt6Core.dll QThread::exec + 0xc7
+0x7fff6d3bbbd8 Qt6Core.dll QThread::start + 0x5b8
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 16748 0x416c
+0x7ff840ccaf04 win32u.dll NtUserMsgWaitForMultipleObjectsEx + 0x14
+0x7fff6d3add7f Qt6Core.dll QEventDispatcherWin32::processEvents + 0x69f
+0x7fff6d20d5a4 Qt6Core.dll QEventLoop::exec + 0x1d4
+0x7fff6d2f9c67 Qt6Core.dll QThread::exec + 0xc7
+0x7fff6d3bbbd8 Qt6Core.dll QThread::start + 0x5b8
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 43012 0xa804
+0x7ff8436028a4 ntdll.dll ZwWaitForMultipleObjects + 0x14
+0x7ff82ddc0006 WINMM.dll joySetThreshold + 0x156
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 41152 0xa0c0
+0x7ff843601dd4 ntdll.dll NtWaitForSingleObject + 0x14
+0x7ff8406abe9f KERNELBASE.dll WaitForSingleObjectEx + 0xaf
+0x7ff8272b7d70 nvwgf2umx.dll NVDEV_Thunk + 0x245f0
+0x7ff82780a2aa nvwgf2umx.dll NVDEV_Thunk + 0x576b2a
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 11180 0x2bac
+0x7ff8436028a4 ntdll.dll ZwWaitForMultipleObjects + 0x14
+0x7ff8406b2773 KERNELBASE.dll WaitForMultipleObjectsEx + 0x123
+0x7ff8406b2641 KERNELBASE.dll WaitForMultipleObjects + 0x11
+0x7ff826aa2c36 nvwgf2umx.dll NVAPI_DirectMethods + 0x32d16
+0x7ff82780a2aa nvwgf2umx.dll NVDEV_Thunk + 0x576b2a
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 13080 0x3318
+0x7ff843601dd4 ntdll.dll NtWaitForSingleObject + 0x14
+0x7ff8406abe9f KERNELBASE.dll WaitForSingleObjectEx + 0xaf
+0x7ff82731ba4f nvwgf2umx.dll NVDEV_Thunk + 0x882cf
+0x7ff82780a2aa nvwgf2umx.dll NVDEV_Thunk + 0x576b2a
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 42992 0xa7f0
+0x7ff843601dd4 ntdll.dll NtWaitForSingleObject + 0x14
+0x7ff8406abe9f KERNELBASE.dll WaitForSingleObjectEx + 0xaf
+0x7ff827293238 nvwgf2umx.dll OpenAdapter12 + 0x159d88
+0x7ff82729315f nvwgf2umx.dll OpenAdapter12 + 0x159caf
+0x7ff82780a2aa nvwgf2umx.dll NVDEV_Thunk + 0x576b2a
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 24168 0x5e68
+0x7ff843601dd4 ntdll.dll NtWaitForSingleObject + 0x14
+0x7ff8406abe9f KERNELBASE.dll WaitForSingleObjectEx + 0xaf
+0x7ff827293238 nvwgf2umx.dll OpenAdapter12 + 0x159d88
+0x7ff82729315f nvwgf2umx.dll OpenAdapter12 + 0x159caf
+0x7ff82780a2aa nvwgf2umx.dll NVDEV_Thunk + 0x576b2a
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 38656 0x9700
+0x7ff843601dd4 ntdll.dll NtWaitForSingleObject + 0x14
+0x7ff8406abe9f KERNELBASE.dll WaitForSingleObjectEx + 0xaf
+0x7ff827293238 nvwgf2umx.dll OpenAdapter12 + 0x159d88
+0x7ff82729315f nvwgf2umx.dll OpenAdapter12 + 0x159caf
+0x7ff82780a2aa nvwgf2umx.dll NVDEV_Thunk + 0x576b2a
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 3876 0xf24
+0x7ff843601dd4 ntdll.dll NtWaitForSingleObject + 0x14
+0x7ff8406abe9f KERNELBASE.dll WaitForSingleObjectEx + 0xaf
+0x7ff827293238 nvwgf2umx.dll OpenAdapter12 + 0x159d88
+0x7ff82729315f nvwgf2umx.dll OpenAdapter12 + 0x159caf
+0x7ff82780a2aa nvwgf2umx.dll NVDEV_Thunk + 0x576b2a
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 26772 0x6894
+0x7ff843601dd4 ntdll.dll NtWaitForSingleObject + 0x14
+0x7ff8406abe9f KERNELBASE.dll WaitForSingleObjectEx + 0xaf
+0x7ff827293238 nvwgf2umx.dll OpenAdapter12 + 0x159d88
+0x7ff82729315f nvwgf2umx.dll OpenAdapter12 + 0x159caf
+0x7ff82780a2aa nvwgf2umx.dll NVDEV_Thunk + 0x576b2a
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 39856 0x9bb0
+0x7ff843601dd4 ntdll.dll NtWaitForSingleObject + 0x14
+0x7ff8406abe9f KERNELBASE.dll WaitForSingleObjectEx + 0xaf
+0x7ff827293238 nvwgf2umx.dll OpenAdapter12 + 0x159d88
+0x7ff82729315f nvwgf2umx.dll OpenAdapter12 + 0x159caf
+0x7ff82780a2aa nvwgf2umx.dll NVDEV_Thunk + 0x576b2a
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 26980 0x6964
+0x7ff843601dd4 ntdll.dll NtWaitForSingleObject + 0x14
+0x7ff8406abe9f KERNELBASE.dll WaitForSingleObjectEx + 0xaf
+0x7ff827293238 nvwgf2umx.dll OpenAdapter12 + 0x159d88
+0x7ff82729315f nvwgf2umx.dll OpenAdapter12 + 0x159caf
+0x7ff82780a2aa nvwgf2umx.dll NVDEV_Thunk + 0x576b2a
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 21308 0x533c
+0x7ff843601dd4 ntdll.dll NtWaitForSingleObject + 0x14
+0x7ff8406abe9f KERNELBASE.dll WaitForSingleObjectEx + 0xaf
+0x7ff827293238 nvwgf2umx.dll OpenAdapter12 + 0x159d88
+0x7ff82729315f nvwgf2umx.dll OpenAdapter12 + 0x159caf
+0x7ff82780a2aa nvwgf2umx.dll NVDEV_Thunk + 0x576b2a
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 39388 0x99dc
+0x7ff843601dd4 ntdll.dll NtWaitForSingleObject + 0x14
+0x7ff8406abe9f KERNELBASE.dll WaitForSingleObjectEx + 0xaf
+0x7ff827293238 nvwgf2umx.dll OpenAdapter12 + 0x159d88
+0x7ff82729315f nvwgf2umx.dll OpenAdapter12 + 0x159caf
+0x7ff82780a2aa nvwgf2umx.dll NVDEV_Thunk + 0x576b2a
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 30608 0x7790
+0x7ff843601dd4 ntdll.dll NtWaitForSingleObject + 0x14
+0x7ff8406abe9f KERNELBASE.dll WaitForSingleObjectEx + 0xaf
+0x7ff827293238 nvwgf2umx.dll OpenAdapter12 + 0x159d88
+0x7ff82729315f nvwgf2umx.dll OpenAdapter12 + 0x159caf
+0x7ff82780a2aa nvwgf2umx.dll NVDEV_Thunk + 0x576b2a
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 43344 0xa950
+0x7ff843601dd4 ntdll.dll NtWaitForSingleObject + 0x14
+0x7ff8406abe9f KERNELBASE.dll WaitForSingleObjectEx + 0xaf
+0x7ff827293238 nvwgf2umx.dll OpenAdapter12 + 0x159d88
+0x7ff82729315f nvwgf2umx.dll OpenAdapter12 + 0x159caf
+0x7ff82780a2aa nvwgf2umx.dll NVDEV_Thunk + 0x576b2a
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 32428 0x7eac
+0x7ff843601dd4 ntdll.dll NtWaitForSingleObject + 0x14
+0x7ff8406abe9f KERNELBASE.dll WaitForSingleObjectEx + 0xaf
+0x7ff827293238 nvwgf2umx.dll OpenAdapter12 + 0x159d88
+0x7ff82729315f nvwgf2umx.dll OpenAdapter12 + 0x159caf
+0x7ff82780a2aa nvwgf2umx.dll NVDEV_Thunk + 0x576b2a
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 34876 0x883c
+0x7ff843601dd4 ntdll.dll NtWaitForSingleObject + 0x14
+0x7ff8406abe9f KERNELBASE.dll WaitForSingleObjectEx + 0xaf
+0x7ff826ee898e nvwgf2umx.dll SetDependencyInfo + 0x69fae
+0x7ff826ee8305 nvwgf2umx.dll SetDependencyInfo + 0x69925
+0x7ff826edcb4d nvwgf2umx.dll SetDependencyInfo + 0x5e16d
+0x7ff8273f24da nvwgf2umx.dll NVDEV_Thunk + 0x15ed5a
+0x7ff82780a2aa nvwgf2umx.dll NVDEV_Thunk + 0x576b2a
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 38672 0x9710
+0x7ff843601dd4 ntdll.dll NtWaitForSingleObject + 0x14
+0x7ff8406abe9f KERNELBASE.dll WaitForSingleObjectEx + 0xaf
+0x7ff827293238 nvwgf2umx.dll OpenAdapter12 + 0x159d88
+0x7ff82729315f nvwgf2umx.dll OpenAdapter12 + 0x159caf
+0x7ff82780a2aa nvwgf2umx.dll NVDEV_Thunk + 0x576b2a
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 2416 0x970
+0x7ff8436059c4 ntdll.dll ZwWaitForAlertByThreadId + 0x14
+0x7ff8434f97be ntdll.dll RtlSleepConditionVariableSRW + 0x1de
+0x7ff8406b2a58 KERNELBASE.dll SleepConditionVariableSRW + 0x38
+0x7fff51035d00 avcodec-63.dll av_parser_iterate + 0x23c20
+0x7fff50cd7813 avcodec-63.dll avcodec_send_frame + 0xf4d3
+0x7fff513a38bf avcodec-63.dll avpriv_split_xiph_headers + 0x27d0f
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 17216 0x4340
+0x7ff8436059c4 ntdll.dll ZwWaitForAlertByThreadId + 0x14
+0x7ff8434f97be ntdll.dll RtlSleepConditionVariableSRW + 0x1de
+0x7ff8406b2a58 KERNELBASE.dll SleepConditionVariableSRW + 0x38
+0x7fff51035d00 avcodec-63.dll av_parser_iterate + 0x23c20
+0x7fff50cd7813 avcodec-63.dll avcodec_send_frame + 0xf4d3
+0x7fff513a38bf avcodec-63.dll avpriv_split_xiph_headers + 0x27d0f
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 39704 0x9b18
+0x7ff8436059c4 ntdll.dll ZwWaitForAlertByThreadId + 0x14
+0x7ff8434f97be ntdll.dll RtlSleepConditionVariableSRW + 0x1de
+0x7ff8406b2a58 KERNELBASE.dll SleepConditionVariableSRW + 0x38
+0x7fff51034cc9 avcodec-63.dll av_parser_iterate + 0x22be9
+0x7fff51035404 avcodec-63.dll av_parser_iterate + 0x23324
+0x7fff50d8f9bb avcodec-63.dll avpriv_h264_has_num_reorder_frames + 0x2bb
+0x7fff50d8f58c avcodec-63.dll avcodec_default_get_buffer2 + 0x5480c
+0x7fff50c6c7c3 avcodec-63.dll avcodec_send_packet + 0x723
+0x7fff50c6e23a avcodec-63.dll avcodec_send_packet + 0x219a
+0x7fff51035dcc avcodec-63.dll av_parser_iterate + 0x23cec
+0x7fff50cd7813 avcodec-63.dll avcodec_send_frame + 0xf4d3
+0x7fff513a38bf avcodec-63.dll avpriv_split_xiph_headers + 0x27d0f
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 43952 0xabb0
+0x7ff8436059c4 ntdll.dll ZwWaitForAlertByThreadId + 0x14
+0x7ff8434f97be ntdll.dll RtlSleepConditionVariableSRW + 0x1de
+0x7ff8406b2a58 KERNELBASE.dll SleepConditionVariableSRW + 0x38
+0x7fff51035d00 avcodec-63.dll av_parser_iterate + 0x23c20
+0x7fff50cd7813 avcodec-63.dll avcodec_send_frame + 0xf4d3
+0x7fff513a38bf avcodec-63.dll avpriv_split_xiph_headers + 0x27d0f
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 41716 0xa2f4
+0x7ff8436059c4 ntdll.dll ZwWaitForAlertByThreadId + 0x14
+0x7ff8434f97be ntdll.dll RtlSleepConditionVariableSRW + 0x1de
+0x7ff8406b2a58 KERNELBASE.dll SleepConditionVariableSRW + 0x38
+0x7fff51035d00 avcodec-63.dll av_parser_iterate + 0x23c20
+0x7fff50cd7813 avcodec-63.dll avcodec_send_frame + 0xf4d3
+0x7fff513a38bf avcodec-63.dll avpriv_split_xiph_headers + 0x27d0f
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 18900 0x49d4
+0x7ff8436059c4 ntdll.dll ZwWaitForAlertByThreadId + 0x14
+0x7ff8434f97be ntdll.dll RtlSleepConditionVariableSRW + 0x1de
+0x7ff8406b2a58 KERNELBASE.dll SleepConditionVariableSRW + 0x38
+0x7fff51035d00 avcodec-63.dll av_parser_iterate + 0x23c20
+0x7fff50cd7813 avcodec-63.dll avcodec_send_frame + 0xf4d3
+0x7fff513a38bf avcodec-63.dll avpriv_split_xiph_headers + 0x27d0f
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 43504 0xa9f0
+0x7ff8436059c4 ntdll.dll ZwWaitForAlertByThreadId + 0x14
+0x7ff8434f97be ntdll.dll RtlSleepConditionVariableSRW + 0x1de
+0x7ff8406b2a58 KERNELBASE.dll SleepConditionVariableSRW + 0x38
+0x7fff51035d00 avcodec-63.dll av_parser_iterate + 0x23c20
+0x7fff50cd7813 avcodec-63.dll avcodec_send_frame + 0xf4d3
+0x7fff513a38bf avcodec-63.dll avpriv_split_xiph_headers + 0x27d0f
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 36508 0x8e9c
+0x7ff8436059c4 ntdll.dll ZwWaitForAlertByThreadId + 0x14
+0x7ff8434f97be ntdll.dll RtlSleepConditionVariableSRW + 0x1de
+0x7ff8406b2a58 KERNELBASE.dll SleepConditionVariableSRW + 0x38
+0x7fff51035d00 avcodec-63.dll av_parser_iterate + 0x23c20
+0x7fff50cd7813 avcodec-63.dll avcodec_send_frame + 0xf4d3
+0x7fff513a38bf avcodec-63.dll avpriv_split_xiph_headers + 0x27d0f
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 40016 0x9c50
+0x7ff8436059c4 ntdll.dll ZwWaitForAlertByThreadId + 0x14
+0x7ff8434f97be ntdll.dll RtlSleepConditionVariableSRW + 0x1de
+0x7ff8406b2a58 KERNELBASE.dll SleepConditionVariableSRW + 0x38
+0x7fff51035d00 avcodec-63.dll av_parser_iterate + 0x23c20
+0x7fff50cd7813 avcodec-63.dll avcodec_send_frame + 0xf4d3
+0x7fff513a38bf avcodec-63.dll avpriv_split_xiph_headers + 0x27d0f
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 39824 0x9b90
+0x7ff8436059c4 ntdll.dll ZwWaitForAlertByThreadId + 0x14
+0x7ff8434f97be ntdll.dll RtlSleepConditionVariableSRW + 0x1de
+0x7ff8406b2a58 KERNELBASE.dll SleepConditionVariableSRW + 0x38
+0x7fff51035d00 avcodec-63.dll av_parser_iterate + 0x23c20
+0x7fff50cd7813 avcodec-63.dll avcodec_send_frame + 0xf4d3
+0x7fff513a38bf avcodec-63.dll avpriv_split_xiph_headers + 0x27d0f
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 43304 0xa928
+0x7ff8436059c4 ntdll.dll ZwWaitForAlertByThreadId + 0x14
+0x7ff8434f97be ntdll.dll RtlSleepConditionVariableSRW + 0x1de
+0x7ff8406b2a58 KERNELBASE.dll SleepConditionVariableSRW + 0x38
+0x7fff51035d00 avcodec-63.dll av_parser_iterate + 0x23c20
+0x7fff50cd7813 avcodec-63.dll avcodec_send_frame + 0xf4d3
+0x7fff513a38bf avcodec-63.dll avpriv_split_xiph_headers + 0x27d0f
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 32716 0x7fcc
+0x7ff8436059c4 ntdll.dll ZwWaitForAlertByThreadId + 0x14
+0x7ff8434f97be ntdll.dll RtlSleepConditionVariableSRW + 0x1de
+0x7ff8406b2a58 KERNELBASE.dll SleepConditionVariableSRW + 0x38
+0x7fff51035d00 avcodec-63.dll av_parser_iterate + 0x23c20
+0x7fff50cd7813 avcodec-63.dll avcodec_send_frame + 0xf4d3
+0x7fff513a38bf avcodec-63.dll avpriv_split_xiph_headers + 0x27d0f
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 41420 0xa1cc
+0x7ff8436059c4 ntdll.dll ZwWaitForAlertByThreadId + 0x14
+0x7ff8434f97be ntdll.dll RtlSleepConditionVariableSRW + 0x1de
+0x7ff8406b2a58 KERNELBASE.dll SleepConditionVariableSRW + 0x38
+0x7fff51035d00 avcodec-63.dll av_parser_iterate + 0x23c20
+0x7fff50cd7813 avcodec-63.dll avcodec_send_frame + 0xf4d3
+0x7fff513a38bf avcodec-63.dll avpriv_split_xiph_headers + 0x27d0f
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 39052 0x988c
+0x7ff8436059c4 ntdll.dll ZwWaitForAlertByThreadId + 0x14
+0x7ff8434f97be ntdll.dll RtlSleepConditionVariableSRW + 0x1de
+0x7ff8406b2a58 KERNELBASE.dll SleepConditionVariableSRW + 0x38
+0x7fff51035d00 avcodec-63.dll av_parser_iterate + 0x23c20
+0x7fff50cd7813 avcodec-63.dll avcodec_send_frame + 0xf4d3
+0x7fff513a38bf avcodec-63.dll avpriv_split_xiph_headers + 0x27d0f
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 40372 0x9db4
+0x7ff8436059c4 ntdll.dll ZwWaitForAlertByThreadId + 0x14
+0x7ff8434f97be ntdll.dll RtlSleepConditionVariableSRW + 0x1de
+0x7ff8406b2a58 KERNELBASE.dll SleepConditionVariableSRW + 0x38
+0x7fff51035d00 avcodec-63.dll av_parser_iterate + 0x23c20
+0x7fff50cd7813 avcodec-63.dll avcodec_send_frame + 0xf4d3
+0x7fff513a38bf avcodec-63.dll avpriv_split_xiph_headers + 0x27d0f
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 7316 0x1c94
+0x7ff8436059c4 ntdll.dll ZwWaitForAlertByThreadId + 0x14
+0x7ff8434f97be ntdll.dll RtlSleepConditionVariableSRW + 0x1de
+0x7ff8406b2a58 KERNELBASE.dll SleepConditionVariableSRW + 0x38
+0x7fff51035d00 avcodec-63.dll av_parser_iterate + 0x23c20
+0x7fff50cd7813 avcodec-63.dll avcodec_send_frame + 0xf4d3
+0x7fff513a38bf avcodec-63.dll avpriv_split_xiph_headers + 0x27d0f
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 23184 0x5a90
+0x7ff840ccaf04 win32u.dll NtUserMsgWaitForMultipleObjectsEx + 0x14
+0x7fff6d3add7f Qt6Core.dll QEventDispatcherWin32::processEvents + 0x69f
+0x7fff6d20d5a4 Qt6Core.dll QEventLoop::exec + 0x1d4
+0x7fff6d2f9c67 Qt6Core.dll QThread::exec + 0xc7
+0x7fff6d3bbbd8 Qt6Core.dll QThread::start + 0x5b8
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 42144 0xa4a0
+0x7ff840ccaf04 win32u.dll NtUserMsgWaitForMultipleObjectsEx + 0x14
+0x7fff6d3add7f Qt6Core.dll QEventDispatcherWin32::processEvents + 0x69f
+0x7fff6d20d5a4 Qt6Core.dll QEventLoop::exec + 0x1d4
+0x7fff6d2f9c67 Qt6Core.dll QThread::exec + 0xc7
+0x7fff6d3bbbd8 Qt6Core.dll QThread::start + 0x5b8
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 28732 0x703c
+0x7ff840ccaf04 win32u.dll NtUserMsgWaitForMultipleObjectsEx + 0x14
+0x7fff6d3add7f Qt6Core.dll QEventDispatcherWin32::processEvents + 0x69f
+0x7fff6d20d5a4 Qt6Core.dll QEventLoop::exec + 0x1d4
+0x7fff6d2f9c67 Qt6Core.dll QThread::exec + 0xc7
+0x7fff6d3bbbd8 Qt6Core.dll QThread::start + 0x5b8
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 28112 0x6dd0
+0x7ff843601dd4 ntdll.dll NtWaitForSingleObject + 0x14
+0x7ff8406abe9f KERNELBASE.dll WaitForSingleObjectEx + 0xaf
+0x7ff8272b7d70 nvwgf2umx.dll NVDEV_Thunk + 0x245f0
+0x7ff82780a2aa nvwgf2umx.dll NVDEV_Thunk + 0x576b2a
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 13744 0x35b0
+0x7ff8436028a4 ntdll.dll ZwWaitForMultipleObjects + 0x14
+0x7ff8406b2773 KERNELBASE.dll WaitForMultipleObjectsEx + 0x123
+0x7ff8406b2641 KERNELBASE.dll WaitForMultipleObjects + 0x11
+0x7ff826aa2c36 nvwgf2umx.dll NVAPI_DirectMethods + 0x32d16
+0x7ff82780a2aa nvwgf2umx.dll NVDEV_Thunk + 0x576b2a
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 32628 0x7f74
+0x7ff843601dd4 ntdll.dll NtWaitForSingleObject + 0x14
+0x7ff8406abe9f KERNELBASE.dll WaitForSingleObjectEx + 0xaf
+0x7ff82731ba4f nvwgf2umx.dll NVDEV_Thunk + 0x882cf
+0x7ff82780a2aa nvwgf2umx.dll NVDEV_Thunk + 0x576b2a
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 32696 0x7fb8
+0x7ff843601dd4 ntdll.dll NtWaitForSingleObject + 0x14
+0x7ff8406abe9f KERNELBASE.dll WaitForSingleObjectEx + 0xaf
+0x7ff827293238 nvwgf2umx.dll OpenAdapter12 + 0x159d88
+0x7ff82729315f nvwgf2umx.dll OpenAdapter12 + 0x159caf
+0x7ff82780a2aa nvwgf2umx.dll NVDEV_Thunk + 0x576b2a
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 39760 0x9b50
+0x7ff843601dd4 ntdll.dll NtWaitForSingleObject + 0x14
+0x7ff8406abe9f KERNELBASE.dll WaitForSingleObjectEx + 0xaf
+0x7ff827293238 nvwgf2umx.dll OpenAdapter12 + 0x159d88
+0x7ff82729315f nvwgf2umx.dll OpenAdapter12 + 0x159caf
+0x7ff82780a2aa nvwgf2umx.dll NVDEV_Thunk + 0x576b2a
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 31904 0x7ca0
+0x7ff843601dd4 ntdll.dll NtWaitForSingleObject + 0x14
+0x7ff8406abe9f KERNELBASE.dll WaitForSingleObjectEx + 0xaf
+0x7ff827293238 nvwgf2umx.dll OpenAdapter12 + 0x159d88
+0x7ff82729315f nvwgf2umx.dll OpenAdapter12 + 0x159caf
+0x7ff82780a2aa nvwgf2umx.dll NVDEV_Thunk + 0x576b2a
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 19656 0x4cc8
+0x7ff843601dd4 ntdll.dll NtWaitForSingleObject + 0x14
+0x7ff8406abe9f KERNELBASE.dll WaitForSingleObjectEx + 0xaf
+0x7ff827293238 nvwgf2umx.dll OpenAdapter12 + 0x159d88
+0x7ff82729315f nvwgf2umx.dll OpenAdapter12 + 0x159caf
+0x7ff82780a2aa nvwgf2umx.dll NVDEV_Thunk + 0x576b2a
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 29992 0x7528
+0x7ff843601dd4 ntdll.dll NtWaitForSingleObject + 0x14
+0x7ff8406abe9f KERNELBASE.dll WaitForSingleObjectEx + 0xaf
+0x7ff827293238 nvwgf2umx.dll OpenAdapter12 + 0x159d88
+0x7ff82729315f nvwgf2umx.dll OpenAdapter12 + 0x159caf
+0x7ff82780a2aa nvwgf2umx.dll NVDEV_Thunk + 0x576b2a
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 43912 0xab88
+0x7ff843601dd4 ntdll.dll NtWaitForSingleObject + 0x14
+0x7ff8406abe9f KERNELBASE.dll WaitForSingleObjectEx + 0xaf
+0x7ff827293238 nvwgf2umx.dll OpenAdapter12 + 0x159d88
+0x7ff82729315f nvwgf2umx.dll OpenAdapter12 + 0x159caf
+0x7ff82780a2aa nvwgf2umx.dll NVDEV_Thunk + 0x576b2a
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 15820 0x3dcc
+0x7ff843601dd4 ntdll.dll NtWaitForSingleObject + 0x14
+0x7ff8406abe9f KERNELBASE.dll WaitForSingleObjectEx + 0xaf
+0x7ff827293238 nvwgf2umx.dll OpenAdapter12 + 0x159d88
+0x7ff82729315f nvwgf2umx.dll OpenAdapter12 + 0x159caf
+0x7ff82780a2aa nvwgf2umx.dll NVDEV_Thunk + 0x576b2a
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 38328 0x95b8
+0x7ff843601dd4 ntdll.dll NtWaitForSingleObject + 0x14
+0x7ff8406abe9f KERNELBASE.dll WaitForSingleObjectEx + 0xaf
+0x7ff827293238 nvwgf2umx.dll OpenAdapter12 + 0x159d88
+0x7ff82729315f nvwgf2umx.dll OpenAdapter12 + 0x159caf
+0x7ff82780a2aa nvwgf2umx.dll NVDEV_Thunk + 0x576b2a
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 40780 0x9f4c
+0x7ff843601dd4 ntdll.dll NtWaitForSingleObject + 0x14
+0x7ff8406abe9f KERNELBASE.dll WaitForSingleObjectEx + 0xaf
+0x7ff827293238 nvwgf2umx.dll OpenAdapter12 + 0x159d88
+0x7ff82729315f nvwgf2umx.dll OpenAdapter12 + 0x159caf
+0x7ff82780a2aa nvwgf2umx.dll NVDEV_Thunk + 0x576b2a
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 636 0x27c
+0x7ff843601dd4 ntdll.dll NtWaitForSingleObject + 0x14
+0x7ff8406abe9f KERNELBASE.dll WaitForSingleObjectEx + 0xaf
+0x7ff827293238 nvwgf2umx.dll OpenAdapter12 + 0x159d88
+0x7ff82729315f nvwgf2umx.dll OpenAdapter12 + 0x159caf
+0x7ff82780a2aa nvwgf2umx.dll NVDEV_Thunk + 0x576b2a
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 33664 0x8380
+0x7ff843601dd4 ntdll.dll NtWaitForSingleObject + 0x14
+0x7ff8406abe9f KERNELBASE.dll WaitForSingleObjectEx + 0xaf
+0x7ff827293238 nvwgf2umx.dll OpenAdapter12 + 0x159d88
+0x7ff82729315f nvwgf2umx.dll OpenAdapter12 + 0x159caf
+0x7ff82780a2aa nvwgf2umx.dll NVDEV_Thunk + 0x576b2a
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 11500 0x2cec
+0x7ff843601dd4 ntdll.dll NtWaitForSingleObject + 0x14
+0x7ff8406abe9f KERNELBASE.dll WaitForSingleObjectEx + 0xaf
+0x7ff827293238 nvwgf2umx.dll OpenAdapter12 + 0x159d88
+0x7ff82729315f nvwgf2umx.dll OpenAdapter12 + 0x159caf
+0x7ff82780a2aa nvwgf2umx.dll NVDEV_Thunk + 0x576b2a
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 4292 0x10c4
+0x7ff843601dd4 ntdll.dll NtWaitForSingleObject + 0x14
+0x7ff8406abe9f KERNELBASE.dll WaitForSingleObjectEx + 0xaf
+0x7ff826ee898e nvwgf2umx.dll SetDependencyInfo + 0x69fae
+0x7ff826ee8305 nvwgf2umx.dll SetDependencyInfo + 0x69925
+0x7ff826edcb4d nvwgf2umx.dll SetDependencyInfo + 0x5e16d
+0x7ff8273f24da nvwgf2umx.dll NVDEV_Thunk + 0x15ed5a
+0x7ff82780a2aa nvwgf2umx.dll NVDEV_Thunk + 0x576b2a
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 30036 0x7554
+0x7ff843601dd4 ntdll.dll NtWaitForSingleObject + 0x14
+0x7ff8406abe9f KERNELBASE.dll WaitForSingleObjectEx + 0xaf
+0x7ff827293238 nvwgf2umx.dll OpenAdapter12 + 0x159d88
+0x7ff82729315f nvwgf2umx.dll OpenAdapter12 + 0x159caf
+0x7ff82780a2aa nvwgf2umx.dll NVDEV_Thunk + 0x576b2a
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 4300 0x10cc
+0x7ff8436059c4 ntdll.dll ZwWaitForAlertByThreadId + 0x14
+0x7ff8434f97be ntdll.dll RtlSleepConditionVariableSRW + 0x1de
+0x7ff8406b2a58 KERNELBASE.dll SleepConditionVariableSRW + 0x38
+0x7fff51035d00 avcodec-63.dll av_parser_iterate + 0x23c20
+0x7fff50cd7813 avcodec-63.dll avcodec_send_frame + 0xf4d3
+0x7fff513a38bf avcodec-63.dll avpriv_split_xiph_headers + 0x27d0f
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 42844 0xa75c
+0x7ff8436059c4 ntdll.dll ZwWaitForAlertByThreadId + 0x14
+0x7ff8434f97be ntdll.dll RtlSleepConditionVariableSRW + 0x1de
+0x7ff8406b2a58 KERNELBASE.dll SleepConditionVariableSRW + 0x38
+0x7fff51035d00 avcodec-63.dll av_parser_iterate + 0x23c20
+0x7fff50cd7813 avcodec-63.dll avcodec_send_frame + 0xf4d3
+0x7fff513a38bf avcodec-63.dll avpriv_split_xiph_headers + 0x27d0f
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 23408 0x5b70
+0x7ff8436059c4 ntdll.dll ZwWaitForAlertByThreadId + 0x14
+0x7ff8434f97be ntdll.dll RtlSleepConditionVariableSRW + 0x1de
+0x7ff8406b2a58 KERNELBASE.dll SleepConditionVariableSRW + 0x38
+0x7fff51035d00 avcodec-63.dll av_parser_iterate + 0x23c20
+0x7fff50cd7813 avcodec-63.dll avcodec_send_frame + 0xf4d3
+0x7fff513a38bf avcodec-63.dll avpriv_split_xiph_headers + 0x27d0f
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 36952 0x9058
+0x7ff8436059c4 ntdll.dll ZwWaitForAlertByThreadId + 0x14
+0x7ff8434f97be ntdll.dll RtlSleepConditionVariableSRW + 0x1de
+0x7ff8406b2a58 KERNELBASE.dll SleepConditionVariableSRW + 0x38
+0x7fff51034cc9 avcodec-63.dll av_parser_iterate + 0x22be9
+0x7fff51035404 avcodec-63.dll av_parser_iterate + 0x23324
+0x7fff50d8f9bb avcodec-63.dll avpriv_h264_has_num_reorder_frames + 0x2bb
+0x7fff50d8f58c avcodec-63.dll avcodec_default_get_buffer2 + 0x5480c
+0x7fff50c6c7c3 avcodec-63.dll avcodec_send_packet + 0x723
+0x7fff50c6e23a avcodec-63.dll avcodec_send_packet + 0x219a
+0x7fff51035dcc avcodec-63.dll av_parser_iterate + 0x23cec
+0x7fff50cd7813 avcodec-63.dll avcodec_send_frame + 0xf4d3
+0x7fff513a38bf avcodec-63.dll avpriv_split_xiph_headers + 0x27d0f
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 30944 0x78e0
+0x7ff8436059c4 ntdll.dll ZwWaitForAlertByThreadId + 0x14
+0x7ff8434f97be ntdll.dll RtlSleepConditionVariableSRW + 0x1de
+0x7ff8406b2a58 KERNELBASE.dll SleepConditionVariableSRW + 0x38
+0x7fff51035d00 avcodec-63.dll av_parser_iterate + 0x23c20
+0x7fff50cd7813 avcodec-63.dll avcodec_send_frame + 0xf4d3
+0x7fff513a38bf avcodec-63.dll avpriv_split_xiph_headers + 0x27d0f
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 18824 0x4988
+0x7ff8436059c4 ntdll.dll ZwWaitForAlertByThreadId + 0x14
+0x7ff8434f97be ntdll.dll RtlSleepConditionVariableSRW + 0x1de
+0x7ff8406b2a58 KERNELBASE.dll SleepConditionVariableSRW + 0x38
+0x7fff51035d00 avcodec-63.dll av_parser_iterate + 0x23c20
+0x7fff50cd7813 avcodec-63.dll avcodec_send_frame + 0xf4d3
+0x7fff513a38bf avcodec-63.dll avpriv_split_xiph_headers + 0x27d0f
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 42956 0xa7cc
+0x7ff8436059c4 ntdll.dll ZwWaitForAlertByThreadId + 0x14
+0x7ff8434f97be ntdll.dll RtlSleepConditionVariableSRW + 0x1de
+0x7ff8406b2a58 KERNELBASE.dll SleepConditionVariableSRW + 0x38
+0x7fff51035d00 avcodec-63.dll av_parser_iterate + 0x23c20
+0x7fff50cd7813 avcodec-63.dll avcodec_send_frame + 0xf4d3
+0x7fff513a38bf avcodec-63.dll avpriv_split_xiph_headers + 0x27d0f
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 29204 0x7214
+0x7ff8436059c4 ntdll.dll ZwWaitForAlertByThreadId + 0x14
+0x7ff8434f97be ntdll.dll RtlSleepConditionVariableSRW + 0x1de
+0x7ff8406b2a58 KERNELBASE.dll SleepConditionVariableSRW + 0x38
+0x7fff51035d00 avcodec-63.dll av_parser_iterate + 0x23c20
+0x7fff50cd7813 avcodec-63.dll avcodec_send_frame + 0xf4d3
+0x7fff513a38bf avcodec-63.dll avpriv_split_xiph_headers + 0x27d0f
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 10928 0x2ab0
+0x7ff8436059c4 ntdll.dll ZwWaitForAlertByThreadId + 0x14
+0x7ff8434f97be ntdll.dll RtlSleepConditionVariableSRW + 0x1de
+0x7ff8406b2a58 KERNELBASE.dll SleepConditionVariableSRW + 0x38
+0x7fff51035d00 avcodec-63.dll av_parser_iterate + 0x23c20
+0x7fff50cd7813 avcodec-63.dll avcodec_send_frame + 0xf4d3
+0x7fff513a38bf avcodec-63.dll avpriv_split_xiph_headers + 0x27d0f
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 30596 0x7784
+0x7ff8436059c4 ntdll.dll ZwWaitForAlertByThreadId + 0x14
+0x7ff8434f97be ntdll.dll RtlSleepConditionVariableSRW + 0x1de
+0x7ff8406b2a58 KERNELBASE.dll SleepConditionVariableSRW + 0x38
+0x7fff51035d00 avcodec-63.dll av_parser_iterate + 0x23c20
+0x7fff50cd7813 avcodec-63.dll avcodec_send_frame + 0xf4d3
+0x7fff513a38bf avcodec-63.dll avpriv_split_xiph_headers + 0x27d0f
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 21164 0x52ac
+0x7ff8436059c4 ntdll.dll ZwWaitForAlertByThreadId + 0x14
+0x7ff8434f97be ntdll.dll RtlSleepConditionVariableSRW + 0x1de
+0x7ff8406b2a58 KERNELBASE.dll SleepConditionVariableSRW + 0x38
+0x7fff51035d00 avcodec-63.dll av_parser_iterate + 0x23c20
+0x7fff50cd7813 avcodec-63.dll avcodec_send_frame + 0xf4d3
+0x7fff513a38bf avcodec-63.dll avpriv_split_xiph_headers + 0x27d0f
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 1940 0x794
+0x7ff8436059c4 ntdll.dll ZwWaitForAlertByThreadId + 0x14
+0x7ff8434f97be ntdll.dll RtlSleepConditionVariableSRW + 0x1de
+0x7ff8406b2a58 KERNELBASE.dll SleepConditionVariableSRW + 0x38
+0x7fff51035d00 avcodec-63.dll av_parser_iterate + 0x23c20
+0x7fff50cd7813 avcodec-63.dll avcodec_send_frame + 0xf4d3
+0x7fff513a38bf avcodec-63.dll avpriv_split_xiph_headers + 0x27d0f
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 43360 0xa960
+0x7ff8436059c4 ntdll.dll ZwWaitForAlertByThreadId + 0x14
+0x7ff8434f97be ntdll.dll RtlSleepConditionVariableSRW + 0x1de
+0x7ff8406b2a58 KERNELBASE.dll SleepConditionVariableSRW + 0x38
+0x7fff51035d00 avcodec-63.dll av_parser_iterate + 0x23c20
+0x7fff50cd7813 avcodec-63.dll avcodec_send_frame + 0xf4d3
+0x7fff513a38bf avcodec-63.dll avpriv_split_xiph_headers + 0x27d0f
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 40992 0xa020
+0x7ff8436059c4 ntdll.dll ZwWaitForAlertByThreadId + 0x14
+0x7ff8434f97be ntdll.dll RtlSleepConditionVariableSRW + 0x1de
+0x7ff8406b2a58 KERNELBASE.dll SleepConditionVariableSRW + 0x38
+0x7fff51035d00 avcodec-63.dll av_parser_iterate + 0x23c20
+0x7fff50cd7813 avcodec-63.dll avcodec_send_frame + 0xf4d3
+0x7fff513a38bf avcodec-63.dll avpriv_split_xiph_headers + 0x27d0f
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 4540 0x11bc
+0x7ff8436059c4 ntdll.dll ZwWaitForAlertByThreadId + 0x14
+0x7ff8434f97be ntdll.dll RtlSleepConditionVariableSRW + 0x1de
+0x7ff8406b2a58 KERNELBASE.dll SleepConditionVariableSRW + 0x38
+0x7fff51035d00 avcodec-63.dll av_parser_iterate + 0x23c20
+0x7fff50cd7813 avcodec-63.dll avcodec_send_frame + 0xf4d3
+0x7fff513a38bf avcodec-63.dll avpriv_split_xiph_headers + 0x27d0f
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 3956 0xf74
+0x7ff8436059c4 ntdll.dll ZwWaitForAlertByThreadId + 0x14
+0x7ff8434f97be ntdll.dll RtlSleepConditionVariableSRW + 0x1de
+0x7ff8406b2a58 KERNELBASE.dll SleepConditionVariableSRW + 0x38
+0x7fff51035d00 avcodec-63.dll av_parser_iterate + 0x23c20
+0x7fff50cd7813 avcodec-63.dll avcodec_send_frame + 0xf4d3
+0x7fff513a38bf avcodec-63.dll avpriv_split_xiph_headers + 0x27d0f
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 38368 0x95e0
+0x7ff840ccaf04 win32u.dll NtUserMsgWaitForMultipleObjectsEx + 0x14
+0x7fff6d3add7f Qt6Core.dll QEventDispatcherWin32::processEvents + 0x69f
+0x7fff6d20d5a4 Qt6Core.dll QEventLoop::exec + 0x1d4
+0x7fff6d2f9c67 Qt6Core.dll QThread::exec + 0xc7
+0x7fff6d3bbbd8 Qt6Core.dll QThread::start + 0x5b8
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 14116 0x3724
+0x7ff840ccaf04 win32u.dll NtUserMsgWaitForMultipleObjectsEx + 0x14
+0x7fff6d3add7f Qt6Core.dll QEventDispatcherWin32::processEvents + 0x69f
+0x7fff6d20d5a4 Qt6Core.dll QEventLoop::exec + 0x1d4
+0x7fff6d2f9c67 Qt6Core.dll QThread::exec + 0xc7
+0x7fff6d3bbbd8 Qt6Core.dll QThread::start + 0x5b8
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 38816 0x97a0
+0x7ff840ccaf04 win32u.dll NtUserMsgWaitForMultipleObjectsEx + 0x14
+0x7fff6d3add7f Qt6Core.dll QEventDispatcherWin32::processEvents + 0x69f
+0x7fff6d20d5a4 Qt6Core.dll QEventLoop::exec + 0x1d4
+0x7fff6d2f9c67 Qt6Core.dll QThread::exec + 0xc7
+0x7fff6d3bbbd8 Qt6Core.dll QThread::start + 0x5b8
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 11936 0x2ea0
+0x7ff843601dd4 ntdll.dll NtWaitForSingleObject + 0x14
+0x7ff8406abe9f KERNELBASE.dll WaitForSingleObjectEx + 0xaf
+0x7ff8272b7d70 nvwgf2umx.dll NVDEV_Thunk + 0x245f0
+0x7ff82780a2aa nvwgf2umx.dll NVDEV_Thunk + 0x576b2a
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 41004 0xa02c
+0x7ff8436028a4 ntdll.dll ZwWaitForMultipleObjects + 0x14
+0x7ff8406b2773 KERNELBASE.dll WaitForMultipleObjectsEx + 0x123
+0x7ff8406b2641 KERNELBASE.dll WaitForMultipleObjects + 0x11
+0x7ff826aa2c36 nvwgf2umx.dll NVAPI_DirectMethods + 0x32d16
+0x7ff82780a2aa nvwgf2umx.dll NVDEV_Thunk + 0x576b2a
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 10828 0x2a4c
+0x7ff843601dd4 ntdll.dll NtWaitForSingleObject + 0x14
+0x7ff8406abe9f KERNELBASE.dll WaitForSingleObjectEx + 0xaf
+0x7ff82731ba4f nvwgf2umx.dll NVDEV_Thunk + 0x882cf
+0x7ff82780a2aa nvwgf2umx.dll NVDEV_Thunk + 0x576b2a
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 38904 0x97f8
+0x7ff843601dd4 ntdll.dll NtWaitForSingleObject + 0x14
+0x7ff8406abe9f KERNELBASE.dll WaitForSingleObjectEx + 0xaf
+0x7ff827293238 nvwgf2umx.dll OpenAdapter12 + 0x159d88
+0x7ff82729315f nvwgf2umx.dll OpenAdapter12 + 0x159caf
+0x7ff82780a2aa nvwgf2umx.dll NVDEV_Thunk + 0x576b2a
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 31444 0x7ad4
+0x7ff843601dd4 ntdll.dll NtWaitForSingleObject + 0x14
+0x7ff8406abe9f KERNELBASE.dll WaitForSingleObjectEx + 0xaf
+0x7ff827293238 nvwgf2umx.dll OpenAdapter12 + 0x159d88
+0x7ff82729315f nvwgf2umx.dll OpenAdapter12 + 0x159caf
+0x7ff82780a2aa nvwgf2umx.dll NVDEV_Thunk + 0x576b2a
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 30080 0x7580
+0x7ff843601dd4 ntdll.dll NtWaitForSingleObject + 0x14
+0x7ff8406abe9f KERNELBASE.dll WaitForSingleObjectEx + 0xaf
+0x7ff827293238 nvwgf2umx.dll OpenAdapter12 + 0x159d88
+0x7ff82729315f nvwgf2umx.dll OpenAdapter12 + 0x159caf
+0x7ff82780a2aa nvwgf2umx.dll NVDEV_Thunk + 0x576b2a
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 40620 0x9eac
+0x7ff843601dd4 ntdll.dll NtWaitForSingleObject + 0x14
+0x7ff8406abe9f KERNELBASE.dll WaitForSingleObjectEx + 0xaf
+0x7ff827293238 nvwgf2umx.dll OpenAdapter12 + 0x159d88
+0x7ff82729315f nvwgf2umx.dll OpenAdapter12 + 0x159caf
+0x7ff82780a2aa nvwgf2umx.dll NVDEV_Thunk + 0x576b2a
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 31632 0x7b90
+0x7ff843601dd4 ntdll.dll NtWaitForSingleObject + 0x14
+0x7ff8406abe9f KERNELBASE.dll WaitForSingleObjectEx + 0xaf
+0x7ff827293238 nvwgf2umx.dll OpenAdapter12 + 0x159d88
+0x7ff82729315f nvwgf2umx.dll OpenAdapter12 + 0x159caf
+0x7ff82780a2aa nvwgf2umx.dll NVDEV_Thunk + 0x576b2a
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 8972 0x230c
+0x7ff843601dd4 ntdll.dll NtWaitForSingleObject + 0x14
+0x7ff8406abe9f KERNELBASE.dll WaitForSingleObjectEx + 0xaf
+0x7ff827293238 nvwgf2umx.dll OpenAdapter12 + 0x159d88
+0x7ff82729315f nvwgf2umx.dll OpenAdapter12 + 0x159caf
+0x7ff82780a2aa nvwgf2umx.dll NVDEV_Thunk + 0x576b2a
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 19904 0x4dc0
+0x7ff843601dd4 ntdll.dll NtWaitForSingleObject + 0x14
+0x7ff8406abe9f KERNELBASE.dll WaitForSingleObjectEx + 0xaf
+0x7ff827293238 nvwgf2umx.dll OpenAdapter12 + 0x159d88
+0x7ff82729315f nvwgf2umx.dll OpenAdapter12 + 0x159caf
+0x7ff82780a2aa nvwgf2umx.dll NVDEV_Thunk + 0x576b2a
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 30072 0x7578
+0x7ff843601dd4 ntdll.dll NtWaitForSingleObject + 0x14
+0x7ff8406abe9f KERNELBASE.dll WaitForSingleObjectEx + 0xaf
+0x7ff827293238 nvwgf2umx.dll OpenAdapter12 + 0x159d88
+0x7ff82729315f nvwgf2umx.dll OpenAdapter12 + 0x159caf
+0x7ff82780a2aa nvwgf2umx.dll NVDEV_Thunk + 0x576b2a
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 23964 0x5d9c
+0x7ff843601dd4 ntdll.dll NtWaitForSingleObject + 0x14
+0x7ff8406abe9f KERNELBASE.dll WaitForSingleObjectEx + 0xaf
+0x7ff827293238 nvwgf2umx.dll OpenAdapter12 + 0x159d88
+0x7ff82729315f nvwgf2umx.dll OpenAdapter12 + 0x159caf
+0x7ff82780a2aa nvwgf2umx.dll NVDEV_Thunk + 0x576b2a
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 34332 0x861c
+0x7ff843601dd4 ntdll.dll NtWaitForSingleObject + 0x14
+0x7ff8406abe9f KERNELBASE.dll WaitForSingleObjectEx + 0xaf
+0x7ff827293238 nvwgf2umx.dll OpenAdapter12 + 0x159d88
+0x7ff82729315f nvwgf2umx.dll OpenAdapter12 + 0x159caf
+0x7ff82780a2aa nvwgf2umx.dll NVDEV_Thunk + 0x576b2a
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 43964 0xabbc
+0x7ff843601dd4 ntdll.dll NtWaitForSingleObject + 0x14
+0x7ff8406abe9f KERNELBASE.dll WaitForSingleObjectEx + 0xaf
+0x7ff827293238 nvwgf2umx.dll OpenAdapter12 + 0x159d88
+0x7ff82729315f nvwgf2umx.dll OpenAdapter12 + 0x159caf
+0x7ff82780a2aa nvwgf2umx.dll NVDEV_Thunk + 0x576b2a
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 30592 0x7780
+0x7ff843601dd4 ntdll.dll NtWaitForSingleObject + 0x14
+0x7ff8406abe9f KERNELBASE.dll WaitForSingleObjectEx + 0xaf
+0x7ff827293238 nvwgf2umx.dll OpenAdapter12 + 0x159d88
+0x7ff82729315f nvwgf2umx.dll OpenAdapter12 + 0x159caf
+0x7ff82780a2aa nvwgf2umx.dll NVDEV_Thunk + 0x576b2a
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 30724 0x7804
+0x7ff843601dd4 ntdll.dll NtWaitForSingleObject + 0x14
+0x7ff8406abe9f KERNELBASE.dll WaitForSingleObjectEx + 0xaf
+0x7ff826ee898e nvwgf2umx.dll SetDependencyInfo + 0x69fae
+0x7ff826ee8305 nvwgf2umx.dll SetDependencyInfo + 0x69925
+0x7ff826edcb4d nvwgf2umx.dll SetDependencyInfo + 0x5e16d
+0x7ff8273f24da nvwgf2umx.dll NVDEV_Thunk + 0x15ed5a
+0x7ff82780a2aa nvwgf2umx.dll NVDEV_Thunk + 0x576b2a
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 22712 0x58b8
+0x7ff843601dd4 ntdll.dll NtWaitForSingleObject + 0x14
+0x7ff8406abe9f KERNELBASE.dll WaitForSingleObjectEx + 0xaf
+0x7ff827293238 nvwgf2umx.dll OpenAdapter12 + 0x159d88
+0x7ff82729315f nvwgf2umx.dll OpenAdapter12 + 0x159caf
+0x7ff82780a2aa nvwgf2umx.dll NVDEV_Thunk + 0x576b2a
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 36368 0x8e10
+0x7ff8436059c4 ntdll.dll ZwWaitForAlertByThreadId + 0x14
+0x7ff8434f97be ntdll.dll RtlSleepConditionVariableSRW + 0x1de
+0x7ff8406b2a58 KERNELBASE.dll SleepConditionVariableSRW + 0x38
+0x7fff51035d00 avcodec-63.dll av_parser_iterate + 0x23c20
+0x7fff50cd7813 avcodec-63.dll avcodec_send_frame + 0xf4d3
+0x7fff513a38bf avcodec-63.dll avpriv_split_xiph_headers + 0x27d0f
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 27636 0x6bf4
+0x7ff8436059c4 ntdll.dll ZwWaitForAlertByThreadId + 0x14
+0x7ff8434f97be ntdll.dll RtlSleepConditionVariableSRW + 0x1de
+0x7ff8406b2a58 KERNELBASE.dll SleepConditionVariableSRW + 0x38
+0x7fff51035d00 avcodec-63.dll av_parser_iterate + 0x23c20
+0x7fff50cd7813 avcodec-63.dll avcodec_send_frame + 0xf4d3
+0x7fff513a38bf avcodec-63.dll avpriv_split_xiph_headers + 0x27d0f
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 41236 0xa114
+0x7ff8436059c4 ntdll.dll ZwWaitForAlertByThreadId + 0x14
+0x7ff8434f97be ntdll.dll RtlSleepConditionVariableSRW + 0x1de
+0x7ff8406b2a58 KERNELBASE.dll SleepConditionVariableSRW + 0x38
+0x7fff51035d00 avcodec-63.dll av_parser_iterate + 0x23c20
+0x7fff50cd7813 avcodec-63.dll avcodec_send_frame + 0xf4d3
+0x7fff513a38bf avcodec-63.dll avpriv_split_xiph_headers + 0x27d0f
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 41544 0xa248
+0x7ff8436059c4 ntdll.dll ZwWaitForAlertByThreadId + 0x14
+0x7ff8434f97be ntdll.dll RtlSleepConditionVariableSRW + 0x1de
+0x7ff8406b2a58 KERNELBASE.dll SleepConditionVariableSRW + 0x38
+0x7fff51035d00 avcodec-63.dll av_parser_iterate + 0x23c20
+0x7fff50cd7813 avcodec-63.dll avcodec_send_frame + 0xf4d3
+0x7fff513a38bf avcodec-63.dll avpriv_split_xiph_headers + 0x27d0f
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 38836 0x97b4
+0x7ff8436059c4 ntdll.dll ZwWaitForAlertByThreadId + 0x14
+0x7ff8434f97be ntdll.dll RtlSleepConditionVariableSRW + 0x1de
+0x7ff8406b2a58 KERNELBASE.dll SleepConditionVariableSRW + 0x38
+0x7fff51034cc9 avcodec-63.dll av_parser_iterate + 0x22be9
+0x7fff51035404 avcodec-63.dll av_parser_iterate + 0x23324
+0x7fff50d8f9bb avcodec-63.dll avpriv_h264_has_num_reorder_frames + 0x2bb
+0x7fff50d8f58c avcodec-63.dll avcodec_default_get_buffer2 + 0x5480c
+0x7fff50c6c7c3 avcodec-63.dll avcodec_send_packet + 0x723
+0x7fff50c6e23a avcodec-63.dll avcodec_send_packet + 0x219a
+0x7fff51035dcc avcodec-63.dll av_parser_iterate + 0x23cec
+0x7fff50cd7813 avcodec-63.dll avcodec_send_frame + 0xf4d3
+0x7fff513a38bf avcodec-63.dll avpriv_split_xiph_headers + 0x27d0f
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 37996 0x946c
+0x7ff8436059c4 ntdll.dll ZwWaitForAlertByThreadId + 0x14
+0x7ff8434f97be ntdll.dll RtlSleepConditionVariableSRW + 0x1de
+0x7ff8406b2a58 KERNELBASE.dll SleepConditionVariableSRW + 0x38
+0x7fff51035d00 avcodec-63.dll av_parser_iterate + 0x23c20
+0x7fff50cd7813 avcodec-63.dll avcodec_send_frame + 0xf4d3
+0x7fff513a38bf avcodec-63.dll avpriv_split_xiph_headers + 0x27d0f
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 40924 0x9fdc
+0x7ff8436059c4 ntdll.dll ZwWaitForAlertByThreadId + 0x14
+0x7ff8434f97be ntdll.dll RtlSleepConditionVariableSRW + 0x1de
+0x7ff8406b2a58 KERNELBASE.dll SleepConditionVariableSRW + 0x38
+0x7fff51035d00 avcodec-63.dll av_parser_iterate + 0x23c20
+0x7fff50cd7813 avcodec-63.dll avcodec_send_frame + 0xf4d3
+0x7fff513a38bf avcodec-63.dll avpriv_split_xiph_headers + 0x27d0f
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 2140 0x85c
+0x7ff8436059c4 ntdll.dll ZwWaitForAlertByThreadId + 0x14
+0x7ff8434f97be ntdll.dll RtlSleepConditionVariableSRW + 0x1de
+0x7ff8406b2a58 KERNELBASE.dll SleepConditionVariableSRW + 0x38
+0x7fff51035d00 avcodec-63.dll av_parser_iterate + 0x23c20
+0x7fff50cd7813 avcodec-63.dll avcodec_send_frame + 0xf4d3
+0x7fff513a38bf avcodec-63.dll avpriv_split_xiph_headers + 0x27d0f
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 15424 0x3c40
+0x7ff8436059c4 ntdll.dll ZwWaitForAlertByThreadId + 0x14
+0x7ff8434f97be ntdll.dll RtlSleepConditionVariableSRW + 0x1de
+0x7ff8406b2a58 KERNELBASE.dll SleepConditionVariableSRW + 0x38
+0x7fff51035d00 avcodec-63.dll av_parser_iterate + 0x23c20
+0x7fff50cd7813 avcodec-63.dll avcodec_send_frame + 0xf4d3
+0x7fff513a38bf avcodec-63.dll avpriv_split_xiph_headers + 0x27d0f
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 15732 0x3d74
+0x7ff8436059c4 ntdll.dll ZwWaitForAlertByThreadId + 0x14
+0x7ff8434f97be ntdll.dll RtlSleepConditionVariableSRW + 0x1de
+0x7ff8406b2a58 KERNELBASE.dll SleepConditionVariableSRW + 0x38
+0x7fff51035d00 avcodec-63.dll av_parser_iterate + 0x23c20
+0x7fff50cd7813 avcodec-63.dll avcodec_send_frame + 0xf4d3
+0x7fff513a38bf avcodec-63.dll avpriv_split_xiph_headers + 0x27d0f
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 37700 0x9344
+0x7ff8436059c4 ntdll.dll ZwWaitForAlertByThreadId + 0x14
+0x7ff8434f97be ntdll.dll RtlSleepConditionVariableSRW + 0x1de
+0x7ff8406b2a58 KERNELBASE.dll SleepConditionVariableSRW + 0x38
+0x7fff51035d00 avcodec-63.dll av_parser_iterate + 0x23c20
+0x7fff50cd7813 avcodec-63.dll avcodec_send_frame + 0xf4d3
+0x7fff513a38bf avcodec-63.dll avpriv_split_xiph_headers + 0x27d0f
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 30696 0x77e8
+0x7ff8436059c4 ntdll.dll ZwWaitForAlertByThreadId + 0x14
+0x7ff8434f97be ntdll.dll RtlSleepConditionVariableSRW + 0x1de
+0x7ff8406b2a58 KERNELBASE.dll SleepConditionVariableSRW + 0x38
+0x7fff51035d00 avcodec-63.dll av_parser_iterate + 0x23c20
+0x7fff50cd7813 avcodec-63.dll avcodec_send_frame + 0xf4d3
+0x7fff513a38bf avcodec-63.dll avpriv_split_xiph_headers + 0x27d0f
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 3128 0xc38
+0x7ff8436059c4 ntdll.dll ZwWaitForAlertByThreadId + 0x14
+0x7ff8434f97be ntdll.dll RtlSleepConditionVariableSRW + 0x1de
+0x7ff8406b2a58 KERNELBASE.dll SleepConditionVariableSRW + 0x38
+0x7fff51035d00 avcodec-63.dll av_parser_iterate + 0x23c20
+0x7fff50cd7813 avcodec-63.dll avcodec_send_frame + 0xf4d3
+0x7fff513a38bf avcodec-63.dll avpriv_split_xiph_headers + 0x27d0f
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 29876 0x74b4
+0x7ff8436059c4 ntdll.dll ZwWaitForAlertByThreadId + 0x14
+0x7ff8434f97be ntdll.dll RtlSleepConditionVariableSRW + 0x1de
+0x7ff8406b2a58 KERNELBASE.dll SleepConditionVariableSRW + 0x38
+0x7fff51035d00 avcodec-63.dll av_parser_iterate + 0x23c20
+0x7fff50cd7813 avcodec-63.dll avcodec_send_frame + 0xf4d3
+0x7fff513a38bf avcodec-63.dll avpriv_split_xiph_headers + 0x27d0f
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 43512 0xa9f8
+0x7ff8436059c4 ntdll.dll ZwWaitForAlertByThreadId + 0x14
+0x7ff8434f97be ntdll.dll RtlSleepConditionVariableSRW + 0x1de
+0x7ff8406b2a58 KERNELBASE.dll SleepConditionVariableSRW + 0x38
+0x7fff51035d00 avcodec-63.dll av_parser_iterate + 0x23c20
+0x7fff50cd7813 avcodec-63.dll avcodec_send_frame + 0xf4d3
+0x7fff513a38bf avcodec-63.dll avpriv_split_xiph_headers + 0x27d0f
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 3848 0xf08
+0x7ff8436059c4 ntdll.dll ZwWaitForAlertByThreadId + 0x14
+0x7ff8434f97be ntdll.dll RtlSleepConditionVariableSRW + 0x1de
+0x7ff8406b2a58 KERNELBASE.dll SleepConditionVariableSRW + 0x38
+0x7fff51035d00 avcodec-63.dll av_parser_iterate + 0x23c20
+0x7fff50cd7813 avcodec-63.dll avcodec_send_frame + 0xf4d3
+0x7fff513a38bf avcodec-63.dll avpriv_split_xiph_headers + 0x27d0f
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 43088 0xa850
+0x7ff843602964 ntdll.dll ZwCancelTimer + 0x14
+0x7ff82ddb2a00 WINMM.dll timeKillEvent + 0x80
+0x7fff6d3af917 Qt6Core.dll QEventDispatcherWin32::unregisterTimer + 0x57
+0x7fff6d254e87 Qt6Core.dll QObject::killTimer + 0xd7
+0x7fff6d20122d Qt6Core.dll QChronoTimer::timerEvent + 0x5d
+0x7fff6d253f36 Qt6Core.dll QObject::event + 0x66
+0x7fff70252fa6 Qt6Widgets.dll QApplicationPrivate::notify_helper + 0x156
+0x7fff70251f8e Qt6Widgets.dll QApplication::notify + 0x161e
+0x7ff80bd56d9f QtWidgets.pyd PyInit_QtWidgets + 0x32606f
+0x7fff6d206e61 Qt6Core.dll QCoreApplication::notifyInternal2 + 0x101
+0x7fff6d3ad607 Qt6Core.dll QEventDispatcherWin32::event + 0x157
+0x7fff70252fa6 Qt6Widgets.dll QApplicationPrivate::notify_helper + 0x156
+0x7fff70251f8e Qt6Widgets.dll QApplication::notify + 0x161e
+0x7ff80bd56d9f QtWidgets.pyd PyInit_QtWidgets + 0x32606f
+0x7fff6d206e61 Qt6Core.dll QCoreApplication::notifyInternal2 + 0x101
+0x7fff6d209729 Qt6Core.dll QCoreApplicationPrivate::sendPostedEvents + 0x249
+0x7fff6d3ad77e Qt6Core.dll QEventDispatcherWin32::processEvents + 0x9e
+0x7fff6d20d5a4 Qt6Core.dll QEventLoop::exec + 0x1d4
+0x7fff6d2f9c67 Qt6Core.dll QThread::exec + 0xc7
+0x7fff6d3bbbd8 Qt6Core.dll QThread::start + 0x5b8
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 5892 0x1704
+0x7ff840ccaf04 win32u.dll NtUserMsgWaitForMultipleObjectsEx + 0x14
+0x7fff6d3add7f Qt6Core.dll QEventDispatcherWin32::processEvents + 0x69f
+0x7fff6d20d5a4 Qt6Core.dll QEventLoop::exec + 0x1d4
+0x7fff6d2f9c67 Qt6Core.dll QThread::exec + 0xc7
+0x7fff6d3bbbd8 Qt6Core.dll QThread::start + 0x5b8
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 43648 0xaa80
+0x7ff840ccaf04 win32u.dll NtUserMsgWaitForMultipleObjectsEx + 0x14
+0x7fff6d3add7f Qt6Core.dll QEventDispatcherWin32::processEvents + 0x69f
+0x7fff6d20d5a4 Qt6Core.dll QEventLoop::exec + 0x1d4
+0x7fff6d2f9c67 Qt6Core.dll QThread::exec + 0xc7
+0x7fff6d3bbbd8 Qt6Core.dll QThread::start + 0x5b8
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 37096 0x90e8
+0x7ff843601dd4 ntdll.dll NtWaitForSingleObject + 0x14
+0x7ff8406abe9f KERNELBASE.dll WaitForSingleObjectEx + 0xaf
+0x7ff8272b7d70 nvwgf2umx.dll NVDEV_Thunk + 0x245f0
+0x7ff82780a2aa nvwgf2umx.dll NVDEV_Thunk + 0x576b2a
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 37460 0x9254
+0x7ff8436028a4 ntdll.dll ZwWaitForMultipleObjects + 0x14
+0x7ff8406b2773 KERNELBASE.dll WaitForMultipleObjectsEx + 0x123
+0x7ff8406b2641 KERNELBASE.dll WaitForMultipleObjects + 0x11
+0x7ff826aa2c36 nvwgf2umx.dll NVAPI_DirectMethods + 0x32d16
+0x7ff82780a2aa nvwgf2umx.dll NVDEV_Thunk + 0x576b2a
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 30364 0x769c
+0x7ff843601dd4 ntdll.dll NtWaitForSingleObject + 0x14
+0x7ff8406abe9f KERNELBASE.dll WaitForSingleObjectEx + 0xaf
+0x7ff82731ba4f nvwgf2umx.dll NVDEV_Thunk + 0x882cf
+0x7ff82780a2aa nvwgf2umx.dll NVDEV_Thunk + 0x576b2a
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 41460 0xa1f4
+0x7ff843601dd4 ntdll.dll NtWaitForSingleObject + 0x14
+0x7ff8406abe9f KERNELBASE.dll WaitForSingleObjectEx + 0xaf
+0x7ff827293238 nvwgf2umx.dll OpenAdapter12 + 0x159d88
+0x7ff82729315f nvwgf2umx.dll OpenAdapter12 + 0x159caf
+0x7ff82780a2aa nvwgf2umx.dll NVDEV_Thunk + 0x576b2a
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 12104 0x2f48
+0x7ff843601dd4 ntdll.dll NtWaitForSingleObject + 0x14
+0x7ff8406abe9f KERNELBASE.dll WaitForSingleObjectEx + 0xaf
+0x7ff827293238 nvwgf2umx.dll OpenAdapter12 + 0x159d88
+0x7ff82729315f nvwgf2umx.dll OpenAdapter12 + 0x159caf
+0x7ff82780a2aa nvwgf2umx.dll NVDEV_Thunk + 0x576b2a
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 41380 0xa1a4
+0x7ff843601dd4 ntdll.dll NtWaitForSingleObject + 0x14
+0x7ff8406abe9f KERNELBASE.dll WaitForSingleObjectEx + 0xaf
+0x7ff827293238 nvwgf2umx.dll OpenAdapter12 + 0x159d88
+0x7ff82729315f nvwgf2umx.dll OpenAdapter12 + 0x159caf
+0x7ff82780a2aa nvwgf2umx.dll NVDEV_Thunk + 0x576b2a
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 38648 0x96f8
+0x7ff843601dd4 ntdll.dll NtWaitForSingleObject + 0x14
+0x7ff8406abe9f KERNELBASE.dll WaitForSingleObjectEx + 0xaf
+0x7ff827293238 nvwgf2umx.dll OpenAdapter12 + 0x159d88
+0x7ff82729315f nvwgf2umx.dll OpenAdapter12 + 0x159caf
+0x7ff82780a2aa nvwgf2umx.dll NVDEV_Thunk + 0x576b2a
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 7012 0x1b64
+0x7ff843601dd4 ntdll.dll NtWaitForSingleObject + 0x14
+0x7ff8406abe9f KERNELBASE.dll WaitForSingleObjectEx + 0xaf
+0x7ff827293238 nvwgf2umx.dll OpenAdapter12 + 0x159d88
+0x7ff82729315f nvwgf2umx.dll OpenAdapter12 + 0x159caf
+0x7ff82780a2aa nvwgf2umx.dll NVDEV_Thunk + 0x576b2a
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 12212 0x2fb4
+0x7ff843601dd4 ntdll.dll NtWaitForSingleObject + 0x14
+0x7ff8406abe9f KERNELBASE.dll WaitForSingleObjectEx + 0xaf
+0x7ff827293238 nvwgf2umx.dll OpenAdapter12 + 0x159d88
+0x7ff82729315f nvwgf2umx.dll OpenAdapter12 + 0x159caf
+0x7ff82780a2aa nvwgf2umx.dll NVDEV_Thunk + 0x576b2a
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 42376 0xa588
+0x7ff843601dd4 ntdll.dll NtWaitForSingleObject + 0x14
+0x7ff8406abe9f KERNELBASE.dll WaitForSingleObjectEx + 0xaf
+0x7ff827293238 nvwgf2umx.dll OpenAdapter12 + 0x159d88
+0x7ff82729315f nvwgf2umx.dll OpenAdapter12 + 0x159caf
+0x7ff82780a2aa nvwgf2umx.dll NVDEV_Thunk + 0x576b2a
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 43452 0xa9bc
+0x7ff843601dd4 ntdll.dll NtWaitForSingleObject + 0x14
+0x7ff8406abe9f KERNELBASE.dll WaitForSingleObjectEx + 0xaf
+0x7ff827293238 nvwgf2umx.dll OpenAdapter12 + 0x159d88
+0x7ff82729315f nvwgf2umx.dll OpenAdapter12 + 0x159caf
+0x7ff82780a2aa nvwgf2umx.dll NVDEV_Thunk + 0x576b2a
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 3984 0xf90
+0x7ff843601dd4 ntdll.dll NtWaitForSingleObject + 0x14
+0x7ff8406abe9f KERNELBASE.dll WaitForSingleObjectEx + 0xaf
+0x7ff827293238 nvwgf2umx.dll OpenAdapter12 + 0x159d88
+0x7ff82729315f nvwgf2umx.dll OpenAdapter12 + 0x159caf
+0x7ff82780a2aa nvwgf2umx.dll NVDEV_Thunk + 0x576b2a
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 43824 0xab30
+0x7ff843601dd4 ntdll.dll NtWaitForSingleObject + 0x14
+0x7ff8406abe9f KERNELBASE.dll WaitForSingleObjectEx + 0xaf
+0x7ff827293238 nvwgf2umx.dll OpenAdapter12 + 0x159d88
+0x7ff82729315f nvwgf2umx.dll OpenAdapter12 + 0x159caf
+0x7ff82780a2aa nvwgf2umx.dll NVDEV_Thunk + 0x576b2a
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 30476 0x770c
+0x7ff843601dd4 ntdll.dll NtWaitForSingleObject + 0x14
+0x7ff8406abe9f KERNELBASE.dll WaitForSingleObjectEx + 0xaf
+0x7ff827293238 nvwgf2umx.dll OpenAdapter12 + 0x159d88
+0x7ff82729315f nvwgf2umx.dll OpenAdapter12 + 0x159caf
+0x7ff82780a2aa nvwgf2umx.dll NVDEV_Thunk + 0x576b2a
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 43436 0xa9ac
+0x7ff843601dd4 ntdll.dll NtWaitForSingleObject + 0x14
+0x7ff8406abe9f KERNELBASE.dll WaitForSingleObjectEx + 0xaf
+0x7ff827293238 nvwgf2umx.dll OpenAdapter12 + 0x159d88
+0x7ff82729315f nvwgf2umx.dll OpenAdapter12 + 0x159caf
+0x7ff82780a2aa nvwgf2umx.dll NVDEV_Thunk + 0x576b2a
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 19524 0x4c44
+0x7ff843601dd4 ntdll.dll NtWaitForSingleObject + 0x14
+0x7ff8406abe9f KERNELBASE.dll WaitForSingleObjectEx + 0xaf
+0x7ff826ee898e nvwgf2umx.dll SetDependencyInfo + 0x69fae
+0x7ff826ee8305 nvwgf2umx.dll SetDependencyInfo + 0x69925
+0x7ff826edcb4d nvwgf2umx.dll SetDependencyInfo + 0x5e16d
+0x7ff8273f24da nvwgf2umx.dll NVDEV_Thunk + 0x15ed5a
+0x7ff82780a2aa nvwgf2umx.dll NVDEV_Thunk + 0x576b2a
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 41660 0xa2bc
+0x7ff843601dd4 ntdll.dll NtWaitForSingleObject + 0x14
+0x7ff8406abe9f KERNELBASE.dll WaitForSingleObjectEx + 0xaf
+0x7ff827293238 nvwgf2umx.dll OpenAdapter12 + 0x159d88
+0x7ff82729315f nvwgf2umx.dll OpenAdapter12 + 0x159caf
+0x7ff82780a2aa nvwgf2umx.dll NVDEV_Thunk + 0x576b2a
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 32736 0x7fe0
+0x7ff8436059c4 ntdll.dll ZwWaitForAlertByThreadId + 0x14
+0x7ff8434f97be ntdll.dll RtlSleepConditionVariableSRW + 0x1de
+0x7ff8406b2a58 KERNELBASE.dll SleepConditionVariableSRW + 0x38
+0x7fff51035d00 avcodec-63.dll av_parser_iterate + 0x23c20
+0x7fff50cd7813 avcodec-63.dll avcodec_send_frame + 0xf4d3
+0x7fff513a38bf avcodec-63.dll avpriv_split_xiph_headers + 0x27d0f
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 17528 0x4478
+0x7ff8436059c4 ntdll.dll ZwWaitForAlertByThreadId + 0x14
+0x7ff8434f97be ntdll.dll RtlSleepConditionVariableSRW + 0x1de
+0x7ff8406b2a58 KERNELBASE.dll SleepConditionVariableSRW + 0x38
+0x7fff51035d00 avcodec-63.dll av_parser_iterate + 0x23c20
+0x7fff50cd7813 avcodec-63.dll avcodec_send_frame + 0xf4d3
+0x7fff513a38bf avcodec-63.dll avpriv_split_xiph_headers + 0x27d0f
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 40160 0x9ce0
+0x7ff8436059c4 ntdll.dll ZwWaitForAlertByThreadId + 0x14
+0x7ff8434f97be ntdll.dll RtlSleepConditionVariableSRW + 0x1de
+0x7ff8406b2a58 KERNELBASE.dll SleepConditionVariableSRW + 0x38
+0x7fff51035d00 avcodec-63.dll av_parser_iterate + 0x23c20
+0x7fff50cd7813 avcodec-63.dll avcodec_send_frame + 0xf4d3
+0x7fff513a38bf avcodec-63.dll avpriv_split_xiph_headers + 0x27d0f
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 33884 0x845c
+0x7ff8436059c4 ntdll.dll ZwWaitForAlertByThreadId + 0x14
+0x7ff8434f97be ntdll.dll RtlSleepConditionVariableSRW + 0x1de
+0x7ff8406b2a58 KERNELBASE.dll SleepConditionVariableSRW + 0x38
+0x7fff51035d00 avcodec-63.dll av_parser_iterate + 0x23c20
+0x7fff50cd7813 avcodec-63.dll avcodec_send_frame + 0xf4d3
+0x7fff513a38bf avcodec-63.dll avpriv_split_xiph_headers + 0x27d0f
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 43664 0xaa90
+0x7ff8436059c4 ntdll.dll ZwWaitForAlertByThreadId + 0x14
+0x7ff8434f97be ntdll.dll RtlSleepConditionVariableSRW + 0x1de
+0x7ff8406b2a58 KERNELBASE.dll SleepConditionVariableSRW + 0x38
+0x7fff51035d00 avcodec-63.dll av_parser_iterate + 0x23c20
+0x7fff50cd7813 avcodec-63.dll avcodec_send_frame + 0xf4d3
+0x7fff513a38bf avcodec-63.dll avpriv_split_xiph_headers + 0x27d0f
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 32984 0x80d8
+0x7ff8436059c4 ntdll.dll ZwWaitForAlertByThreadId + 0x14
+0x7ff8434f97be ntdll.dll RtlSleepConditionVariableSRW + 0x1de
+0x7ff8406b2a58 KERNELBASE.dll SleepConditionVariableSRW + 0x38
+0x7fff51034cc9 avcodec-63.dll av_parser_iterate + 0x22be9
+0x7fff51035404 avcodec-63.dll av_parser_iterate + 0x23324
+0x7fff50d8f9bb avcodec-63.dll avpriv_h264_has_num_reorder_frames + 0x2bb
+0x7fff50d8f58c avcodec-63.dll avcodec_default_get_buffer2 + 0x5480c
+0x7fff50c6c7c3 avcodec-63.dll avcodec_send_packet + 0x723
+0x7fff50c6e23a avcodec-63.dll avcodec_send_packet + 0x219a
+0x7fff51035dcc avcodec-63.dll av_parser_iterate + 0x23cec
+0x7fff50cd7813 avcodec-63.dll avcodec_send_frame + 0xf4d3
+0x7fff513a38bf avcodec-63.dll avpriv_split_xiph_headers + 0x27d0f
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 30152 0x75c8
+0x7ff8436059c4 ntdll.dll ZwWaitForAlertByThreadId + 0x14
+0x7ff8434f97be ntdll.dll RtlSleepConditionVariableSRW + 0x1de
+0x7ff8406b2a58 KERNELBASE.dll SleepConditionVariableSRW + 0x38
+0x7fff51035d00 avcodec-63.dll av_parser_iterate + 0x23c20
+0x7fff50cd7813 avcodec-63.dll avcodec_send_frame + 0xf4d3
+0x7fff513a38bf avcodec-63.dll avpriv_split_xiph_headers + 0x27d0f
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 25368 0x6318
+0x7ff8436059c4 ntdll.dll ZwWaitForAlertByThreadId + 0x14
+0x7ff8434f97be ntdll.dll RtlSleepConditionVariableSRW + 0x1de
+0x7ff8406b2a58 KERNELBASE.dll SleepConditionVariableSRW + 0x38
+0x7fff51035d00 avcodec-63.dll av_parser_iterate + 0x23c20
+0x7fff50cd7813 avcodec-63.dll avcodec_send_frame + 0xf4d3
+0x7fff513a38bf avcodec-63.dll avpriv_split_xiph_headers + 0x27d0f
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 43636 0xaa74
+0x7ff8436059c4 ntdll.dll ZwWaitForAlertByThreadId + 0x14
+0x7ff8434f97be ntdll.dll RtlSleepConditionVariableSRW + 0x1de
+0x7ff8406b2a58 KERNELBASE.dll SleepConditionVariableSRW + 0x38
+0x7fff51035d00 avcodec-63.dll av_parser_iterate + 0x23c20
+0x7fff50cd7813 avcodec-63.dll avcodec_send_frame + 0xf4d3
+0x7fff513a38bf avcodec-63.dll avpriv_split_xiph_headers + 0x27d0f
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 37304 0x91b8
+0x7ff8436059c4 ntdll.dll ZwWaitForAlertByThreadId + 0x14
+0x7ff8434f97be ntdll.dll RtlSleepConditionVariableSRW + 0x1de
+0x7ff8406b2a58 KERNELBASE.dll SleepConditionVariableSRW + 0x38
+0x7fff51035d00 avcodec-63.dll av_parser_iterate + 0x23c20
+0x7fff50cd7813 avcodec-63.dll avcodec_send_frame + 0xf4d3
+0x7fff513a38bf avcodec-63.dll avpriv_split_xiph_headers + 0x27d0f
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 3872 0xf20
+0x7ff8436059c4 ntdll.dll ZwWaitForAlertByThreadId + 0x14
+0x7ff8434f97be ntdll.dll RtlSleepConditionVariableSRW + 0x1de
+0x7ff8406b2a58 KERNELBASE.dll SleepConditionVariableSRW + 0x38
+0x7fff51035d00 avcodec-63.dll av_parser_iterate + 0x23c20
+0x7fff50cd7813 avcodec-63.dll avcodec_send_frame + 0xf4d3
+0x7fff513a38bf avcodec-63.dll avpriv_split_xiph_headers + 0x27d0f
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 33524 0x82f4
+0x7ff8436059c4 ntdll.dll ZwWaitForAlertByThreadId + 0x14
+0x7ff8434f97be ntdll.dll RtlSleepConditionVariableSRW + 0x1de
+0x7ff8406b2a58 KERNELBASE.dll SleepConditionVariableSRW + 0x38
+0x7fff51035d00 avcodec-63.dll av_parser_iterate + 0x23c20
+0x7fff50cd7813 avcodec-63.dll avcodec_send_frame + 0xf4d3
+0x7fff513a38bf avcodec-63.dll avpriv_split_xiph_headers + 0x27d0f
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 41532 0xa23c
+0x7ff8436059c4 ntdll.dll ZwWaitForAlertByThreadId + 0x14
+0x7ff8434f97be ntdll.dll RtlSleepConditionVariableSRW + 0x1de
+0x7ff8406b2a58 KERNELBASE.dll SleepConditionVariableSRW + 0x38
+0x7fff51035d00 avcodec-63.dll av_parser_iterate + 0x23c20
+0x7fff50cd7813 avcodec-63.dll avcodec_send_frame + 0xf4d3
+0x7fff513a38bf avcodec-63.dll avpriv_split_xiph_headers + 0x27d0f
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 16424 0x4028
+0x7ff8436059c4 ntdll.dll ZwWaitForAlertByThreadId + 0x14
+0x7ff8434f97be ntdll.dll RtlSleepConditionVariableSRW + 0x1de
+0x7ff8406b2a58 KERNELBASE.dll SleepConditionVariableSRW + 0x38
+0x7fff51035d00 avcodec-63.dll av_parser_iterate + 0x23c20
+0x7fff50cd7813 avcodec-63.dll avcodec_send_frame + 0xf4d3
+0x7fff513a38bf avcodec-63.dll avpriv_split_xiph_headers + 0x27d0f
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 1952 0x7a0
+0x7ff8436059c4 ntdll.dll ZwWaitForAlertByThreadId + 0x14
+0x7ff8434f97be ntdll.dll RtlSleepConditionVariableSRW + 0x1de
+0x7ff8406b2a58 KERNELBASE.dll SleepConditionVariableSRW + 0x38
+0x7fff51035d00 avcodec-63.dll av_parser_iterate + 0x23c20
+0x7fff50cd7813 avcodec-63.dll avcodec_send_frame + 0xf4d3
+0x7fff513a38bf avcodec-63.dll avpriv_split_xiph_headers + 0x27d0f
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 39668 0x9af4
+0x7ff8436059c4 ntdll.dll ZwWaitForAlertByThreadId + 0x14
+0x7ff8434f97be ntdll.dll RtlSleepConditionVariableSRW + 0x1de
+0x7ff8406b2a58 KERNELBASE.dll SleepConditionVariableSRW + 0x38
+0x7fff51035d00 avcodec-63.dll av_parser_iterate + 0x23c20
+0x7fff50cd7813 avcodec-63.dll avcodec_send_frame + 0xf4d3
+0x7fff513a38bf avcodec-63.dll avpriv_split_xiph_headers + 0x27d0f
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 16648 0x4108
+0x7ff840ccaf04 win32u.dll NtUserMsgWaitForMultipleObjectsEx + 0x14
+0x7fff6d3add7f Qt6Core.dll QEventDispatcherWin32::processEvents + 0x69f
+0x7fff6d20d5a4 Qt6Core.dll QEventLoop::exec + 0x1d4
+0x7fff6d2f9c67 Qt6Core.dll QThread::exec + 0xc7
+0x7fff6d3bbbd8 Qt6Core.dll QThread::start + 0x5b8
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 42460 0xa5dc
+0x7ff840ccaf04 win32u.dll NtUserMsgWaitForMultipleObjectsEx + 0x14
+0x7fff6d3add7f Qt6Core.dll QEventDispatcherWin32::processEvents + 0x69f
+0x7fff6d20d5a4 Qt6Core.dll QEventLoop::exec + 0x1d4
+0x7fff6d2f9c67 Qt6Core.dll QThread::exec + 0xc7
+0x7fff6d3bbbd8 Qt6Core.dll QThread::start + 0x5b8
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 31228 0x79fc
+0x7ff840ccaf04 win32u.dll NtUserMsgWaitForMultipleObjectsEx + 0x14
+0x7fff6d3add7f Qt6Core.dll QEventDispatcherWin32::processEvents + 0x69f
+0x7fff6d20d5a4 Qt6Core.dll QEventLoop::exec + 0x1d4
+0x7fff6d2f9c67 Qt6Core.dll QThread::exec + 0xc7
+0x7fff6d3bbbd8 Qt6Core.dll QThread::start + 0x5b8
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 32916 0x8094
+0x7ff843601dd4 ntdll.dll NtWaitForSingleObject + 0x14
+0x7ff8406abe9f KERNELBASE.dll WaitForSingleObjectEx + 0xaf
+0x7ff8272b7d70 nvwgf2umx.dll NVDEV_Thunk + 0x245f0
+0x7ff82780a2aa nvwgf2umx.dll NVDEV_Thunk + 0x576b2a
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 29900 0x74cc
+0x7ff8436028a4 ntdll.dll ZwWaitForMultipleObjects + 0x14
+0x7ff8406b2773 KERNELBASE.dll WaitForMultipleObjectsEx + 0x123
+0x7ff8406b2641 KERNELBASE.dll WaitForMultipleObjects + 0x11
+0x7ff826aa2c36 nvwgf2umx.dll NVAPI_DirectMethods + 0x32d16
+0x7ff82780a2aa nvwgf2umx.dll NVDEV_Thunk + 0x576b2a
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 30524 0x773c
+0x7ff843601dd4 ntdll.dll NtWaitForSingleObject + 0x14
+0x7ff8406abe9f KERNELBASE.dll WaitForSingleObjectEx + 0xaf
+0x7ff82731ba4f nvwgf2umx.dll NVDEV_Thunk + 0x882cf
+0x7ff82780a2aa nvwgf2umx.dll NVDEV_Thunk + 0x576b2a
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 41568 0xa260
+0x7ff843601dd4 ntdll.dll NtWaitForSingleObject + 0x14
+0x7ff8406abe9f KERNELBASE.dll WaitForSingleObjectEx + 0xaf
+0x7ff827293238 nvwgf2umx.dll OpenAdapter12 + 0x159d88
+0x7ff82729315f nvwgf2umx.dll OpenAdapter12 + 0x159caf
+0x7ff82780a2aa nvwgf2umx.dll NVDEV_Thunk + 0x576b2a
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 33804 0x840c
+0x7ff843601dd4 ntdll.dll NtWaitForSingleObject + 0x14
+0x7ff8406abe9f KERNELBASE.dll WaitForSingleObjectEx + 0xaf
+0x7ff827293238 nvwgf2umx.dll OpenAdapter12 + 0x159d88
+0x7ff82729315f nvwgf2umx.dll OpenAdapter12 + 0x159caf
+0x7ff82780a2aa nvwgf2umx.dll NVDEV_Thunk + 0x576b2a
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 8852 0x2294
+0x7ff843601dd4 ntdll.dll NtWaitForSingleObject + 0x14
+0x7ff8406abe9f KERNELBASE.dll WaitForSingleObjectEx + 0xaf
+0x7ff827293238 nvwgf2umx.dll OpenAdapter12 + 0x159d88
+0x7ff82729315f nvwgf2umx.dll OpenAdapter12 + 0x159caf
+0x7ff82780a2aa nvwgf2umx.dll NVDEV_Thunk + 0x576b2a
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 40412 0x9ddc
+0x7ff843601dd4 ntdll.dll NtWaitForSingleObject + 0x14
+0x7ff8406abe9f KERNELBASE.dll WaitForSingleObjectEx + 0xaf
+0x7ff827293238 nvwgf2umx.dll OpenAdapter12 + 0x159d88
+0x7ff82729315f nvwgf2umx.dll OpenAdapter12 + 0x159caf
+0x7ff82780a2aa nvwgf2umx.dll NVDEV_Thunk + 0x576b2a
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 41400 0xa1b8
+0x7ff843601dd4 ntdll.dll NtWaitForSingleObject + 0x14
+0x7ff8406abe9f KERNELBASE.dll WaitForSingleObjectEx + 0xaf
+0x7ff827293238 nvwgf2umx.dll OpenAdapter12 + 0x159d88
+0x7ff82729315f nvwgf2umx.dll OpenAdapter12 + 0x159caf
+0x7ff82780a2aa nvwgf2umx.dll NVDEV_Thunk + 0x576b2a
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 4560 0x11d0
+0x7ff843601dd4 ntdll.dll NtWaitForSingleObject + 0x14
+0x7ff8406abe9f KERNELBASE.dll WaitForSingleObjectEx + 0xaf
+0x7ff827293238 nvwgf2umx.dll OpenAdapter12 + 0x159d88
+0x7ff82729315f nvwgf2umx.dll OpenAdapter12 + 0x159caf
+0x7ff82780a2aa nvwgf2umx.dll NVDEV_Thunk + 0x576b2a
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 7624 0x1dc8
+0x7ff843601dd4 ntdll.dll NtWaitForSingleObject + 0x14
+0x7ff8406abe9f KERNELBASE.dll WaitForSingleObjectEx + 0xaf
+0x7ff827293238 nvwgf2umx.dll OpenAdapter12 + 0x159d88
+0x7ff82729315f nvwgf2umx.dll OpenAdapter12 + 0x159caf
+0x7ff82780a2aa nvwgf2umx.dll NVDEV_Thunk + 0x576b2a
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 32908 0x808c
+0x7ff843601dd4 ntdll.dll NtWaitForSingleObject + 0x14
+0x7ff8406abe9f KERNELBASE.dll WaitForSingleObjectEx + 0xaf
+0x7ff827293238 nvwgf2umx.dll OpenAdapter12 + 0x159d88
+0x7ff82729315f nvwgf2umx.dll OpenAdapter12 + 0x159caf
+0x7ff82780a2aa nvwgf2umx.dll NVDEV_Thunk + 0x576b2a
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 10980 0x2ae4
+0x7ff843601dd4 ntdll.dll NtWaitForSingleObject + 0x14
+0x7ff8406abe9f KERNELBASE.dll WaitForSingleObjectEx + 0xaf
+0x7ff827293238 nvwgf2umx.dll OpenAdapter12 + 0x159d88
+0x7ff82729315f nvwgf2umx.dll OpenAdapter12 + 0x159caf
+0x7ff82780a2aa nvwgf2umx.dll NVDEV_Thunk + 0x576b2a
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 15148 0x3b2c
+0x7ff843601dd4 ntdll.dll NtWaitForSingleObject + 0x14
+0x7ff8406abe9f KERNELBASE.dll WaitForSingleObjectEx + 0xaf
+0x7ff827293238 nvwgf2umx.dll OpenAdapter12 + 0x159d88
+0x7ff82729315f nvwgf2umx.dll OpenAdapter12 + 0x159caf
+0x7ff82780a2aa nvwgf2umx.dll NVDEV_Thunk + 0x576b2a
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 6172 0x181c
+0x7ff843601dd4 ntdll.dll NtWaitForSingleObject + 0x14
+0x7ff8406abe9f KERNELBASE.dll WaitForSingleObjectEx + 0xaf
+0x7ff827293238 nvwgf2umx.dll OpenAdapter12 + 0x159d88
+0x7ff82729315f nvwgf2umx.dll OpenAdapter12 + 0x159caf
+0x7ff82780a2aa nvwgf2umx.dll NVDEV_Thunk + 0x576b2a
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 34732 0x87ac
+0x7ff843601dd4 ntdll.dll NtWaitForSingleObject + 0x14
+0x7ff8406abe9f KERNELBASE.dll WaitForSingleObjectEx + 0xaf
+0x7ff827293238 nvwgf2umx.dll OpenAdapter12 + 0x159d88
+0x7ff82729315f nvwgf2umx.dll OpenAdapter12 + 0x159caf
+0x7ff82780a2aa nvwgf2umx.dll NVDEV_Thunk + 0x576b2a
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 30000 0x7530
+0x7ff843601dd4 ntdll.dll NtWaitForSingleObject + 0x14
+0x7ff8406abe9f KERNELBASE.dll WaitForSingleObjectEx + 0xaf
+0x7ff826ee898e nvwgf2umx.dll SetDependencyInfo + 0x69fae
+0x7ff826ee8305 nvwgf2umx.dll SetDependencyInfo + 0x69925
+0x7ff826edcb4d nvwgf2umx.dll SetDependencyInfo + 0x5e16d
+0x7ff8273f24da nvwgf2umx.dll NVDEV_Thunk + 0x15ed5a
+0x7ff82780a2aa nvwgf2umx.dll NVDEV_Thunk + 0x576b2a
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 29136 0x71d0
+0x7ff843601dd4 ntdll.dll NtWaitForSingleObject + 0x14
+0x7ff8406abe9f KERNELBASE.dll WaitForSingleObjectEx + 0xaf
+0x7ff827293238 nvwgf2umx.dll OpenAdapter12 + 0x159d88
+0x7ff82729315f nvwgf2umx.dll OpenAdapter12 + 0x159caf
+0x7ff82780a2aa nvwgf2umx.dll NVDEV_Thunk + 0x576b2a
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 16860 0x41dc
+0x7ff8436059c4 ntdll.dll ZwWaitForAlertByThreadId + 0x14
+0x7ff8434f97be ntdll.dll RtlSleepConditionVariableSRW + 0x1de
+0x7ff8406b2a58 KERNELBASE.dll SleepConditionVariableSRW + 0x38
+0x7fff51035d00 avcodec-63.dll av_parser_iterate + 0x23c20
+0x7fff50cd7813 avcodec-63.dll avcodec_send_frame + 0xf4d3
+0x7fff513a38bf avcodec-63.dll avpriv_split_xiph_headers + 0x27d0f
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 11860 0x2e54
+0x7ff8436059c4 ntdll.dll ZwWaitForAlertByThreadId + 0x14
+0x7ff8434f97be ntdll.dll RtlSleepConditionVariableSRW + 0x1de
+0x7ff8406b2a58 KERNELBASE.dll SleepConditionVariableSRW + 0x38
+0x7fff51035d00 avcodec-63.dll av_parser_iterate + 0x23c20
+0x7fff50cd7813 avcodec-63.dll avcodec_send_frame + 0xf4d3
+0x7fff513a38bf avcodec-63.dll avpriv_split_xiph_headers + 0x27d0f
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 7808 0x1e80
+0x7ff8436059c4 ntdll.dll ZwWaitForAlertByThreadId + 0x14
+0x7ff8434f97be ntdll.dll RtlSleepConditionVariableSRW + 0x1de
+0x7ff8406b2a58 KERNELBASE.dll SleepConditionVariableSRW + 0x38
+0x7fff51035d00 avcodec-63.dll av_parser_iterate + 0x23c20
+0x7fff50cd7813 avcodec-63.dll avcodec_send_frame + 0xf4d3
+0x7fff513a38bf avcodec-63.dll avpriv_split_xiph_headers + 0x27d0f
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 19772 0x4d3c
+0x7ff8436059c4 ntdll.dll ZwWaitForAlertByThreadId + 0x14
+0x7ff8434f97be ntdll.dll RtlSleepConditionVariableSRW + 0x1de
+0x7ff8406b2a58 KERNELBASE.dll SleepConditionVariableSRW + 0x38
+0x7fff51035d00 avcodec-63.dll av_parser_iterate + 0x23c20
+0x7fff50cd7813 avcodec-63.dll avcodec_send_frame + 0xf4d3
+0x7fff513a38bf avcodec-63.dll avpriv_split_xiph_headers + 0x27d0f
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 39036 0x987c
+0x7ff8436059c4 ntdll.dll ZwWaitForAlertByThreadId + 0x14
+0x7ff8434f97be ntdll.dll RtlSleepConditionVariableSRW + 0x1de
+0x7ff8406b2a58 KERNELBASE.dll SleepConditionVariableSRW + 0x38
+0x7fff51035d00 avcodec-63.dll av_parser_iterate + 0x23c20
+0x7fff50cd7813 avcodec-63.dll avcodec_send_frame + 0xf4d3
+0x7fff513a38bf avcodec-63.dll avpriv_split_xiph_headers + 0x27d0f
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 34976 0x88a0
+0x7ff8436059c4 ntdll.dll ZwWaitForAlertByThreadId + 0x14
+0x7ff8434f97be ntdll.dll RtlSleepConditionVariableSRW + 0x1de
+0x7ff8406b2a58 KERNELBASE.dll SleepConditionVariableSRW + 0x38
+0x7fff51035d00 avcodec-63.dll av_parser_iterate + 0x23c20
+0x7fff50cd7813 avcodec-63.dll avcodec_send_frame + 0xf4d3
+0x7fff513a38bf avcodec-63.dll avpriv_split_xiph_headers + 0x27d0f
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 41332 0xa174
+0x7ff8436059c4 ntdll.dll ZwWaitForAlertByThreadId + 0x14
+0x7ff8434f97be ntdll.dll RtlSleepConditionVariableSRW + 0x1de
+0x7ff8406b2a58 KERNELBASE.dll SleepConditionVariableSRW + 0x38
+0x7fff51034cc9 avcodec-63.dll av_parser_iterate + 0x22be9
+0x7fff51035404 avcodec-63.dll av_parser_iterate + 0x23324
+0x7fff50d8f9bb avcodec-63.dll avpriv_h264_has_num_reorder_frames + 0x2bb
+0x7fff50d8f58c avcodec-63.dll avcodec_default_get_buffer2 + 0x5480c
+0x7fff50c6c7c3 avcodec-63.dll avcodec_send_packet + 0x723
+0x7fff50c6e23a avcodec-63.dll avcodec_send_packet + 0x219a
+0x7fff51035dcc avcodec-63.dll av_parser_iterate + 0x23cec
+0x7fff50cd7813 avcodec-63.dll avcodec_send_frame + 0xf4d3
+0x7fff513a38bf avcodec-63.dll avpriv_split_xiph_headers + 0x27d0f
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 19228 0x4b1c
+0x7ff8436059c4 ntdll.dll ZwWaitForAlertByThreadId + 0x14
+0x7ff8434f97be ntdll.dll RtlSleepConditionVariableSRW + 0x1de
+0x7ff8406b2a58 KERNELBASE.dll SleepConditionVariableSRW + 0x38
+0x7fff51035d00 avcodec-63.dll av_parser_iterate + 0x23c20
+0x7fff50cd7813 avcodec-63.dll avcodec_send_frame + 0xf4d3
+0x7fff513a38bf avcodec-63.dll avpriv_split_xiph_headers + 0x27d0f
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 20636 0x509c
+0x7ff8436059c4 ntdll.dll ZwWaitForAlertByThreadId + 0x14
+0x7ff8434f97be ntdll.dll RtlSleepConditionVariableSRW + 0x1de
+0x7ff8406b2a58 KERNELBASE.dll SleepConditionVariableSRW + 0x38
+0x7fff51035d00 avcodec-63.dll av_parser_iterate + 0x23c20
+0x7fff50cd7813 avcodec-63.dll avcodec_send_frame + 0xf4d3
+0x7fff513a38bf avcodec-63.dll avpriv_split_xiph_headers + 0x27d0f
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 38004 0x9474
+0x7ff8436059c4 ntdll.dll ZwWaitForAlertByThreadId + 0x14
+0x7ff8434f97be ntdll.dll RtlSleepConditionVariableSRW + 0x1de
+0x7ff8406b2a58 KERNELBASE.dll SleepConditionVariableSRW + 0x38
+0x7fff51035d00 avcodec-63.dll av_parser_iterate + 0x23c20
+0x7fff50cd7813 avcodec-63.dll avcodec_send_frame + 0xf4d3
+0x7fff513a38bf avcodec-63.dll avpriv_split_xiph_headers + 0x27d0f
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 38256 0x9570
+0x7ff8436059c4 ntdll.dll ZwWaitForAlertByThreadId + 0x14
+0x7ff8434f97be ntdll.dll RtlSleepConditionVariableSRW + 0x1de
+0x7ff8406b2a58 KERNELBASE.dll SleepConditionVariableSRW + 0x38
+0x7fff51035d00 avcodec-63.dll av_parser_iterate + 0x23c20
+0x7fff50cd7813 avcodec-63.dll avcodec_send_frame + 0xf4d3
+0x7fff513a38bf avcodec-63.dll avpriv_split_xiph_headers + 0x27d0f
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 32268 0x7e0c
+0x7ff8436059c4 ntdll.dll ZwWaitForAlertByThreadId + 0x14
+0x7ff8434f97be ntdll.dll RtlSleepConditionVariableSRW + 0x1de
+0x7ff8406b2a58 KERNELBASE.dll SleepConditionVariableSRW + 0x38
+0x7fff51035d00 avcodec-63.dll av_parser_iterate + 0x23c20
+0x7fff50cd7813 avcodec-63.dll avcodec_send_frame + 0xf4d3
+0x7fff513a38bf avcodec-63.dll avpriv_split_xiph_headers + 0x27d0f
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 40116 0x9cb4
+0x7ff8436059c4 ntdll.dll ZwWaitForAlertByThreadId + 0x14
+0x7ff8434f97be ntdll.dll RtlSleepConditionVariableSRW + 0x1de
+0x7ff8406b2a58 KERNELBASE.dll SleepConditionVariableSRW + 0x38
+0x7fff51035d00 avcodec-63.dll av_parser_iterate + 0x23c20
+0x7fff50cd7813 avcodec-63.dll avcodec_send_frame + 0xf4d3
+0x7fff513a38bf avcodec-63.dll avpriv_split_xiph_headers + 0x27d0f
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 41956 0xa3e4
+0x7ff8436059c4 ntdll.dll ZwWaitForAlertByThreadId + 0x14
+0x7ff8434f97be ntdll.dll RtlSleepConditionVariableSRW + 0x1de
+0x7ff8406b2a58 KERNELBASE.dll SleepConditionVariableSRW + 0x38
+0x7fff51035d00 avcodec-63.dll av_parser_iterate + 0x23c20
+0x7fff50cd7813 avcodec-63.dll avcodec_send_frame + 0xf4d3
+0x7fff513a38bf avcodec-63.dll avpriv_split_xiph_headers + 0x27d0f
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 41204 0xa0f4
+0x7ff8436059c4 ntdll.dll ZwWaitForAlertByThreadId + 0x14
+0x7ff8434f97be ntdll.dll RtlSleepConditionVariableSRW + 0x1de
+0x7ff8406b2a58 KERNELBASE.dll SleepConditionVariableSRW + 0x38
+0x7fff51035d00 avcodec-63.dll av_parser_iterate + 0x23c20
+0x7fff50cd7813 avcodec-63.dll avcodec_send_frame + 0xf4d3
+0x7fff513a38bf avcodec-63.dll avpriv_split_xiph_headers + 0x27d0f
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 27424 0x6b20
+0x7ff8436059c4 ntdll.dll ZwWaitForAlertByThreadId + 0x14
+0x7ff8434f97be ntdll.dll RtlSleepConditionVariableSRW + 0x1de
+0x7ff8406b2a58 KERNELBASE.dll SleepConditionVariableSRW + 0x38
+0x7fff51035d00 avcodec-63.dll av_parser_iterate + 0x23c20
+0x7fff50cd7813 avcodec-63.dll avcodec_send_frame + 0xf4d3
+0x7fff513a38bf avcodec-63.dll avpriv_split_xiph_headers + 0x27d0f
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 41296 0xa150
+0x7ff840ccaf04 win32u.dll NtUserMsgWaitForMultipleObjectsEx + 0x14
+0x7fff6d3add7f Qt6Core.dll QEventDispatcherWin32::processEvents + 0x69f
+0x7fff6d20d5a4 Qt6Core.dll QEventLoop::exec + 0x1d4
+0x7fff6d2f9c67 Qt6Core.dll QThread::exec + 0xc7
+0x7fff6d3bbbd8 Qt6Core.dll QThread::start + 0x5b8
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 25608 0x6408
+0x7ff840ccaf04 win32u.dll NtUserMsgWaitForMultipleObjectsEx + 0x14
+0x7fff6d3add7f Qt6Core.dll QEventDispatcherWin32::processEvents + 0x69f
+0x7fff6d20d5a4 Qt6Core.dll QEventLoop::exec + 0x1d4
+0x7fff6d2f9c67 Qt6Core.dll QThread::exec + 0xc7
+0x7fff6d3bbbd8 Qt6Core.dll QThread::start + 0x5b8
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 592 0x250
+0x7ff840ccaf04 win32u.dll NtUserMsgWaitForMultipleObjectsEx + 0x14
+0x7fff6d3add7f Qt6Core.dll QEventDispatcherWin32::processEvents + 0x69f
+0x7fff6d20d5a4 Qt6Core.dll QEventLoop::exec + 0x1d4
+0x7fff6d2f9c67 Qt6Core.dll QThread::exec + 0xc7
+0x7fff6d3bbbd8 Qt6Core.dll QThread::start + 0x5b8
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 33104 0x8150
+0x7ff843601dd4 ntdll.dll NtWaitForSingleObject + 0x14
+0x7ff8406abe9f KERNELBASE.dll WaitForSingleObjectEx + 0xaf
+0x7ff8272b7d70 nvwgf2umx.dll NVDEV_Thunk + 0x245f0
+0x7ff82780a2aa nvwgf2umx.dll NVDEV_Thunk + 0x576b2a
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 10284 0x282c
+0x7ff8436028a4 ntdll.dll ZwWaitForMultipleObjects + 0x14
+0x7ff8406b2773 KERNELBASE.dll WaitForMultipleObjectsEx + 0x123
+0x7ff8406b2641 KERNELBASE.dll WaitForMultipleObjects + 0x11
+0x7ff826aa2c36 nvwgf2umx.dll NVAPI_DirectMethods + 0x32d16
+0x7ff82780a2aa nvwgf2umx.dll NVDEV_Thunk + 0x576b2a
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 40468 0x9e14
+0x7ff843601dd4 ntdll.dll NtWaitForSingleObject + 0x14
+0x7ff8406abe9f KERNELBASE.dll WaitForSingleObjectEx + 0xaf
+0x7ff82731ba4f nvwgf2umx.dll NVDEV_Thunk + 0x882cf
+0x7ff82780a2aa nvwgf2umx.dll NVDEV_Thunk + 0x576b2a
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 27848 0x6cc8
+0x7ff843601dd4 ntdll.dll NtWaitForSingleObject + 0x14
+0x7ff8406abe9f KERNELBASE.dll WaitForSingleObjectEx + 0xaf
+0x7ff827293238 nvwgf2umx.dll OpenAdapter12 + 0x159d88
+0x7ff82729315f nvwgf2umx.dll OpenAdapter12 + 0x159caf
+0x7ff82780a2aa nvwgf2umx.dll NVDEV_Thunk + 0x576b2a
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 18420 0x47f4
+0x7ff843601dd4 ntdll.dll NtWaitForSingleObject + 0x14
+0x7ff8406abe9f KERNELBASE.dll WaitForSingleObjectEx + 0xaf
+0x7ff827293238 nvwgf2umx.dll OpenAdapter12 + 0x159d88
+0x7ff82729315f nvwgf2umx.dll OpenAdapter12 + 0x159caf
+0x7ff82780a2aa nvwgf2umx.dll NVDEV_Thunk + 0x576b2a
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 3624 0xe28
+0x7ff843601dd4 ntdll.dll NtWaitForSingleObject + 0x14
+0x7ff8406abe9f KERNELBASE.dll WaitForSingleObjectEx + 0xaf
+0x7ff827293238 nvwgf2umx.dll OpenAdapter12 + 0x159d88
+0x7ff82729315f nvwgf2umx.dll OpenAdapter12 + 0x159caf
+0x7ff82780a2aa nvwgf2umx.dll NVDEV_Thunk + 0x576b2a
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 31600 0x7b70
+0x7ff843601dd4 ntdll.dll NtWaitForSingleObject + 0x14
+0x7ff8406abe9f KERNELBASE.dll WaitForSingleObjectEx + 0xaf
+0x7ff827293238 nvwgf2umx.dll OpenAdapter12 + 0x159d88
+0x7ff82729315f nvwgf2umx.dll OpenAdapter12 + 0x159caf
+0x7ff82780a2aa nvwgf2umx.dll NVDEV_Thunk + 0x576b2a
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 42508 0xa60c
+0x7ff843601dd4 ntdll.dll NtWaitForSingleObject + 0x14
+0x7ff8406abe9f KERNELBASE.dll WaitForSingleObjectEx + 0xaf
+0x7ff827293238 nvwgf2umx.dll OpenAdapter12 + 0x159d88
+0x7ff82729315f nvwgf2umx.dll OpenAdapter12 + 0x159caf
+0x7ff82780a2aa nvwgf2umx.dll NVDEV_Thunk + 0x576b2a
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 36232 0x8d88
+0x7ff843601dd4 ntdll.dll NtWaitForSingleObject + 0x14
+0x7ff8406abe9f KERNELBASE.dll WaitForSingleObjectEx + 0xaf
+0x7ff827293238 nvwgf2umx.dll OpenAdapter12 + 0x159d88
+0x7ff82729315f nvwgf2umx.dll OpenAdapter12 + 0x159caf
+0x7ff82780a2aa nvwgf2umx.dll NVDEV_Thunk + 0x576b2a
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 31184 0x79d0
+0x7ff843601dd4 ntdll.dll NtWaitForSingleObject + 0x14
+0x7ff8406abe9f KERNELBASE.dll WaitForSingleObjectEx + 0xaf
+0x7ff827293238 nvwgf2umx.dll OpenAdapter12 + 0x159d88
+0x7ff82729315f nvwgf2umx.dll OpenAdapter12 + 0x159caf
+0x7ff82780a2aa nvwgf2umx.dll NVDEV_Thunk + 0x576b2a
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 19960 0x4df8
+0x7ff843601dd4 ntdll.dll NtWaitForSingleObject + 0x14
+0x7ff8406abe9f KERNELBASE.dll WaitForSingleObjectEx + 0xaf
+0x7ff827293238 nvwgf2umx.dll OpenAdapter12 + 0x159d88
+0x7ff82729315f nvwgf2umx.dll OpenAdapter12 + 0x159caf
+0x7ff82780a2aa nvwgf2umx.dll NVDEV_Thunk + 0x576b2a
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 33724 0x83bc
+0x7ff843601dd4 ntdll.dll NtWaitForSingleObject + 0x14
+0x7ff8406abe9f KERNELBASE.dll WaitForSingleObjectEx + 0xaf
+0x7ff827293238 nvwgf2umx.dll OpenAdapter12 + 0x159d88
+0x7ff82729315f nvwgf2umx.dll OpenAdapter12 + 0x159caf
+0x7ff82780a2aa nvwgf2umx.dll NVDEV_Thunk + 0x576b2a
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 42596 0xa664
+0x7ff843601dd4 ntdll.dll NtWaitForSingleObject + 0x14
+0x7ff8406abe9f KERNELBASE.dll WaitForSingleObjectEx + 0xaf
+0x7ff827293238 nvwgf2umx.dll OpenAdapter12 + 0x159d88
+0x7ff82729315f nvwgf2umx.dll OpenAdapter12 + 0x159caf
+0x7ff82780a2aa nvwgf2umx.dll NVDEV_Thunk + 0x576b2a
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 43580 0xaa3c
+0x7ff843601dd4 ntdll.dll NtWaitForSingleObject + 0x14
+0x7ff8406abe9f KERNELBASE.dll WaitForSingleObjectEx + 0xaf
+0x7ff827293238 nvwgf2umx.dll OpenAdapter12 + 0x159d88
+0x7ff82729315f nvwgf2umx.dll OpenAdapter12 + 0x159caf
+0x7ff82780a2aa nvwgf2umx.dll NVDEV_Thunk + 0x576b2a
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 21424 0x53b0
+0x7ff843601dd4 ntdll.dll NtWaitForSingleObject + 0x14
+0x7ff8406abe9f KERNELBASE.dll WaitForSingleObjectEx + 0xaf
+0x7ff827293238 nvwgf2umx.dll OpenAdapter12 + 0x159d88
+0x7ff82729315f nvwgf2umx.dll OpenAdapter12 + 0x159caf
+0x7ff82780a2aa nvwgf2umx.dll NVDEV_Thunk + 0x576b2a
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 25644 0x642c
+0x7ff843601dd4 ntdll.dll NtWaitForSingleObject + 0x14
+0x7ff8406abe9f KERNELBASE.dll WaitForSingleObjectEx + 0xaf
+0x7ff826ee898e nvwgf2umx.dll SetDependencyInfo + 0x69fae
+0x7ff826ee8305 nvwgf2umx.dll SetDependencyInfo + 0x69925
+0x7ff826edcb4d nvwgf2umx.dll SetDependencyInfo + 0x5e16d
+0x7ff8273f24da nvwgf2umx.dll NVDEV_Thunk + 0x15ed5a
+0x7ff82780a2aa nvwgf2umx.dll NVDEV_Thunk + 0x576b2a
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 40912 0x9fd0
+0x7ff843601dd4 ntdll.dll NtWaitForSingleObject + 0x14
+0x7ff8406abe9f KERNELBASE.dll WaitForSingleObjectEx + 0xaf
+0x7ff827293238 nvwgf2umx.dll OpenAdapter12 + 0x159d88
+0x7ff82729315f nvwgf2umx.dll OpenAdapter12 + 0x159caf
+0x7ff82780a2aa nvwgf2umx.dll NVDEV_Thunk + 0x576b2a
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 39436 0x9a0c
+0x7ff8436059c4 ntdll.dll ZwWaitForAlertByThreadId + 0x14
+0x7ff8434f97be ntdll.dll RtlSleepConditionVariableSRW + 0x1de
+0x7ff8406b2a58 KERNELBASE.dll SleepConditionVariableSRW + 0x38
+0x7fff51035d00 avcodec-63.dll av_parser_iterate + 0x23c20
+0x7fff50cd7813 avcodec-63.dll avcodec_send_frame + 0xf4d3
+0x7fff513a38bf avcodec-63.dll avpriv_split_xiph_headers + 0x27d0f
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 44008 0xabe8
+0x7ff8436059c4 ntdll.dll ZwWaitForAlertByThreadId + 0x14
+0x7ff8434f97be ntdll.dll RtlSleepConditionVariableSRW + 0x1de
+0x7ff8406b2a58 KERNELBASE.dll SleepConditionVariableSRW + 0x38
+0x7fff51035d00 avcodec-63.dll av_parser_iterate + 0x23c20
+0x7fff50cd7813 avcodec-63.dll avcodec_send_frame + 0xf4d3
+0x7fff513a38bf avcodec-63.dll avpriv_split_xiph_headers + 0x27d0f
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 20908 0x51ac
+0x7ff8436059c4 ntdll.dll ZwWaitForAlertByThreadId + 0x14
+0x7ff8434f97be ntdll.dll RtlSleepConditionVariableSRW + 0x1de
+0x7ff8406b2a58 KERNELBASE.dll SleepConditionVariableSRW + 0x38
+0x7fff51035d00 avcodec-63.dll av_parser_iterate + 0x23c20
+0x7fff50cd7813 avcodec-63.dll avcodec_send_frame + 0xf4d3
+0x7fff513a38bf avcodec-63.dll avpriv_split_xiph_headers + 0x27d0f
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 7872 0x1ec0
+0x7ff8436059c4 ntdll.dll ZwWaitForAlertByThreadId + 0x14
+0x7ff8434f97be ntdll.dll RtlSleepConditionVariableSRW + 0x1de
+0x7ff8406b2a58 KERNELBASE.dll SleepConditionVariableSRW + 0x38
+0x7fff51035d00 avcodec-63.dll av_parser_iterate + 0x23c20
+0x7fff50cd7813 avcodec-63.dll avcodec_send_frame + 0xf4d3
+0x7fff513a38bf avcodec-63.dll avpriv_split_xiph_headers + 0x27d0f
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 38944 0x9820
+0x7ff8436059c4 ntdll.dll ZwWaitForAlertByThreadId + 0x14
+0x7ff8434f97be ntdll.dll RtlSleepConditionVariableSRW + 0x1de
+0x7ff8406b2a58 KERNELBASE.dll SleepConditionVariableSRW + 0x38
+0x7fff51035d00 avcodec-63.dll av_parser_iterate + 0x23c20
+0x7fff50cd7813 avcodec-63.dll avcodec_send_frame + 0xf4d3
+0x7fff513a38bf avcodec-63.dll avpriv_split_xiph_headers + 0x27d0f
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 34440 0x8688
+0x7ff8436059c4 ntdll.dll ZwWaitForAlertByThreadId + 0x14
+0x7ff8434f97be ntdll.dll RtlSleepConditionVariableSRW + 0x1de
+0x7ff8406b2a58 KERNELBASE.dll SleepConditionVariableSRW + 0x38
+0x7fff51035d00 avcodec-63.dll av_parser_iterate + 0x23c20
+0x7fff50cd7813 avcodec-63.dll avcodec_send_frame + 0xf4d3
+0x7fff513a38bf avcodec-63.dll avpriv_split_xiph_headers + 0x27d0f
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 30528 0x7740
+0x7ff8436059c4 ntdll.dll ZwWaitForAlertByThreadId + 0x14
+0x7ff8434f97be ntdll.dll RtlSleepConditionVariableSRW + 0x1de
+0x7ff8406b2a58 KERNELBASE.dll SleepConditionVariableSRW + 0x38
+0x7fff51035d00 avcodec-63.dll av_parser_iterate + 0x23c20
+0x7fff50cd7813 avcodec-63.dll avcodec_send_frame + 0xf4d3
+0x7fff513a38bf avcodec-63.dll avpriv_split_xiph_headers + 0x27d0f
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 8016 0x1f50
+0x7ff8436059c4 ntdll.dll ZwWaitForAlertByThreadId + 0x14
+0x7ff8434f97be ntdll.dll RtlSleepConditionVariableSRW + 0x1de
+0x7ff8406b2a58 KERNELBASE.dll SleepConditionVariableSRW + 0x38
+0x7fff51035d00 avcodec-63.dll av_parser_iterate + 0x23c20
+0x7fff50cd7813 avcodec-63.dll avcodec_send_frame + 0xf4d3
+0x7fff513a38bf avcodec-63.dll avpriv_split_xiph_headers + 0x27d0f
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 41116 0xa09c
+0x7ff8436059c4 ntdll.dll ZwWaitForAlertByThreadId + 0x14
+0x7ff8434f97be ntdll.dll RtlSleepConditionVariableSRW + 0x1de
+0x7ff8406b2a58 KERNELBASE.dll SleepConditionVariableSRW + 0x38
+0x7fff51034cc9 avcodec-63.dll av_parser_iterate + 0x22be9
+0x7fff51035404 avcodec-63.dll av_parser_iterate + 0x23324
+0x7fff50d8f9bb avcodec-63.dll avpriv_h264_has_num_reorder_frames + 0x2bb
+0x7fff50d8f58c avcodec-63.dll avcodec_default_get_buffer2 + 0x5480c
+0x7fff50c6c7c3 avcodec-63.dll avcodec_send_packet + 0x723
+0x7fff50c6e23a avcodec-63.dll avcodec_send_packet + 0x219a
+0x7fff51035dcc avcodec-63.dll av_parser_iterate + 0x23cec
+0x7fff50cd7813 avcodec-63.dll avcodec_send_frame + 0xf4d3
+0x7fff513a38bf avcodec-63.dll avpriv_split_xiph_headers + 0x27d0f
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 39404 0x99ec
+0x7ff8436059c4 ntdll.dll ZwWaitForAlertByThreadId + 0x14
+0x7ff8434f97be ntdll.dll RtlSleepConditionVariableSRW + 0x1de
+0x7ff8406b2a58 KERNELBASE.dll SleepConditionVariableSRW + 0x38
+0x7fff51035d00 avcodec-63.dll av_parser_iterate + 0x23c20
+0x7fff50cd7813 avcodec-63.dll avcodec_send_frame + 0xf4d3
+0x7fff513a38bf avcodec-63.dll avpriv_split_xiph_headers + 0x27d0f
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 26028 0x65ac
+0x7ff8436059c4 ntdll.dll ZwWaitForAlertByThreadId + 0x14
+0x7ff8434f97be ntdll.dll RtlSleepConditionVariableSRW + 0x1de
+0x7ff8406b2a58 KERNELBASE.dll SleepConditionVariableSRW + 0x38
+0x7fff51035d00 avcodec-63.dll av_parser_iterate + 0x23c20
+0x7fff50cd7813 avcodec-63.dll avcodec_send_frame + 0xf4d3
+0x7fff513a38bf avcodec-63.dll avpriv_split_xiph_headers + 0x27d0f
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 10460 0x28dc
+0x7ff8436059c4 ntdll.dll ZwWaitForAlertByThreadId + 0x14
+0x7ff8434f97be ntdll.dll RtlSleepConditionVariableSRW + 0x1de
+0x7ff8406b2a58 KERNELBASE.dll SleepConditionVariableSRW + 0x38
+0x7fff51035d00 avcodec-63.dll av_parser_iterate + 0x23c20
+0x7fff50cd7813 avcodec-63.dll avcodec_send_frame + 0xf4d3
+0x7fff513a38bf avcodec-63.dll avpriv_split_xiph_headers + 0x27d0f
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 39664 0x9af0
+0x7ff8436059c4 ntdll.dll ZwWaitForAlertByThreadId + 0x14
+0x7ff8434f97be ntdll.dll RtlSleepConditionVariableSRW + 0x1de
+0x7ff8406b2a58 KERNELBASE.dll SleepConditionVariableSRW + 0x38
+0x7fff51035d00 avcodec-63.dll av_parser_iterate + 0x23c20
+0x7fff50cd7813 avcodec-63.dll avcodec_send_frame + 0xf4d3
+0x7fff513a38bf avcodec-63.dll avpriv_split_xiph_headers + 0x27d0f
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 41372 0xa19c
+0x7ff8436059c4 ntdll.dll ZwWaitForAlertByThreadId + 0x14
+0x7ff8434f97be ntdll.dll RtlSleepConditionVariableSRW + 0x1de
+0x7ff8406b2a58 KERNELBASE.dll SleepConditionVariableSRW + 0x38
+0x7fff51035d00 avcodec-63.dll av_parser_iterate + 0x23c20
+0x7fff50cd7813 avcodec-63.dll avcodec_send_frame + 0xf4d3
+0x7fff513a38bf avcodec-63.dll avpriv_split_xiph_headers + 0x27d0f
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 40884 0x9fb4
+0x7ff8436059c4 ntdll.dll ZwWaitForAlertByThreadId + 0x14
+0x7ff8434f97be ntdll.dll RtlSleepConditionVariableSRW + 0x1de
+0x7ff8406b2a58 KERNELBASE.dll SleepConditionVariableSRW + 0x38
+0x7fff51035d00 avcodec-63.dll av_parser_iterate + 0x23c20
+0x7fff50cd7813 avcodec-63.dll avcodec_send_frame + 0xf4d3
+0x7fff513a38bf avcodec-63.dll avpriv_split_xiph_headers + 0x27d0f
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 19232 0x4b20
+0x7ff8436059c4 ntdll.dll ZwWaitForAlertByThreadId + 0x14
+0x7ff8434f97be ntdll.dll RtlSleepConditionVariableSRW + 0x1de
+0x7ff8406b2a58 KERNELBASE.dll SleepConditionVariableSRW + 0x38
+0x7fff51035d00 avcodec-63.dll av_parser_iterate + 0x23c20
+0x7fff50cd7813 avcodec-63.dll avcodec_send_frame + 0xf4d3
+0x7fff513a38bf avcodec-63.dll avpriv_split_xiph_headers + 0x27d0f
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 21328 0x5350
+0x7ff840ccaf04 win32u.dll NtUserMsgWaitForMultipleObjectsEx + 0x14
+0x7fff6d3add7f Qt6Core.dll QEventDispatcherWin32::processEvents + 0x69f
+0x7fff6d20d5a4 Qt6Core.dll QEventLoop::exec + 0x1d4
+0x7fff6d2f9c67 Qt6Core.dll QThread::exec + 0xc7
+0x7fff6d3bbbd8 Qt6Core.dll QThread::start + 0x5b8
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 31972 0x7ce4
+0x7ff840ccaf04 win32u.dll NtUserMsgWaitForMultipleObjectsEx + 0x14
+0x7fff6d3add7f Qt6Core.dll QEventDispatcherWin32::processEvents + 0x69f
+0x7fff6d20d5a4 Qt6Core.dll QEventLoop::exec + 0x1d4
+0x7fff6d2f9c67 Qt6Core.dll QThread::exec + 0xc7
+0x7fff6d3bbbd8 Qt6Core.dll QThread::start + 0x5b8
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 31964 0x7cdc
+0x7ff840ccaf04 win32u.dll NtUserMsgWaitForMultipleObjectsEx + 0x14
+0x7fff6d3add7f Qt6Core.dll QEventDispatcherWin32::processEvents + 0x69f
+0x7fff6d20d5a4 Qt6Core.dll QEventLoop::exec + 0x1d4
+0x7fff6d2f9c67 Qt6Core.dll QThread::exec + 0xc7
+0x7fff6d3bbbd8 Qt6Core.dll QThread::start + 0x5b8
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 31164 0x79bc
+0x7ff843601dd4 ntdll.dll NtWaitForSingleObject + 0x14
+0x7ff8406abe9f KERNELBASE.dll WaitForSingleObjectEx + 0xaf
+0x7ff8272b7d70 nvwgf2umx.dll NVDEV_Thunk + 0x245f0
+0x7ff82780a2aa nvwgf2umx.dll NVDEV_Thunk + 0x576b2a
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 19204 0x4b04
+0x7ff8436028a4 ntdll.dll ZwWaitForMultipleObjects + 0x14
+0x7ff8406b2773 KERNELBASE.dll WaitForMultipleObjectsEx + 0x123
+0x7ff8406b2641 KERNELBASE.dll WaitForMultipleObjects + 0x11
+0x7ff826aa2c36 nvwgf2umx.dll NVAPI_DirectMethods + 0x32d16
+0x7ff82780a2aa nvwgf2umx.dll NVDEV_Thunk + 0x576b2a
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 40568 0x9e78
+0x7ff843601dd4 ntdll.dll NtWaitForSingleObject + 0x14
+0x7ff8406abe9f KERNELBASE.dll WaitForSingleObjectEx + 0xaf
+0x7ff82731ba4f nvwgf2umx.dll NVDEV_Thunk + 0x882cf
+0x7ff82780a2aa nvwgf2umx.dll NVDEV_Thunk + 0x576b2a
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 4980 0x1374
+0x7ff843601dd4 ntdll.dll NtWaitForSingleObject + 0x14
+0x7ff8406abe9f KERNELBASE.dll WaitForSingleObjectEx + 0xaf
+0x7ff827293238 nvwgf2umx.dll OpenAdapter12 + 0x159d88
+0x7ff82729315f nvwgf2umx.dll OpenAdapter12 + 0x159caf
+0x7ff82780a2aa nvwgf2umx.dll NVDEV_Thunk + 0x576b2a
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 37912 0x9418
+0x7ff843601dd4 ntdll.dll NtWaitForSingleObject + 0x14
+0x7ff8406abe9f KERNELBASE.dll WaitForSingleObjectEx + 0xaf
+0x7ff827293238 nvwgf2umx.dll OpenAdapter12 + 0x159d88
+0x7ff82729315f nvwgf2umx.dll OpenAdapter12 + 0x159caf
+0x7ff82780a2aa nvwgf2umx.dll NVDEV_Thunk + 0x576b2a
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 40440 0x9df8
+0x7ff843601dd4 ntdll.dll NtWaitForSingleObject + 0x14
+0x7ff8406abe9f KERNELBASE.dll WaitForSingleObjectEx + 0xaf
+0x7ff827293238 nvwgf2umx.dll OpenAdapter12 + 0x159d88
+0x7ff82729315f nvwgf2umx.dll OpenAdapter12 + 0x159caf
+0x7ff82780a2aa nvwgf2umx.dll NVDEV_Thunk + 0x576b2a
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 17840 0x45b0
+0x7ff843601dd4 ntdll.dll NtWaitForSingleObject + 0x14
+0x7ff8406abe9f KERNELBASE.dll WaitForSingleObjectEx + 0xaf
+0x7ff827293238 nvwgf2umx.dll OpenAdapter12 + 0x159d88
+0x7ff82729315f nvwgf2umx.dll OpenAdapter12 + 0x159caf
+0x7ff82780a2aa nvwgf2umx.dll NVDEV_Thunk + 0x576b2a
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 39672 0x9af8
+0x7ff843601dd4 ntdll.dll NtWaitForSingleObject + 0x14
+0x7ff8406abe9f KERNELBASE.dll WaitForSingleObjectEx + 0xaf
+0x7ff827293238 nvwgf2umx.dll OpenAdapter12 + 0x159d88
+0x7ff82729315f nvwgf2umx.dll OpenAdapter12 + 0x159caf
+0x7ff82780a2aa nvwgf2umx.dll NVDEV_Thunk + 0x576b2a
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 43812 0xab24
+0x7ff843601dd4 ntdll.dll NtWaitForSingleObject + 0x14
+0x7ff8406abe9f KERNELBASE.dll WaitForSingleObjectEx + 0xaf
+0x7ff827293238 nvwgf2umx.dll OpenAdapter12 + 0x159d88
+0x7ff82729315f nvwgf2umx.dll OpenAdapter12 + 0x159caf
+0x7ff82780a2aa nvwgf2umx.dll NVDEV_Thunk + 0x576b2a
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 43548 0xaa1c
+0x7ff843601dd4 ntdll.dll NtWaitForSingleObject + 0x14
+0x7ff8406abe9f KERNELBASE.dll WaitForSingleObjectEx + 0xaf
+0x7ff827293238 nvwgf2umx.dll OpenAdapter12 + 0x159d88
+0x7ff82729315f nvwgf2umx.dll OpenAdapter12 + 0x159caf
+0x7ff82780a2aa nvwgf2umx.dll NVDEV_Thunk + 0x576b2a
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 38472 0x9648
+0x7ff843601dd4 ntdll.dll NtWaitForSingleObject + 0x14
+0x7ff8406abe9f KERNELBASE.dll WaitForSingleObjectEx + 0xaf
+0x7ff827293238 nvwgf2umx.dll OpenAdapter12 + 0x159d88
+0x7ff82729315f nvwgf2umx.dll OpenAdapter12 + 0x159caf
+0x7ff82780a2aa nvwgf2umx.dll NVDEV_Thunk + 0x576b2a
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 42984 0xa7e8
+0x7ff843601dd4 ntdll.dll NtWaitForSingleObject + 0x14
+0x7ff8406abe9f KERNELBASE.dll WaitForSingleObjectEx + 0xaf
+0x7ff827293238 nvwgf2umx.dll OpenAdapter12 + 0x159d88
+0x7ff82729315f nvwgf2umx.dll OpenAdapter12 + 0x159caf
+0x7ff82780a2aa nvwgf2umx.dll NVDEV_Thunk + 0x576b2a
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 41764 0xa324
+0x7ff843601dd4 ntdll.dll NtWaitForSingleObject + 0x14
+0x7ff8406abe9f KERNELBASE.dll WaitForSingleObjectEx + 0xaf
+0x7ff827293238 nvwgf2umx.dll OpenAdapter12 + 0x159d88
+0x7ff82729315f nvwgf2umx.dll OpenAdapter12 + 0x159caf
+0x7ff82780a2aa nvwgf2umx.dll NVDEV_Thunk + 0x576b2a
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 12476 0x30bc
+0x7ff843601dd4 ntdll.dll NtWaitForSingleObject + 0x14
+0x7ff8406abe9f KERNELBASE.dll WaitForSingleObjectEx + 0xaf
+0x7ff827293238 nvwgf2umx.dll OpenAdapter12 + 0x159d88
+0x7ff82729315f nvwgf2umx.dll OpenAdapter12 + 0x159caf
+0x7ff82780a2aa nvwgf2umx.dll NVDEV_Thunk + 0x576b2a
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 38020 0x9484
+0x7ff843601dd4 ntdll.dll NtWaitForSingleObject + 0x14
+0x7ff8406abe9f KERNELBASE.dll WaitForSingleObjectEx + 0xaf
+0x7ff827293238 nvwgf2umx.dll OpenAdapter12 + 0x159d88
+0x7ff82729315f nvwgf2umx.dll OpenAdapter12 + 0x159caf
+0x7ff82780a2aa nvwgf2umx.dll NVDEV_Thunk + 0x576b2a
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 33484 0x82cc
+0x7ff843601dd4 ntdll.dll NtWaitForSingleObject + 0x14
+0x7ff8406abe9f KERNELBASE.dll WaitForSingleObjectEx + 0xaf
+0x7ff826ee898e nvwgf2umx.dll SetDependencyInfo + 0x69fae
+0x7ff826ee8305 nvwgf2umx.dll SetDependencyInfo + 0x69925
+0x7ff826edcb4d nvwgf2umx.dll SetDependencyInfo + 0x5e16d
+0x7ff8273f24da nvwgf2umx.dll NVDEV_Thunk + 0x15ed5a
+0x7ff82780a2aa nvwgf2umx.dll NVDEV_Thunk + 0x576b2a
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 13652 0x3554
+0x7ff843601dd4 ntdll.dll NtWaitForSingleObject + 0x14
+0x7ff8406abe9f KERNELBASE.dll WaitForSingleObjectEx + 0xaf
+0x7ff827293238 nvwgf2umx.dll OpenAdapter12 + 0x159d88
+0x7ff82729315f nvwgf2umx.dll OpenAdapter12 + 0x159caf
+0x7ff82780a2aa nvwgf2umx.dll NVDEV_Thunk + 0x576b2a
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 41136 0xa0b0
+0x7ff8436059c4 ntdll.dll ZwWaitForAlertByThreadId + 0x14
+0x7ff8434f97be ntdll.dll RtlSleepConditionVariableSRW + 0x1de
+0x7ff8406b2a58 KERNELBASE.dll SleepConditionVariableSRW + 0x38
+0x7fff51035d00 avcodec-63.dll av_parser_iterate + 0x23c20
+0x7fff50cd7813 avcodec-63.dll avcodec_send_frame + 0xf4d3
+0x7fff513a38bf avcodec-63.dll avpriv_split_xiph_headers + 0x27d0f
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 20964 0x51e4
+0x7ff8436059c4 ntdll.dll ZwWaitForAlertByThreadId + 0x14
+0x7ff8434f97be ntdll.dll RtlSleepConditionVariableSRW + 0x1de
+0x7ff8406b2a58 KERNELBASE.dll SleepConditionVariableSRW + 0x38
+0x7fff51035d00 avcodec-63.dll av_parser_iterate + 0x23c20
+0x7fff50cd7813 avcodec-63.dll avcodec_send_frame + 0xf4d3
+0x7fff513a38bf avcodec-63.dll avpriv_split_xiph_headers + 0x27d0f
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 19120 0x4ab0
+0x7ff8436059c4 ntdll.dll ZwWaitForAlertByThreadId + 0x14
+0x7ff8434f97be ntdll.dll RtlSleepConditionVariableSRW + 0x1de
+0x7ff8406b2a58 KERNELBASE.dll SleepConditionVariableSRW + 0x38
+0x7fff51035d00 avcodec-63.dll av_parser_iterate + 0x23c20
+0x7fff50cd7813 avcodec-63.dll avcodec_send_frame + 0xf4d3
+0x7fff513a38bf avcodec-63.dll avpriv_split_xiph_headers + 0x27d0f
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 26048 0x65c0
+0x7ff8436059c4 ntdll.dll ZwWaitForAlertByThreadId + 0x14
+0x7ff8434f97be ntdll.dll RtlSleepConditionVariableSRW + 0x1de
+0x7ff8406b2a58 KERNELBASE.dll SleepConditionVariableSRW + 0x38
+0x7fff51035d00 avcodec-63.dll av_parser_iterate + 0x23c20
+0x7fff50cd7813 avcodec-63.dll avcodec_send_frame + 0xf4d3
+0x7fff513a38bf avcodec-63.dll avpriv_split_xiph_headers + 0x27d0f
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 17756 0x455c
+0x7ff8436059c4 ntdll.dll ZwWaitForAlertByThreadId + 0x14
+0x7ff8434f97be ntdll.dll RtlSleepConditionVariableSRW + 0x1de
+0x7ff8406b2a58 KERNELBASE.dll SleepConditionVariableSRW + 0x38
+0x7fff51035d00 avcodec-63.dll av_parser_iterate + 0x23c20
+0x7fff50cd7813 avcodec-63.dll avcodec_send_frame + 0xf4d3
+0x7fff513a38bf avcodec-63.dll avpriv_split_xiph_headers + 0x27d0f
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 42644 0xa694
+0x7ff8436059c4 ntdll.dll ZwWaitForAlertByThreadId + 0x14
+0x7ff8434f97be ntdll.dll RtlSleepConditionVariableSRW + 0x1de
+0x7ff8406b2a58 KERNELBASE.dll SleepConditionVariableSRW + 0x38
+0x7fff51035d00 avcodec-63.dll av_parser_iterate + 0x23c20
+0x7fff50cd7813 avcodec-63.dll avcodec_send_frame + 0xf4d3
+0x7fff513a38bf avcodec-63.dll avpriv_split_xiph_headers + 0x27d0f
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 21864 0x5568
+0x7ff8436059c4 ntdll.dll ZwWaitForAlertByThreadId + 0x14
+0x7ff8434f97be ntdll.dll RtlSleepConditionVariableSRW + 0x1de
+0x7ff8406b2a58 KERNELBASE.dll SleepConditionVariableSRW + 0x38
+0x7fff51035d00 avcodec-63.dll av_parser_iterate + 0x23c20
+0x7fff50cd7813 avcodec-63.dll avcodec_send_frame + 0xf4d3
+0x7fff513a38bf avcodec-63.dll avpriv_split_xiph_headers + 0x27d0f
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 43200 0xa8c0
+0x7ff8436059c4 ntdll.dll ZwWaitForAlertByThreadId + 0x14
+0x7ff8434f97be ntdll.dll RtlSleepConditionVariableSRW + 0x1de
+0x7ff8406b2a58 KERNELBASE.dll SleepConditionVariableSRW + 0x38
+0x7fff51035d00 avcodec-63.dll av_parser_iterate + 0x23c20
+0x7fff50cd7813 avcodec-63.dll avcodec_send_frame + 0xf4d3
+0x7fff513a38bf avcodec-63.dll avpriv_split_xiph_headers + 0x27d0f
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 34080 0x8520
+0x7ff8436059c4 ntdll.dll ZwWaitForAlertByThreadId + 0x14
+0x7ff8434f97be ntdll.dll RtlSleepConditionVariableSRW + 0x1de
+0x7ff8406b2a58 KERNELBASE.dll SleepConditionVariableSRW + 0x38
+0x7fff51035d00 avcodec-63.dll av_parser_iterate + 0x23c20
+0x7fff50cd7813 avcodec-63.dll avcodec_send_frame + 0xf4d3
+0x7fff513a38bf avcodec-63.dll avpriv_split_xiph_headers + 0x27d0f
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 41176 0xa0d8
+0x7ff8436059c4 ntdll.dll ZwWaitForAlertByThreadId + 0x14
+0x7ff8434f97be ntdll.dll RtlSleepConditionVariableSRW + 0x1de
+0x7ff8406b2a58 KERNELBASE.dll SleepConditionVariableSRW + 0x38
+0x7fff51034cc9 avcodec-63.dll av_parser_iterate + 0x22be9
+0x7fff51035404 avcodec-63.dll av_parser_iterate + 0x23324
+0x7fff50d8f9bb avcodec-63.dll avpriv_h264_has_num_reorder_frames + 0x2bb
+0x7fff50d8f58c avcodec-63.dll avcodec_default_get_buffer2 + 0x5480c
+0x7fff50c6c7c3 avcodec-63.dll avcodec_send_packet + 0x723
+0x7fff50c6e23a avcodec-63.dll avcodec_send_packet + 0x219a
+0x7fff51035dcc avcodec-63.dll av_parser_iterate + 0x23cec
+0x7fff50cd7813 avcodec-63.dll avcodec_send_frame + 0xf4d3
+0x7fff513a38bf avcodec-63.dll avpriv_split_xiph_headers + 0x27d0f
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 13320 0x3408
+0x7ff8436059c4 ntdll.dll ZwWaitForAlertByThreadId + 0x14
+0x7ff8434f97be ntdll.dll RtlSleepConditionVariableSRW + 0x1de
+0x7ff8406b2a58 KERNELBASE.dll SleepConditionVariableSRW + 0x38
+0x7fff51035d00 avcodec-63.dll av_parser_iterate + 0x23c20
+0x7fff50cd7813 avcodec-63.dll avcodec_send_frame + 0xf4d3
+0x7fff513a38bf avcodec-63.dll avpriv_split_xiph_headers + 0x27d0f
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 39892 0x9bd4
+0x7ff8436059c4 ntdll.dll ZwWaitForAlertByThreadId + 0x14
+0x7ff8434f97be ntdll.dll RtlSleepConditionVariableSRW + 0x1de
+0x7ff8406b2a58 KERNELBASE.dll SleepConditionVariableSRW + 0x38
+0x7fff51035d00 avcodec-63.dll av_parser_iterate + 0x23c20
+0x7fff50cd7813 avcodec-63.dll avcodec_send_frame + 0xf4d3
+0x7fff513a38bf avcodec-63.dll avpriv_split_xiph_headers + 0x27d0f
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 10292 0x2834
+0x7ff8436059c4 ntdll.dll ZwWaitForAlertByThreadId + 0x14
+0x7ff8434f97be ntdll.dll RtlSleepConditionVariableSRW + 0x1de
+0x7ff8406b2a58 KERNELBASE.dll SleepConditionVariableSRW + 0x38
+0x7fff51035d00 avcodec-63.dll av_parser_iterate + 0x23c20
+0x7fff50cd7813 avcodec-63.dll avcodec_send_frame + 0xf4d3
+0x7fff513a38bf avcodec-63.dll avpriv_split_xiph_headers + 0x27d0f
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 3016 0xbc8
+0x7ff8436059c4 ntdll.dll ZwWaitForAlertByThreadId + 0x14
+0x7ff8434f97be ntdll.dll RtlSleepConditionVariableSRW + 0x1de
+0x7ff8406b2a58 KERNELBASE.dll SleepConditionVariableSRW + 0x38
+0x7fff51035d00 avcodec-63.dll av_parser_iterate + 0x23c20
+0x7fff50cd7813 avcodec-63.dll avcodec_send_frame + 0xf4d3
+0x7fff513a38bf avcodec-63.dll avpriv_split_xiph_headers + 0x27d0f
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 34452 0x8694
+0x7ff8436059c4 ntdll.dll ZwWaitForAlertByThreadId + 0x14
+0x7ff8434f97be ntdll.dll RtlSleepConditionVariableSRW + 0x1de
+0x7ff8406b2a58 KERNELBASE.dll SleepConditionVariableSRW + 0x38
+0x7fff51035d00 avcodec-63.dll av_parser_iterate + 0x23c20
+0x7fff50cd7813 avcodec-63.dll avcodec_send_frame + 0xf4d3
+0x7fff513a38bf avcodec-63.dll avpriv_split_xiph_headers + 0x27d0f
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 40976 0xa010
+0x7ff8436059c4 ntdll.dll ZwWaitForAlertByThreadId + 0x14
+0x7ff8434f97be ntdll.dll RtlSleepConditionVariableSRW + 0x1de
+0x7ff8406b2a58 KERNELBASE.dll SleepConditionVariableSRW + 0x38
+0x7fff51035d00 avcodec-63.dll av_parser_iterate + 0x23c20
+0x7fff50cd7813 avcodec-63.dll avcodec_send_frame + 0xf4d3
+0x7fff513a38bf avcodec-63.dll avpriv_split_xiph_headers + 0x27d0f
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 10844 0x2a5c
+0x7ff840ccaf04 win32u.dll NtUserMsgWaitForMultipleObjectsEx + 0x14
+0x7fff6d3add7f Qt6Core.dll QEventDispatcherWin32::processEvents + 0x69f
+0x7fff6d20d5a4 Qt6Core.dll QEventLoop::exec + 0x1d4
+0x7fff6d2f9c67 Qt6Core.dll QThread::exec + 0xc7
+0x7fff6d3bbbd8 Qt6Core.dll QThread::start + 0x5b8
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 42208 0xa4e0
+0x7ff840ccaf04 win32u.dll NtUserMsgWaitForMultipleObjectsEx + 0x14
+0x7fff6d3add7f Qt6Core.dll QEventDispatcherWin32::processEvents + 0x69f
+0x7fff6d20d5a4 Qt6Core.dll QEventLoop::exec + 0x1d4
+0x7fff6d2f9c67 Qt6Core.dll QThread::exec + 0xc7
+0x7fff6d3bbbd8 Qt6Core.dll QThread::start + 0x5b8
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c
+
+THREAD 3556 0xde4
+0x7ff840ccaf04 win32u.dll NtUserMsgWaitForMultipleObjectsEx + 0x14
+0x7fff6d3add7f Qt6Core.dll QEventDispatcherWin32::processEvents + 0x69f
+0x7fff6d20d5a4 Qt6Core.dll QEventLoop::exec + 0x1d4
+0x7fff6d2f9c67 Qt6Core.dll QThread::exec + 0xc7
+0x7fff6d3bbbd8 Qt6Core.dll QThread::start + 0x5b8
+0x7ff84274dda7 KERNEL32.DLL BaseThreadInitThunk + 0x17
+0x7ff84351ee4c ntdll.dll RtlUserThreadStart + 0x2c

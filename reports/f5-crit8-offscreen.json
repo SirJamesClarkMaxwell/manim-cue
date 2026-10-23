@@ -1,0 +1,110 @@
+{
+  "metric": "Odbiór w GUI, nie fizyczne odświeżenie monitora",
+  "platform": "offscreen",
+  "qt_ffmpeg_decoding_hw_device_types": null,
+  "host": "Windows-11-10.0.26200-SP0",
+  "resolution": [
+    1920,
+    1080
+  ],
+  "source_fps": 60,
+  "clock": "time.perf_counter",
+  "change_detection": "startTime/endTime",
+  "live_change_detection": "CRC32 frame.pixels",
+  "pixel_probe": false,
+  "info": true,
+  "loss_estimate": "max(0, round(duration * source_fps) - changed_frames)",
+  "warmup_seconds": 3.0,
+  "requested_seconds": 20.0,
+  "live": true,
+  "live_cpu_note": "Nie mierzono CPU procesu potomnego; process_time obejmuje tylko player",
+  "results": [
+    {
+      "clips": 1,
+      "info_visible": true,
+      "duration_seconds": 20.02063709999493,
+      "streams": {
+        "base": {
+          "source_fps": 60,
+          "received_frames": 545,
+          "received_fps": 27.221910935098965,
+          "changed_frames": 545,
+          "changed_fps": 27.221910935098965,
+          "changed_interval_ms": {
+            "p50": 28.929199994308874,
+            "p95": 82.7452999947127,
+            "max": 296.4000999927521
+          },
+          "estimated_lost_frames": 656,
+          "longest_silence_ms": 296.4000999927521
+        },
+        "clip_1": {
+          "source_fps": 60,
+          "received_frames": 539,
+          "received_fps": 26.92222017251072,
+          "changed_frames": 539,
+          "changed_fps": 26.92222017251072,
+          "changed_interval_ms": {
+            "p50": 26.31420000398066,
+            "p95": 84.48599999246653,
+            "max": 285.10199999436736
+          },
+          "estimated_lost_frames": 662,
+          "longest_silence_ms": 285.10199999436736
+        },
+        "live": {
+          "source_fps": 60,
+          "received_frames": 845,
+          "received_fps": 42.20644906451124,
+          "changed_frames": 751,
+          "changed_fps": 37.51129378396206,
+          "changed_interval_ms": {
+            "p50": 23.941699997521937,
+            "p95": 36.41749999951571,
+            "max": 164.16050000407267
+          },
+          "estimated_lost_frames": 450,
+          "longest_silence_ms": 164.16050000407267
+        }
+      },
+      "first_changed_after_release_ms": {
+        "base": 41.091599996434525,
+        "clip_1": 41.098999994574115
+      },
+      "start_spread_ms": 0.007399998139590025,
+      "qt_timer_gap_ms": {
+        "p50": 22.075299988500774,
+        "p95": 25.347300004796125,
+        "max": 87.40129999932833
+      },
+      "qt_timer_delay_ms": {
+        "p50": 21.075299988500774,
+        "p95": 24.347300004796125,
+        "max": 86.40129999932833
+      },
+      "qt_timer_samples": 1038,
+      "player_cpu_seconds": 25.296875,
+      "player_cpu_percent_one_core": 126.35399599749205,
+      "live_cpu_percent_one_core": null,
+      "errors": [],
+      "live_states": [
+        "ready"
+      ]
+    },
+    {
+      "clips": 2,
+      "streams": {},
+      "errors": [
+        "Timeout procesu: 113.0 s"
+      ]
+    },
+    {
+      "clips": 3,
+      "streams": {},
+      "errors": [
+        "Timeout procesu: 113.0 s"
+      ]
+    }
+  ],
+  "elapsed_seconds": 255.14807189999556
+}
