@@ -5,7 +5,41 @@ import time
 from multiprocessing import get_context
 from multiprocessing.shared_memory import SharedMemory
 
-from .decoder_worker import HEADER, SLOT, run_decoder
+from .decoder_worker import HEADER, PROGRESS, SLOT, run_pooled
+
+POOL_SIZE = 4
+"""Ciepłe procesy na bazę i do trzech klipów slajdu; podgląd może wystartować na zimno."""
+_pool = []
+
+
+def _spawn():
+    context = get_context("spawn")
+    control = context.RawArray("d", [0] * 12)
+    connection, child = context.Pipe()
+    process = context.Process(target=run_pooled, args=(control, child), daemon=True)
+    process.start()
+    child.close()
+    return process, connection, control
+
+
+def _take():
+    """Start procesu i importy (ok. 0,2–0,35 s) poza ścieżką wejścia na slajd."""
+    while _pool:
+        worker = _pool.pop(0)
+        if worker[0].is_alive():
+            break
+        worker[1].close()
+    else:
+        worker = _spawn()
+    while len(_pool) < POOL_SIZE:
+        _pool.append(_spawn())
+    return worker
+
+
+def close_pool() -> None:
+    """Zamknięty potok kończy czekający proces puli bez join w UI."""
+    while _pool:
+        _pool.pop()[1].close()
 
 
 class Source:
@@ -29,7 +63,7 @@ class Source:
         self.started = self.progress = 0.0
 
     def prepare(self, entry_id: int, media: dict) -> None:
-        """Unieważnij stare wyniki; spawn nie wykonuje decode w UI."""
+        """Unieważnij stare wyniki; proces z puli nie wykonuje decode w UI."""
         self.request_close()
         self.generation += 1
         self.entry_id = entry_id
@@ -39,16 +73,8 @@ class Source:
         self.duration = None
         self.started = self.progress = time.monotonic()
         self.media = dict(media)
-        context = get_context("spawn")
-        self.control = context.RawArray("d", [0] * 12)
-        self.connection, child = context.Pipe()
-        self.process = context.Process(
-            target=run_decoder,
-            args=({"media": self.media, "control": self.control}, child),
-            daemon=True,
-        )
-        self.process.start()
-        child.close()
+        self.process, self.connection, self.control = _take()
+        self.connection.send(self.media)
 
     def poll(self, now: float, target: float | None, budget_ms: float) -> dict:
         """Kopiuj tylko najnowszy spójny slot, zachowując ostatni dobry obraz."""
@@ -85,10 +111,16 @@ class Source:
                 elif kind == "eof":
                     self.eof = True
             if self.memory is not None and time.perf_counter() < deadline:
-                self.progress = max(self.progress, struct.unpack_from("<d", self.memory.buf, 48)[0])
+                self.progress = max(
+                    self.progress, struct.unpack_from("<d", self.memory.buf, PROGRESS)[0]
+                )
                 headers = [(SLOT.unpack_from(self.memory.buf, i * SLOT.size), i) for i in range(2)]
-                (revision, frame_id, pts), slot = max(headers)
-                if revision > self.last_revision and revision % 2 == 0:
+                # Zapis w toku (nieparzysta rewizja) ani klatka wyprzedzona przed show_at nie
+                # zasłania gotowej klatki drugiego slotu; przy vsync 60 Hz pominięty tick to
+                # zgubiona klatka materiału 60 fps.
+                due = [item for item in headers if item[0][0] % 2 == 0 and item[0][3] <= now]
+                (revision, frame_id, pts, _), slot = max(due, default=((0, 0, 0.0, 0.0), 0))
+                if revision > self.last_revision:
                     size = self.width * self.height * 4
                     start = HEADER + slot * size
                     pixels = bytes(self.memory.buf[start : start + size])

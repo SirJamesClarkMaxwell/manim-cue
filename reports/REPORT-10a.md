@@ -783,3 +783,50 @@ każde wejście na slajd uruchamia nowe procesy spawn (koszt startu PyAV).
 **Zadanie 11 — nadal otwarte:** pomiar w oknie z vsync (ekran odblokowany),
 porównanie zrzutów z Qt, DPI, fokus, dwa monitory w praktyce, `F`/`H` na
 prawdziwym ekranie, próba człowieka.
+
+## Pierwsza próba prelegenta i poprawki Claude — 2026-10-23, ok. 22:00–23:30
+
+Ekran odblokowany, vsync działa (pętla 60 Hz). Próba człowieka na Demo, potem pomiar
+`experiments/f10a_gate/drive.py` z instrumentacją (cProfile, czas prepare→pierwsza klatka,
+okno pierwszoplanowe, ślad każdego `Source.poll`).
+
+**Zgłoszenia prelegenta** i ich los:
+
+| # | Zgłoszenie | Przyczyna | Stan |
+|---|---|---|---|
+| 1 | szare mignięcie przy zmianie slajdu | `_prepare` czyścił klatki, kompozycja rysowała placeholder do pierwszej klatki nowych dekoderów | poprawione: wstrzymana ostatnia kompozycja poprzedniego wejścia do `ready` |
+| 2 | przycina się | deepcopy manifestu co tick ~2 ms; `glCheckError` PyOpenGL ~1,4 ms/tick; wybór slotu przegrywał z zapisem w toku; fazowanie 60 Hz UI z 60 fps materiału | poprawione (niżej); otwarte: wolny upload przy GPU w spoczynku |
+| 3 | gubiony fokus, trzeba kliknąć okno | `import manimlib` w workerze live tworzy ukryte okno cienia pyglet (`GenericAppClass…`), które przejmuje okno pierwszoplanowe Windows | poprawione: `pyglet.options["shadow_window"]=False` w `run_worker`; pomiar: zero zmian okna pierwszoplanowego |
+| 4 | z panelu live → nie przechodzi dalej, klik nieoczywisty | D20: fokus live zabiera strzałki do Esc | decyzja D45 (etap 10d) |
+| 5 | Info jak PowerPoint, nawigacja, większe notatki, LaTeX | — | decyzja D46 (etap 10d); glify ←→ w Markdown poprawione merge Inconsolata |
+| 6 | wolne przerywanie animacji | każde źródło = nowy proces spawn, ~350 ms do pierwszej klatki; live ~1,7 s | pliki: pula 4 ciepłych procesów, 83–130 ms; live otwarte |
+| 7 | mysz jak Blender/Defect-Studio | — | decyzja D47 (etap 10d) |
+| — | drżenie podglądu w Info (druga obserwacja) | pasek przewijania pojawiał się/znikał co klatkę, szerokość podglądu skakała | poprawione: `always_vertical_scrollbar` |
+
+**Zmiany (pliki):** `live_worker.py` (okno cienia), `player/app.py` (wstrzymany obraz `held`,
+`stage`/`stage_frames`/`stage_time` wspólne dla sceny i Info, aktualizacja tekstury w miejscu,
+`drop_all`), `player/desktop.py` (kompozycja z `app.stage`, `close_pool`, merge fontu,
+pasek przewijania), `player/sources_av.py` (pula `_take`/`close_pool`, wybór slotu po `show_at`
+z pominięciem zapisu w toku), `player/decoder_worker.py` (`run_pooled`; slot 32 B z `show_at`,
+`PROGRESS`, `HEADER=96`; pół klatki wyprzedzenia przy odtwarzaniu — wybór po czasie
+wyświetlenia zgodny z D43), `player/textures.py` (`ERROR_CHECKING=False` z jawnym `glGetError`,
+`TextureLease.update` przez ponowne `glTexImage2D`; `glTexSubImage2D` czekało na GPU),
+`player/state.py` (snapshot bez kopii manifestu). Testy: `test_previous_image_held_until_new_entry_ready`
+(mutacja potwierdzona), `test_pool_takes_warm_worker`, cele spawn w testach źródeł przez `run_pooled`.
+
+**Pomiary (Demo, dwell 3 s, vsync 60 Hz, bez zrzutów PNG):**
+- prepare→pierwsza klatka pliku: 347–406 ms → 83–130 ms; start live manimgl bez zmian 1,6–1,8 s;
+- źródło 1080p60 samo, poll co 1/60 s: 59,7 nowych klatek/s, 0 odrzuconych;
+- w playerze skoki `frame_id` między pollami po poprawkach: 1 — 2882, 2 — 43, ≥3 — 18
+  (reszta 0: materiał 30 fps, EOF, pauza); przed poprawką wyboru slotu i `show_at` stosunek
+  skoków 0:2 był ~1:1 (fazowanie), a baza w pętli dawała 39–41 nowych klatek/s;
+- `_accept_update` p50 0,84 ms, ale p95 14,4 ms: wszystkie wolne uploady 1080p (434) w pierwszych
+  8 s, do startu pierwszego procesu live; potem zero. Tak samo dla nowej tekstury i aktualizacji
+  w miejscu. Hipoteza: niskie taktowanie GPU w spoczynku (NVIDIA). **Otwarte** — kandydaci:
+  podgląd Info dekodowany w rozmiarze Info zamiast 1080p, PBO.
+
+**Artefakt narzędzia:** zrzut PNG 3440×1440 w `drive.py` blokuje pętlę ~0,9 s na slajd, więc
+statystyki `new_frames_per_s` z `drive.json` z włączonymi zrzutami nie są pomiarem.
+
+**Zadanie 11 — nadal otwarte:** właściwy pomiar N=1..3 (5 s + 60 s × 3) z JSONL, 30 akcji
+wejścia, 30 min stabilności, porównanie zrzutów z Qt; próba człowieka po 10d.

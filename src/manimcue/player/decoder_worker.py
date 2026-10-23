@@ -6,8 +6,23 @@ import struct
 import time
 from multiprocessing.shared_memory import SharedMemory
 
-HEADER = 64
-SLOT = struct.Struct("<Qqd")
+# Slot: rewizja, frame_id, PTS i czas monotoniczny, od którego klatkę wolno pokazać.
+SLOT = struct.Struct("<Qqdd")
+PROGRESS = 2 * SLOT.size
+HEADER = 96
+
+
+def run_pooled(control, connection) -> None:
+    """Proces puli: importy przed czekaniem, potem jedno źródło do końca życia."""
+    try:
+        import av  # noqa: F401 — import poza ścieżką wejścia na slajd
+        from PIL import Image  # noqa: F401
+
+        media = connection.recv()
+    except (EOFError, OSError):
+        connection.close()
+        return
+    run_decoder({"media": media, "control": control}, connection)
 
 
 def run_decoder(spec: dict, connection) -> None:
@@ -95,9 +110,10 @@ def run_decoder(spec: dict, connection) -> None:
         loop_number = 0
         target_revision = -1
         exit_at = None
+        period = 0.0
         while True:
             now = time.monotonic()
-            struct.pack_into("<d", memory.buf, 48, now)
+            struct.pack_into("<d", memory.buf, PROGRESS, now)
             if control[0]:
                 return
             # Rodzic nic nie wysyła; poll() rzuca BrokenPipeError po jego śmierci, więc
@@ -180,19 +196,26 @@ def run_decoder(spec: dict, connection) -> None:
                         began = time.perf_counter()
                         pixels = item.to_ndarray(format="rgba").tobytes()
                         control[7] += time.perf_counter() - began
+                    if previous_pts >= 0:
+                        period = pts - previous_pts
                     previous_pts = pts
                     pending = pts, pixels
                 pts, pixels = pending
-                if pts > target and frame_id:
+                # Pół klatki wyprzedzenia: UI przy vsync bierze klatkę po show_at, więc opóźnienie
+                # dekodowania na granicy ticku nie daje na zmianę dwóch klatek i żadnej. Mniej
+                # niż okres, więc drugi slot nie nadpisuje klatki, której UI jeszcze potrzebuje.
+                lead = 0.5 * period if playing else 0.0
+                if pts > target + lead and frame_id:
                     break
+                show_at = now + (pts - target) / rate if playing else now
                 slot = frame_id % 2
                 offset = slot * SLOT.size
                 # Nieparzysta rewizja oznacza zapis w toku, parzysta gotowy obraz.
                 revision = 2 * (frame_id + 1)
-                SLOT.pack_into(memory.buf, offset, revision - 1, frame_id, pts)
+                SLOT.pack_into(memory.buf, offset, revision - 1, frame_id, pts, show_at)
                 start = HEADER + slot * size
                 memory.buf[start : start + size] = pixels
-                SLOT.pack_into(memory.buf, offset, revision, frame_id, pts)
+                SLOT.pack_into(memory.buf, offset, revision, frame_id, pts, show_at)
                 frame_id += 1
                 control[10] = frame_id
                 pending = None

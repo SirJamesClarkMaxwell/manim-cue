@@ -27,5 +27,12 @@ def initial_state(manifest: dict, now: float = 0.0) -> dict:
 
 
 def snapshot(state: dict) -> dict:
-    """Niezależny snapshot prostych danych dla UI i raportu stanu."""
-    return deepcopy(state)
+    """Niezależny snapshot prostych danych dla UI i raportu stanu.
+
+    Manifest jest tylko do odczytu, więc snapshot go współdzieli; jego głęboka kopia
+    w każdym ticku kosztowała ok. 2 ms pętli UI.
+    """
+    result = deepcopy({key: value for key, value in state.items() if key != "manifest"})
+    if "manifest" in state:
+        result["manifest"] = state["manifest"]
+    return result

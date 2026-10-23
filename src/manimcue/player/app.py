@@ -54,6 +54,9 @@ class App:
         self.cursor = 0
         self.composition = []
         self.preview_composition = []
+        # Wejście kompozycji, którą widać; w przygotowaniu wstrzymany obraz poprzedniego.
+        self.stage, self.stage_frames, self.stage_time = None, {}, 0.0
+        self.held = None
         self._prepare("initial", self.started_at)
 
     def _slide(self):
@@ -71,6 +74,26 @@ class App:
             if frame.get("lease"):
                 self.retired_leases.append(frame["lease"])
         frames.clear()
+
+    def drop_all(self):
+        """Przed zniszczeniem kontekstu GL: wszystkie tekstury, także wstrzymane."""
+        if self.held:
+            self._drop_frames(self.held["frames"])
+            self.held = None
+        self._drop_frames(self.frames)
+        self._drop_frames(self.preview_frames)
+
+    def _held_ids(self):
+        frames = self.held["frames"].values() if self.held else ()
+        return {id(frame["lease"]) for frame in frames if frame.get("lease")}
+
+    def _retire_unused(self, frames):
+        kept = self._held_ids() | {
+            id(frame["lease"]) for frame in self.frames.values() if frame.get("lease")
+        }
+        for frame in frames.values():
+            if frame.get("lease") and id(frame["lease"]) not in kept:
+                self.retired_leases.append(frame["lease"])
 
     def _new_source(self, key, media, sources, *, preview=False):
         if media["kind"] == "live":
@@ -134,10 +157,12 @@ class App:
                 }
             if lease is not None and old is not None:
                 self.frames[str(index)] = old
-        retained = {id(frame["lease"]) for frame in self.frames.values() if frame.get("lease")}
-        for frame in old_frames.values():
-            if frame.get("lease") and id(frame["lease"]) not in retained:
-                self.retired_leases.append(frame["lease"])
+        if self.held is None and self.stage is not None:
+            # Do gotowości wejścia scena i Info pokazują ostatni obraz poprzedniego slajdu,
+            # nie szare placeholdery na czas startu dekoderów (kryterium 4: brak pustej klatki).
+            self.held = {"stage": self.stage, "frames": old_frames, "time": self.stage_time}
+        else:
+            self._retire_unused(old_frames)
         self._prepare_preview()
         self.prepare_deadline = now + 5
 
@@ -211,13 +236,24 @@ class App:
         if "rgba" not in update or update.get("frame_id") == frames.get(key, {}).get("frame_id"):
             return
         began = time.perf_counter()
+        old = frames.get(key, {}).get("lease")
+        # Ten sam rozmiar: podmiana treści w miejscu zamiast nowej tekstury na każdą klatkę.
+        in_place = (
+            hasattr(old, "update")
+            and (getattr(old, "width", None), getattr(old, "height", None))
+            == (update.get("width"), update.get("height"))
+            and id(old) not in self._held_ids()
+        )
         try:
-            lease = self.uploader(update)
+            if in_place:
+                old.update(update)
+                lease = old
+            else:
+                lease = self.uploader(update)
         except Exception as error:  # noqa: BLE001 — granica adaptera GL zachowuje ostatni obraz
             self.errors.append(f"Upload {key}: {error}")
             return
-        old = frames.get(key, {}).get("lease")
-        if old:
+        if old and not in_place:
             self.retired_leases.append(old)
         frames[key] = {**update, "texture": lease.texture, "lease": lease}
         frames[key]["upload_ms"] = (time.perf_counter() - began) * 1000
@@ -331,16 +367,21 @@ class App:
                 self.frames[str(index)].update(
                     active=self.live.active == index, error=index in self.live.failed
                 )
-        self.composition = compose(
-            {
+        if self.held and not self.state["preparing"]:
+            held, self.held = self.held, None
+            self._retire_unused(held["frames"])
+        if self.held:
+            self.stage, self.stage_frames = self.held["stage"], self.held["frames"]
+            self.stage_time = self.held["time"]
+        else:
+            self.stage = {
                 "resolution": self.state["resolution"],
                 "slide": self._slide(),
                 "aspect_ratio": self.options.get("aspect_ratio", "keep"),
                 "reverse": self.state["reverse"],
-            },
-            self.frames,
-            active_time,
-        )
+            }
+            self.stage_frames, self.stage_time = self.frames, active_time
+        self.composition = compose(self.stage, self.stage_frames, self.stage_time)
         if self.preview:
             slide = {**self.preview, "layers": []}
             for index, layer in enumerate(self.preview.get("layers", [])):
@@ -394,7 +435,7 @@ class App:
     def after_render(self):
         """Wywołaj po draw data obu viewportów w aktywnym kontekście GL."""
         leases, self.retired_leases = self.retired_leases, []
-        pinned = {id(lease) for lease in self.live.pinned_leases}
+        pinned = {id(lease) for lease in self.live.pinned_leases} | self._held_ids()
         seen = set()
         for lease in leases:
             if id(lease) in seen:

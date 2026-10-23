@@ -7,12 +7,12 @@ import time
 import warnings
 
 from .app import App
-from .clock import media_time
 from .geometry import fit
 from .info import render_info, state_text
 from .input import route
 from .keys import bindings
 from .live import view
+from .sources_av import close_pool
 from .stage import compose, draw
 
 
@@ -154,7 +154,7 @@ def warn_audio(manifest):
 
 def run_desktop(manifest: dict, options: dict) -> int:
     """Uruchom dwa viewporty z trwałymi teksturami i wspólnym shutdown."""
-    from imgui_bundle import hello_imgui, imgui, immapp
+    from imgui_bundle import hello_imgui, imgui, imgui_md, immapp
 
     options = start_options(manifest, options)
     rate = options.get("playback_rate", 1)
@@ -300,17 +300,7 @@ def run_desktop(manifest: dict, options: dict) -> int:
             viewport.work_size.x,
             viewport.work_size.y,
         )
-        commands = compose(
-            {
-                "resolution": app.state["resolution"],
-                "slide": app._slide(),
-                "viewport": main_box,
-                "aspect_ratio": options.get("aspect_ratio", "keep"),
-                "reverse": app.state["reverse"],
-            },
-            app.frames,
-            media_time(app.motion_clock, now),
-        )
+        commands = compose({**app.stage, "viewport": main_box}, app.stage_frames, app.stage_time)
         runtime["commands"] = commands
         draw(commands, imgui.get_window_draw_list())
         if state.get("message"):
@@ -355,7 +345,9 @@ def run_desktop(manifest: dict, options: dict) -> int:
                 x, y, _, _ = windows.monitors[runtime["options"]["info_window_screen_number"]]
                 imgui.set_next_window_pos((x + 100, y + 100))
                 imgui.set_next_window_size((600, 800))
-            _, opened = imgui.begin("Info", True)
+            # Pasek przewijania stale: gdy treść jest prawie tak wysoka jak okno, pojawiał się
+            # i znikał co klatkę, a szerokość podglądów skakała razem z nim (drżenie Info).
+            _, opened = imgui.begin("Info", True, imgui.WindowFlags_.always_vertical_scrollbar)
             runtime["info_viewport"] = imgui.get_window_viewport().id_
             if not opened:
                 app.dispatch({"type": "quit"}, now)
@@ -390,8 +382,8 @@ def run_desktop(manifest: dict, options: dict) -> int:
             render_info(state, {"composition": app.preview_composition, "render": render})
             imgui.end()
         if app.closed:
-            app._drop_frames(app.frames)
-            app._drop_frames(app.preview_frames)
+            app.drop_all()
+            close_pool()
             params.app_shall_exit = True
         runtime["first"] = False
 
@@ -418,5 +410,8 @@ def run_desktop(manifest: dict, options: dict) -> int:
     params.callbacks.show_gui = gui
     params.callbacks.after_swap = after_swap
     # Notatki w Info używają imgui_md; samo hello_imgui.run go nie inicjalizuje.
-    immapp.run(params, immapp.AddOnsParams(with_markdown=True))
+    markdown = imgui_md.MarkdownOptions()
+    # Roboto Markdownu nie ma strzałek z notatek; Inconsolata z assets imgui_bundle je ma.
+    markdown.font_options.merge_fonts = ["fonts/Inconsolata-Medium.ttf"]
+    immapp.run(params, immapp.AddOnsParams(with_markdown=True, with_markdown_options=markdown))
     return 0

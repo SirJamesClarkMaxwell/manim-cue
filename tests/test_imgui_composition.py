@@ -173,3 +173,45 @@ void main() { pixel=texture(image, tex_uv)*tint; }
         red.release()
         blue.release()
         gl.release()
+
+
+def test_previous_image_held_until_new_entry_ready():
+    from itertools import count
+    from types import SimpleNamespace
+
+    from test_imgui_info import FakeSource
+
+    from manimcue.player.app import App
+
+    class SlowSource(FakeSource):
+        released = False
+
+        def poll(self, now, target, budget_ms):
+            if self.media["file"] == "second" and not SlowSource.released:
+                return {"status": "preparing"}
+            return super().poll(now, target, budget_ms)
+
+    textures, closed = count(1), set()
+
+    def uploader(update):
+        texture = next(textures)
+        return SimpleNamespace(texture=texture, close=lambda: closed.add(texture))
+
+    slides = [{"kind": "image", "file": "first"}, {"kind": "image", "file": "second"}]
+    data = {"version": 1, "resolution": [100, 100], "presentations": [{"slides": slides}]}
+    app = App(data, {"show_info": False}, SlowSource, uploader)
+    now = app.started_at
+
+    def shown():
+        app.after_render()
+        return [command["texture"] for command in app.composition if command["type"] != "fill"]
+
+    app.tick(now)
+    assert shown() == [1] and not app.state["preparing"]
+    app.dispatch({"type": "next"}, now + 1)
+    app.tick(now + 1.1)
+    # Dekoder nowego slajdu jeszcze startuje: zamiast placeholdera ostatni obraz poprzedniego.
+    assert app.state["preparing"] and shown() == [1] and not closed
+    SlowSource.released = True
+    app.tick(now + 1.2)
+    assert not app.state["preparing"] and shown() == [2] and closed == {1}

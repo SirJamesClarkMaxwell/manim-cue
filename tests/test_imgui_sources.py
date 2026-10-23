@@ -19,6 +19,21 @@ def wait_for(source, predicate, target=0):
     raise AssertionError(update)
 
 
+@pytest.fixture(autouse=True, scope="module")
+def pool_closed_after_module():
+    """Ciepłe procesy puli nie mogą przeżyć modułu: inne testy sprawdzają active_children()."""
+    yield
+    import multiprocessing as mp
+
+    from manimcue.player.sources_av import close_pool
+
+    close_pool()
+    deadline = time.monotonic() + 10
+    while mp.active_children() and time.monotonic() < deadline:
+        time.sleep(0.05)
+    assert not mp.active_children()
+
+
 @pytest.fixture
 def source():
     item = Source()
@@ -59,6 +74,20 @@ def test_orphaned_decoder_exits_when_parent_pipe_closes(source, tmp_path):
     assert not process.is_alive()
 
 
+def test_pool_takes_warm_worker(source, tmp_path):
+    import manimcue.player.sources_av as adapter
+
+    path = tmp_path / "image.png"
+    Image.new("RGBA", (4, 4), "red").save(path)
+    source.prepare(1, {"kind": "image", "file": str(path)})
+    wait_for(source, lambda update: "rgba" in update)
+    assert len(adapter._pool) == adapter.POOL_SIZE
+    warm = adapter._pool[0][0]
+    source.prepare(2, {"kind": "image", "file": str(path)})
+    assert source.process is warm
+    assert wait_for(source, lambda update: "rgba" in update)["entry_id"] == 2
+
+
 def test_gif_variable_times(source, tmp_path):
     path = tmp_path / "animation.gif"
     frames = [Image.new("RGBA", (4, 4), color) for color in ["red", "green", "blue"]]
@@ -81,7 +110,9 @@ def test_invalid_file_error(source, tmp_path, monkeypatch):
     assert update["error"] and "rgba" not in update
     import manimcue.player.sources_av as adapter
 
-    monkeypatch.setattr(adapter, "run_decoder", vanished_memory_decoder)
+    # Ciepłe procesy puli mają już prawdziwy cel; nowe dostaną podmieniony.
+    monkeypatch.setattr(adapter, "_pool", [])
+    monkeypatch.setattr(adapter, "run_pooled", vanished_memory_pooled)
     source.prepare(2, {"kind": "video", "file": "unused"})
     update = wait_for(source, lambda update: update["status"] == "error")
     assert "f10_missing_" in update["error"]
@@ -146,14 +177,14 @@ def stalled_decoder(spec, connection):
     import struct
     from multiprocessing.shared_memory import SharedMemory
 
-    from manimcue.player.decoder_worker import SLOT
+    from manimcue.player.decoder_worker import HEADER, PROGRESS, SLOT
 
-    memory = SharedMemory(create=True, size=72)
+    memory = SharedMemory(create=True, size=HEADER + 4)
     try:
         memory.buf[:] = bytes(memory.size)
-        memory.buf[64:68] = bytes((1, 2, 3, 4))
-        SLOT.pack_into(memory.buf, 0, 2, 0, 0)
-        struct.pack_into("<d", memory.buf, 48, time.monotonic())
+        memory.buf[HEADER : HEADER + 4] = bytes((1, 2, 3, 4))
+        SLOT.pack_into(memory.buf, 0, 2, 0, 0, 0)
+        struct.pack_into("<d", memory.buf, PROGRESS, time.monotonic())
         connection.send(
             {"type": "memory", "name": memory.name, "width": 1, "height": 1, "duration": 60}
         )
@@ -166,7 +197,8 @@ def stalled_decoder(spec, connection):
 def test_ready_decoder_hang_keeps_frame_and_nonblocking_control(source, monkeypatch):
     import manimcue.player.sources_av as adapter
 
-    monkeypatch.setattr(adapter, "run_decoder", stalled_decoder)
+    monkeypatch.setattr(adapter, "_pool", [])
+    monkeypatch.setattr(adapter, "run_pooled", stalled_pooled)
     source.prepare(42, {"kind": "video", "file": "unused"})
     ready = wait_for(source, lambda u: "rgba" in u)
     start = time.perf_counter()
@@ -225,6 +257,14 @@ def test_pts_preflight_rejects_before_first_image(monkeypatch, timestamps):
     run_decoder({"media": {"kind": "video", "file": "test"}, "control": [0] * 12}, connection)
     assert len(connection.messages) == 1
     assert connection.messages[0]["type"] == "error" and "PTS" in connection.messages[0]["error"]
+
+
+def stalled_pooled(control, connection):
+    stalled_decoder({"media": connection.recv(), "control": control}, connection)
+
+
+def vanished_memory_pooled(control, connection):
+    vanished_memory_decoder({"media": connection.recv(), "control": control}, connection)
 
 
 def vanished_memory_decoder(spec, connection):

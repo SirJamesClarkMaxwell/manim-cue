@@ -16,6 +16,11 @@ def run_worker(spec, shm_name, frame_lock, bootstrap_sender) -> None:
     shm = None
     scene = None
     try:
+        import pyglet
+
+        # import manimlib tworzy ukryte okno cienia pyglet; na Windows przejmuje ono
+        # fokus playera i klawisze przestają działać. Worker renderuje bez okna.
+        pyglet.options["shadow_window"] = False
         from manimlib.constants import FRAME_HEIGHT, FRAME_WIDTH
 
         from manimcue.frame_buffer import FrameBuffer
