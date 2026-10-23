@@ -144,3 +144,28 @@ def test_two_ce_and_gl_animate_and_close(qapp, tmp_path):
     finally:
         player.close()
         player.live.shutdown()
+
+
+def test_qt_file_first_deck_pool_poll_shutdown(qapp, make_player, monkeypatch):
+    original = persistent.presentation
+
+    def presentation(*args, **kwargs):
+        deck = original(*args, **kwargs)
+        deck.slides[0].layers = []
+        return deck
+
+    monkeypatch.setattr(persistent, "presentation", presentation)
+    player = make_player()
+    from test_live_layers import pump
+
+    pump(
+        qapp,
+        lambda: (
+            len(player.live.pool.workers) == 2 and all(w.ready for w in player.live.pool.workers)
+        ),
+    )
+    assert not player.live.sessions
+    assert player.live.pool.engines == {"ce-cairo"}
+    player.close()
+    player.live.shutdown()
+    assert player.live.pool.closed

@@ -7,7 +7,7 @@ pokazuje ten sam obraz z konstrukcji. Podgląd następnego slajdu ma własną ko
 import math
 from pathlib import Path
 
-from qtpy.QtCore import QEvent, QPointF, QRectF, QSizeF, Qt, Signal
+from qtpy.QtCore import QPointF, QRectF, QSizeF, Qt, Signal
 from qtpy.QtGui import QColor, QImage, QPainter, QPixmap, QTransform
 from qtpy.QtMultimediaWidgets import QGraphicsVideoItem
 from qtpy.QtWidgets import QApplication, QFrame, QGraphicsPixmapItem, QGraphicsScene, QGraphicsView
@@ -235,7 +235,11 @@ class SlideView(QGraphicsView):
         super().__init__(composition)
         self.aspect_ratio_mode = aspect_ratio_mode
         self.pointer_button = None
-        QApplication.instance().installEventFilter(self)
+        # Sygnały zamiast filtra zdarzeń całej aplikacji: filtr wołał Pythona dla każdego
+        # zdarzenia każdego żyjącego widoku i dławił ścieżkę GUI (test_gui_path_keeps_up...).
+        app = QApplication.instance()
+        app.applicationStateChanged.connect(self._application_state_changed)
+        app.focusWindowChanged.connect(self._focus_window_changed)
         self.setFrameShape(QFrame.Shape.NoFrame)
         self.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         self.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
@@ -245,17 +249,20 @@ class SlideView(QGraphicsView):
         # mają trafiać do okna (Player.keyPressEvent, Info.keyPressEvent).
         self.setFocusPolicy(Qt.FocusPolicy.NoFocus)
 
-    def eventFilter(self, watched, event):
-        if self.pointer_button is not None and (
-            event.type() == QEvent.Type.ApplicationDeactivate
-            or (
-                event.type() in (QEvent.Type.WindowDeactivate, QEvent.Type.FocusOut)
-                and watched in (self, self.viewport(), self.window())
-            )
-        ):
+    def _application_state_changed(self, state) -> None:
+        if state != Qt.ApplicationState.ApplicationActive:
+            self._cancel_capture()
+
+    def _focus_window_changed(self, window) -> None:
+        # Fokus na własnym oknie (np. klik po Info) nie przerywa gestu, który właśnie startuje.
+        if window is None or window is not self.window().windowHandle():
+            self._cancel_capture()
+
+    def _cancel_capture(self) -> None:
+        """Utrata aktywności lub fokusu kończy capture bez nowego press (D47)."""
+        if self.pointer_button is not None:
             self.pointer_button = None
             self.pointer_released.emit()
-        return super().eventFilter(watched, event)
 
     def layer_at(self, point) -> int:
         """Najwyższy kontener pod punktem; margines klipu blokuje klik do live poniżej."""

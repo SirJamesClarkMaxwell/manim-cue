@@ -201,7 +201,9 @@ def test_leaving_slide_reaps_process_and_reentry_is_fresh(qapp, player_for) -> N
     player.load_previous_slide()
     assert player.live.sessions == {}
     pump(qapp, lambda: not player.live.stopping, what="odbiór procesu")
-    assert mp.active_children() == []
+    # Ciepłe workery puli D48 żyją dalej z założenia; osierocona sesja nie.
+    warm = {worker.process for worker in player.live.pool.workers}
+    assert [p for p in mp.active_children() if p not in warm] == []
 
     player.load_next_slide()
     assert player.live.sessions[0] is not first
@@ -511,7 +513,7 @@ def test_qt_wheel_angle_pixel_delta_and_pointer_signal(qt_gestures):
     view.close()
 
 
-@pytest.mark.parametrize("kind", ["FocusOut", "WindowDeactivate", "ApplicationDeactivate"])
+@pytest.mark.parametrize("kind", ["focus_window", "application_state"])
 def test_qt_event_loss_cancels_capture(qt_gestures, kind):
     from qtpy.QtCore import QEvent, QPointF, Qt
     from qtpy.QtGui import QMouseEvent
@@ -546,9 +548,10 @@ def test_qt_event_loss_cancels_capture(qt_gestures, kind):
         mouse(QEvent.Type.MouseButtonPress)
         mouse(QEvent.Type.MouseMove, 5)
         assert commands and controller.drag_from is not None
-        QApplication.sendEvent(
-            app if kind == "ApplicationDeactivate" else view, QEvent(getattr(QEvent.Type, kind))
-        )
+        if kind == "focus_window":
+            app.focusWindowChanged.emit(None)
+        else:
+            app.applicationStateChanged.emit(Qt.ApplicationState.ApplicationInactive)
         assert view.pointer_button is None and controller.drag_from is None
         before = list(commands)
         mouse(QEvent.Type.MouseMove, 10)

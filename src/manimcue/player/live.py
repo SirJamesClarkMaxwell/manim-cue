@@ -10,7 +10,8 @@ from manimcue.live_session import LiveSession, LiveSpec
 class LiveController:
     """Oddziela kopiowanie klatki od akceptacji trwałego zasobu kompozycji."""
 
-    def __init__(self, session_factory=LiveSession):
+    def __init__(self, session_factory=LiveSession, *, pool=None):
+        self.pool = pool
         self.session_factory = session_factory
         self.sessions = {}
         self.identities = {}
@@ -33,8 +34,9 @@ class LiveController:
         self.events = []
         self.steps = {}
         self.step_counters = {}
+        self.adoptions = {}
 
-    def enter(self, entry: dict) -> None:
+    def enter(self, entry: dict, *, prefetched: dict | None = None) -> None:
         """Przejmiij zgodne sąsiednie sesje; nowe wejście rezerwuje checkpoint."""
         if self.closing:
             return
@@ -90,7 +92,23 @@ class LiveController:
                 ),
                 None,
             )
-            if reused is None:
+            prepared = (prefetched or {}).pop(str(index), None)
+            if reused is not None and prepared is not None:
+                prepared["source"].request_stop()
+                self.stopping.append(prepared["source"])
+                prepared = None
+            if reused is None and prepared is not None:
+                session = prepared["source"]
+                if identity[0] is None:
+                    checkpoint = f"g{id(session):x}_e{entry['entry_id']}"
+                    session.send(f"adopt_prefetch 1 {checkpoint}")
+                    self.adoptions[session] = {
+                        "checkpoint": checkpoint,
+                        "frame_id": None,
+                        "acked": False,
+                    }
+                    self.step_counters[session] = 1
+            elif reused is None:
                 session = self.session_factory()
                 session.start(
                     LiveSpec(
@@ -101,7 +119,8 @@ class LiveController:
                         identity[5],
                         identity[6],
                         identity[7],
-                    )
+                    ),
+                    **({"pool": self.pool} if self.pool is not None else {}),
                 )
             else:
                 session = old.pop(reused)
@@ -135,6 +154,7 @@ class LiveController:
             session.request_stop()
             self.stopping.append(session)
             self.histories.pop(session, None)
+            self.adoptions.pop(session, None)
             self.frames.pop(session, None)
             self.leases.pop(session, None)
             self.restore_resources.pop(session, None)
@@ -173,6 +193,11 @@ class LiveController:
             history = self.histories.get(session)
             for event in session.poll():
                 self._step_status(session, event, now)
+                adoption = self.adoptions.get(session)
+                if adoption and event.startswith(f"PREFETCH_ADOPTED 1 {adoption['checkpoint']} "):
+                    adoption["frame_id"] = int(event.split()[-1])
+                if adoption and event.startswith("CHECKPOINT_ERROR "):
+                    self._fail(index, event)
                 if history:
                     correlated = (history.expected, history.pending_start)
                     history.accept(event)
@@ -230,6 +255,9 @@ class LiveController:
                 self.pending[session] = frame
             frame = self.pending.get(session)
             if frame is None:
+                continue
+            adoption = self.adoptions.get(session)
+            if adoption and frame.frame_id != adoption["frame_id"]:
                 continue
             request = history.boundaries.get(frame.frame_id) if history and frame.boundary else None
             step = next(
@@ -304,6 +332,8 @@ class LiveController:
         self.events.append({"type": "assigned", "index": index, "entry_id": self.entry["entry_id"]})
         if owned.boundary:
             session.send(f"frame_seen {owned.frame_id}")
+            if session in self.adoptions:
+                self.adoptions[session]["acked"] = True
             steps = self.steps.get(session, [])
             step = next((s for s in steps if s.get("frame_id") == owned.frame_id), None)
             if step:
@@ -343,10 +373,19 @@ class LiveController:
                 session in self.leases
                 and not getattr(self.leases[session], "closed", False)
                 and session.state == "ready"
+                and (session not in self.adoptions or self.adoptions[session]["acked"])
                 and not (self.histories.get(session) and self.histories[session].waiting)
             )
             for index, session in self.sessions.items()
         )
+
+    def release_prefetch(self):
+        """Zwolnij przyjęte wejście bez historii, również gdy grupa pozostaje w pauzie."""
+        for session, adoption in list(self.adoptions.items()):
+            if adoption["acked"]:
+                session.send(f"release 2 {adoption['checkpoint']}")
+                self.step_counters[session] = 2
+                del self.adoptions[session]
 
     def start_entries(self, now):
         """Wywołaj dopiero po wspólnym starcie plików; pauza zachowuje rezerwację."""

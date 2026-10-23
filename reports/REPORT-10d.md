@@ -275,3 +275,243 @@ pojedynczo 2× passed, z `test_layers.py` 38 passed. Przed poprawkami ten sam pr
 Podejrzany: filtr zdarzeń na całą `QApplication` z poprawki 4 (`composition.py`), wołający Pythona dla każdego
 zdarzenia. Jeśli błąd wróci w przebiegach etapu 2 — zamienić na sygnały `applicationStateChanged`
 /`focusWindowChanged`.
+
+## Etap 2 — zadanie 6: pula live GL/CE
+
+2026-10-24, `develop`, baza HEAD z etapem 1. Zmiany etapu 1 zachowane; bez commita,
+zmian zależności, synchronizacji `.venv`, stash/reset/checkout/worktree.
+
+Zmiany plik po pliku:
+
+- `src/manimcue/live_pool.py` (nowy): `ProcessBudget`, admisja i priorytety wspólne
+  dla procesów PC; PID zwalnia slot wyłącznie po exit. Rachunek D48 z manifestu,
+  kończące procesy nadal w limicie, obniżanie limitu po zmianie decku bez sumowania pul.
+  `LivePool`: dwa jednorazowe sloty na użyty silnik, POOL_READY po imporcie bez
+  pliku autora/sceny/SHM/kontekstu GPU; jeden import uzupełnienia naraz. Lock i oba
+  Pipe przed spawn, spec i nazwa SHM później. Kontrola rodzica/EOF co 250 ms,
+  timeout importu 5 s, ograniczona ponowna próba, zamknięcie i kill po 2 s.
+  Anulowanie importu z powodu priorytetu nie liczy się jako awaria importu.
+- `src/manimcue/live_session.py`: opcjonalny jawny `pool`, waiting_slot pompowany
+  przez poll; SHM dopiero po przydziale, wspólny lifecycle i sprzątanie po exit.
+  Zimne `capture_first_frame` zachowane. Nowe wejście nie przejmuje waiting_slot
+  poprzednika; anuluje stare żądanie przed nowym startem.
+- `src/manimcue/player/sources_av.py`: wspólna admisja dekoderów, zapasu i miniatur;
+  waiting_slot dla źródła; również zimne starty i procesy kończące zajmują slot.
+  Priorytetowe wycofanie niższych kategorii nie zwalnia slotu przed exit.
+- `src/manimcue/player/live.py`: jawne przekazanie puli do nowych LiveSession;
+  historia, zgodne sąsiednie przejęcie i dwa równoczesne trwałe live zachowane.
+- `src/manimcue/player/app.py`: właściciel puli i budżetu PC, konfiguracja całego
+  bieżącego decku, poll także na slajdzie plikowym, shutdown i snapshot liczników.
+- `src/manimcue/live_layers.py`: pula Qt, poll również bez aktywnego live,
+  waiting_slot uwzględniony w terminie wejścia; diagnozy importu i końcowy reap.
+- `src/manimcue/slides/present/player.py`: konfiguracja silników i pułapu całego
+  decku przed show, także przy pierwszym slajdzie plikowym. Styl forka zachowany;
+  nie uruchamiano ruff format na tym pliku.
+- `tests/test_live_pool.py` (nowy): rzeczywiste importy GL i CE bez sceny/GPU,
+  późny spec/Lock/SHM oraz TCP CE, unlink po exit, pełny budżet i anulowanie
+  oczekiwania, osierocenie przez osobny proces rodzica, dwie jednorazowe sceny,
+  anulowane uzupełnianie bez wyłączenia silnika. Każda pula jest sprzątana przez fixture.
+- `tests/test_live_ce_player.py`: Qt offscreen, pierwszy slajd plikowy, silnik z
+  dalszej części decku, timer puli i pełny shutdown.
+
+Bramka przed rozpoczęciem zadania 7:
+
+```powershell
+uv run --frozen pytest -q -p no:cacheprovider tests/test_live_pool.py tests/test_imgui_sources.py tests/test_live_session.py tests/test_live_ce_player.py tests/test_imgui_live.py -m 'not gpu and not slow'
+```
+
+**73 passed, 17 deselected, 48,62 s**. Po dodaniu śmierci rodzica i Qt file-first:
+**50 passed, 14,01 s** (pool, file-first, źródła i ImGui live). Późniejsza regresja
+pool/session/cały CE player oraz bramka wspólnych importów PC: **33 passed,
+17 deselected, 51,18 s**. Nie są to wyniki GPU ani dowód progu p95.
+
+Czas zadania 6: około 7 min do pierwszej bramki; późniejsze wspólne regresje
+rozliczone poniżej. Budżet 10 h / stop 20 h nieprzekroczony. Odstępstw kontraktu
+nie wprowadzano. Do Claude: oba silniki w prawdziwym oknie, dwie sesje 5g,
+zmiany decku pod obciążeniem, fokus, RSS/VRAM zapasu i pomiar bez prefetcha.
+
+## Etap 2 — zadanie 7: prefetch N+1 tylko ImGui PC
+
+- `src/manimcue/player/prefetch.py` (nowy): jeden token pełnej specyfikacji,
+  rewizji manifestu/decku, źródłowego entry_id i celu. Oddzielne źródła plikowe
+  i LiveSession; take przekazuje własność raz i zmienia kategorię budżetu na scene.
+  Anulowane zasoby zajmują pamięć/slot do exit, błędny token nie jest ponawiany.
+  Konserwatywna rezerwa 8 rastrów + nagłówki na warstwę, suma maks. 128 MiB;
+  brak rezerwy lub za duży plik pomija warstwę, pozostałe można przejąć.
+- `src/manimcue/player/app.py`: przygotowanie po gotowości N także bez Info,
+  token sprawdzany ponownie przed nawigacją; wyłącznie rzeczywisty normalny N+1
+  przejmuje źródła. Reverse, Previous, replay, skoki, zmiana decku/spec i exit
+  anulują spekulację. No-op bieżącego start_at i obroty pętli jej nie konsumują.
+  Sąsiednie zgodne live rozpoznawane po rzeczywistej tożsamości, także przy zmianie
+  położenia rect; nie są budowane drugi raz. Efekty EOF/iteration_end otrzymują
+  powód auto_next/skip_all, aby zachować zwykłe przygotowanie cue także po trafieniu.
+- `src/manimcue/player/sources_av.py`: `hold_first`, potwierdzenie held, adopt bez
+  ponownego dekodowania, nowa generacja/entry_id oraz zegar przy wspólnym starcie.
+- `src/manimcue/player/decoder_worker.py`: potwierdzony hold po pierwszym t=0,
+  bez EOF/postępu odtwarzania/pętli; limit rastra przed konwersją/alokacją SHM,
+  osobny sygnał zwolnienia hold i kotwica odtwarzania. Preview nie jest przejmowane.
+- `src/manimcue/live_session.py`: opt-in `LiveSpec.prefetch=False`.
+- `src/manimcue/live_worker.py`, `src/manimcue/live_scene_ce.py`: przekazanie trybu
+  do sceny dopiero po przydziale; zwykła ścieżka pozostaje domyślna.
+- `src/manimcue/live_scene.py`, `src/manimcue/live_scene_ce.py`: podczas hold nowa
+  granica adopcji używa istniejącego rastra, bez update_frame/update_mobjects dt=0.
+- `src/manimcue/live_transport.py`: techniczny ACK READY i PREFETCH_HELD, blokada
+  ręcznych cue/view podczas hold; jawne adopt_prefetch bez session_id/cue/historii,
+  nowy frame_id, osobny ACK po przypisaniu zasobu kompozycji i release. Checkpoint
+  trwałego wejścia kończy hold przed zwykłymi operacjami D41; stare żądania/ACK
+  nadal przechodzą istniejącą kontrolę generacji, numeru żądania i frame_id.
+- `src/manimcue/player/live.py`: przejęcie po sprawdzeniu D39, zwykłe tworzenie
+  historii dopiero przy wejściu, nowa granica adopcji i ACK dla live bez historii;
+  release także dla wejścia pozostającego w pauzie. READY spekulacji nie otwiera bariery.
+- `src/manimcue/live_pool.py`: kategoria prefetch w admisji i przeklasyfikowanie
+  właściciela; liczniki procesów zawierają wszystkie kategorie i twardy pułap.
+- `tests/test_imgui_prefetch.py` (nowy): spawn/socket/SHM CE oraz źródła plikowe;
+  hold ponad 5 s, brak dt=0 updaterów, checkpoint/nowa granica/kompozycja/ACK,
+  zwykły live bez session_id/cue i wejście w pauzie; odpowiedniki GL oznaczone gpu.
+  Rzeczywista App: niezależny preview, przejęcie pliku, no-op bieżącego start_at,
+  anulowanie, pierwszeństwo adjacent i niezmieniona historia przy Previous.
+  Pełny B, nowa nawigacja podczas waiting_slot, cleanup po module i częściowe
+  trafienie przy przekroczeniu pamięci. Zwykłe powtórzenia mają 2–3 próby.
+- `README.md`, `docs/api.md`: po angielsku opis puli, spekulacyjnego build_objects
+  i jego I/O, reguł przejęcia/anulowania, niezależnego preview oraz limitów.
+
+Testy zadania 7 (zestaw z transportem obu silników):
+
+```powershell
+uv run --frozen pytest -q -p no:cacheprovider tests/test_imgui_prefetch.py tests/test_imgui_sources.py tests/test_imgui_live_checkpoint.py tests/test_imgui_navigation.py tests/test_live_scene.py tests/test_live_ce.py -m 'not gpu and not slow'
+```
+
+**121 passed, 7 deselected, 80,53 s**. Po rozszerzeniu testów App i admisji:
+**79 passed, 7 deselected, 30,47 s**. Wspólna regresja pool/źródła/ImGui/live
+checkpoint/nawigacja/session/Qt CE: **106 passed, 24 deselected, 74,14 s**.
+Po końcowych poprawkach własności budżetu i częściowych trafień: zestaw ImGui
+z analizatorem śladu **77 passed, 7 deselected, 20,40 s**; adjacent + rebase
+osobno **2 passed, 2,19 s**. Końcowy zestaw nowych testów dopisany poniżej.
+
+Czas zadania 7 z regresjami: około 14 min. Budżet 11 h / stop 22 h
+nieprzekroczony. Przegląd Claude i oczekiwanie na człowieka: 0 min.
+Odstępstw semantycznych nie wprowadzano. Rezerwa pamięci jest konserwatywna:
+plik większy niż przydzielony raster lub GIF z cache większym niż rezerwa może
+nie trafić w prefetch mimo wolnej pamięci systemowej; wejście użyje zwykłej ścieżki.
+Nie jest to limit RSS bibliotek ani VRAM kontekstu/sceny.
+
+Do Claude w oknie: wszystkie scenariusze GL, zgodność obrazu pierwszej klatki,
+release w pauzie i późniejsze cue, D39–D41/5g pod pełnym obciążeniem, skoki podczas
+prefetcha, auto_next/skip_all/pętle/koniec decku, zmiany DPI i rzeczywista pamięć.
+
+## Instrumentacja zadania 8 — przygotowana, odbiór niewykonany
+
+Wyłącznie instrumentacja z zamkniętej listy zadania 8:
+
+- `tests/test_imgui_acceptance.py`: rzeczywisty player GLFW/OpenGL3 i App, oba
+  silniki, prefetch off/on, trzy serie po 10 wejść rozgrzewki + 100 pomiarów.
+  Deck 24 slajdów, każda nawigacja tworzy nową scenę bez session_id i enter_cue;
+  skok po końcu decku jest niemierzony. Opcjonalne trzy ruchome klipy, niezależne
+  Info i miniatury. Czas od przyjętego next do gotowej kompozycji i swapu oraz
+  opróżnienia kolejki ACK do socketu (konserwatywnie następny swap, jeśli potrzeba).
+  Pula ma być rozgrzana przed next. Ślad rozdziela pool hit, cold fallback,
+  prefetch hit, kategorie procesów i RSS; `vram_bytes=null` nie udaje pomiaru VRAM.
+- `experiments/f10a_gate/measure.py`: analiza śladu wejść osobno od metryk 10a;
+  wyłączenie rozgrzewki, cold osobno, p50/p95/max, liczba trafień, peak procesów
+  i RSS. Flaga passes_latency wymaga 100 ciepłych próbek i p95 ≤500 ms;
+  `acceptance` nadal pending Claude. Dotychczasowe progi i analiza 10a zachowane.
+- `tests/conftest.py`: tylko nazwa `test_d48_window_measurement` w SLOW,
+  ponieważ próba wykonuje ≥10 powtórzeń. Bez zmiany domyślnego filtrowania.
+
+Zwykły test analizatora sprawdza rozgrzewkę/cold i brak VRAM. Nie uruchamiano
+próby GPU, okien, pełnego pytest ani `-n`. Same READY, testy offline ani rekordy
+syntetyczne nie stanowią odbioru ≤0,5 s p95. 10a/11 pozostaje osobną bramką.
+Instrumentacja i raport: około 6 min; łącznie około 27 min, z czasem czytania
+kontraktu i testów. Żaden limit zadania ani całego etapu nie został przekroczony.
+
+### Komendy dla Claude — D48, nieuruchomione
+
+PowerShell w repo, odblokowany ekran, zainstalowane/istniejące materiały Demo.
+Przed rozpoczęciem dopasować monitory i zweryfikować sprzęt, Hz i rozdzielczości.
+
+```powershell
+$env:UV_OFFLINE = '1'
+$env:UV_CACHE_DIR = "$PWD/.cache/uv"
+$env:TMP = "$PWD/.tmp"
+$env:TEMP = "$PWD/.tmp"
+Remove-Item Env:QT_QPA_PLATFORM -ErrorAction SilentlyContinue
+$env:MANIMCUE_D48_DECK = 'slides/Demo.json'
+$env:MANIMCUE_D48_OUTPUT = '.tmp/d48-baseline'
+Remove-Item Env:MANIMCUE_D48_FULL_LOAD -ErrorAction SilentlyContinue
+uv run --frozen python experiments/f10a_gate/measure.py --timeout 3600 --output .tmp/d48-baseline-watchdog.json -- uv run --frozen pytest -q -p no:cacheprovider tests/test_imgui_acceptance.py::test_d48_window_measurement -m 'gpu and slow'
+
+$env:MANIMCUE_D48_FULL_LOAD = '1'
+$env:MANIMCUE_D48_OUTPUT = '.tmp/d48-full-load'
+uv run --frozen python experiments/f10a_gate/measure.py --timeout 3600 --output .tmp/d48-full-load-watchdog.json -- uv run --frozen pytest -q -p no:cacheprovider tests/test_imgui_acceptance.py::test_d48_window_measurement -m 'gpu and slow'
+
+Get-ChildItem .tmp/d48-baseline/*.jsonl, .tmp/d48-full-load/*.jsonl | ForEach-Object {
+    uv run --frozen python experiments/f10a_gate/measure.py --trace $_.FullName --output ($_.FullName + '.summary.json')
+}
+```
+
+To cztery warianty GL/CE × prefetch off/on, każdy z trzema seriami. Domyślny
+baseline zachowuje warstwy wybranego slajdu Demo; FULL_LOAD dodaje trzy klipy
+z istniejących plików. Zweryfikować kompozycję i dobrać fixture pełnego D46,
+jeżeli wybrany slajd już zawiera klipy. Skoki, odwracanie, anulowanie i exit
+nadal sprawdzić według odbioru ręcznego, nie zastępować ich samym benchmarkiem.
+
+VRAM mierzyć równolegle z zewnątrz, aby zapytania sterownika nie blokowały UI.
+Przykład w drugim terminalu, przerwać Ctrl+C po próbie:
+
+```powershell
+nvidia-smi -l 1 | Tee-Object .tmp/d48-vram.txt
+```
+
+Jeżeli sterownik/WDDM zwraca N/A, użyć dostępnego profilera GPU i zanotować
+ograniczenie; nie zaliczać VRAM na podstawie RSS ani pustego pola śladu.
+RSS w śladzie próbkowany jest przy zmierzonych wejściach, więc jego peak nie
+obejmuje gwarantowanie chwilowych szczytów pomiędzy nimi. Claude powinien także
+próbkować procesy podczas anulowania/exit i osobno porównać aktywne, idle,
+prefetch i retiring. Przekroczenie progu uruchamia STOP/przegląd, nie zmianę
+liczby workerów lub osłabienie progu.
+
+Regresje GPU nowych ścieżek i pełny odbiór — wyłącznie Claude:
+
+```powershell
+uv run --frozen pytest -q -p no:cacheprovider tests/test_imgui_prefetch.py -m gpu
+uv run --frozen pytest -q -p no:cacheprovider -m ''
+```
+
+### Końcowa weryfikacja etapu 2
+
+Po poprawkach ostatnich przypadków (anulowanie importu nie wyłącza silnika,
+przeklasyfikowanie procesu po take, częściowe trafienie przy limicie pamięci):
+
+```powershell
+uv run --frozen pytest -q -p no:cacheprovider tests/test_live_pool.py tests/test_imgui_prefetch.py tests/test_imgui_acceptance.py::test_d48_measure_excludes_warmup_and_cold -m 'not gpu and not slow'
+```
+
+**21 passed, 3 deselected (GPU), 32,01 s**. Dwa dotychczasowe ostrzeżenia
+zależności: pkg_resources i PyGLM. Żadna nowa próba offline nie ma ≥10 powtórzeń.
+Końcowy `ruff check` i `ruff format --check`: **18 własnych plików Python zielone**,
+bez forka `src/manimcue/slides/`; `git diff --check` zielony.
+`test_pc_shared_imports` wykonano w zestawie 33 passed opisanym przy zadaniu 6.
+Bez GPU, Pyodide, pełnego pytest, xdist i zmian `.venv`; nie wykonano commita.
+Odbiór zadania 8, pomiar p95, VRAM i próba prelegenta pozostają po stronie Claude.
+
+## Przegląd Claude — etap 2
+
+Recenzja adwersaryjna codex etapu 2 przerwana limitem użycia codex (do 3:28, 2026-10-24); do powtórzenia.
+Przegląd Claude (statyczny, `live_pool.py`, `prefetch.py`):
+
+- Cykl życia procesów zgodny z D48: slot zwalnia dopiero exit, zamknięcie `control` kończy ciepły proces,
+  kill po 2 s; w UI tylko `poll(0)`/`join(0)` po `exitcode`.
+- **Istotne, otwarte:** przy pełnym budżecie `ProcessBudget.try_acquire` woła wszystkie reclaimery i stoppery
+  niższych kategorii przy każdym nieudanym wywołaniu (co klatkę `waiting_slot`). Miniatura bez slotu
+  zatrzymuje całą ciepłą pulę obu silników, nie jeden proces — churn importów ~1,4 s. Poprawka: najwyżej
+  jeden odzysk naraz (nic nie jest `retiring`), najniższa kategoria pierwsza. Przy budżecie Demo (~25) pod
+  zwykłym obciążeniem (~21 procesów) nie występuje.
+
+Zwykły pytest po etapie 2: **701 passed, 2 failed**; po poprawkach niżej **702 passed, 0 failed, 575 s**:
+- `test_leaving_slide_reaps_process_and_reentry_is_fresh` — liczył ciepłe workery puli Qt jako osierocone;
+  test wyklucza teraz `player.live.pool.workers`.
+- `test_gui_path_keeps_up_with_live_frames` — 23,25 fps (próg 48). Przyczyna potwierdzona eksperymentem:
+  filtr zdarzeń całej `QApplication` z poprawki 4 etapu 1 (każdy żyjący `SlideView` z wcześniejszych testów
+  wołał Pythona dla każdego zdarzenia; sekwencja plików Qt odtwarzała spadek do 43 fps, bez filtra test
+  przechodził). Zamienione na sygnały `applicationStateChanged`/`focusWindowChanged`
+  (`composition.py`); test anulowania capture emituje sygnały. Sekwencja Qt: 76 passed.

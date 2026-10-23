@@ -244,3 +244,20 @@ See `reports/REPORT-10a.md` for test evidence, remaining acceptance checks
 and network-dependent tests. Native window appearance,
 DPI, focus, two-monitor use, vsync and performance still require acceptance
 with an unlocked screen. The existing ImGui experiment remains a separate PoC.
+
+
+Both desktop players warm two single-use live workers per engine used by the current
+deck (ManimGL and/or CE Cairo). Idle workers import the backend without loading author
+code, allocating frame SHM or creating a scene/GPU context. Active and retiring workers
+share a deck-sized process budget with ImGui file decoders; a busy budget delays entry
+through the existing five-second preparation deadline. Pools close on player shutdown.
+
+ImGui PC also prepares one normal next slide after the current slide is ready, even
+when Info is hidden. Files hold their first frame at t=0; live panels build objects and
+hold their first frame without entry cues or checkpoint history. Author `build_objects`
+code can therefore run before navigation, including its I/O effects. Only a committed
+normal next adopts this work; backward/reverse/replay navigation, jumps, deck/spec
+changes and failures discard it. Compatible adjacent live sessions take precedence.
+Info preview remains independent. Speculative frame buffers and copies are limited to
+128 MiB CPU+GPU; backend/scene RSS and VRAM are measured separately. Qt and web do not
+prefetch. The 0.5-second p95 target remains subject to windowed acceptance.

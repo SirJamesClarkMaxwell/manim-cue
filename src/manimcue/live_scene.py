@@ -323,7 +323,8 @@ class LiveScene(LiveTransport, Scene):
     def live_publish(self, boundary: bool = False, dt: float = 0) -> None:
         began = time.monotonic()
         self.live_view_dirty = False
-        self.update_frame(dt, force_draw=True)
+        if not (getattr(self, "live_prefetch", False) and self.live_frame_id):
+            self.update_frame(dt, force_draw=True)
         rendered = time.monotonic()
         pixels = self.camera.get_raw_fbo_data(dtype="f1")
         width, height = self.camera.get_pixel_shape()

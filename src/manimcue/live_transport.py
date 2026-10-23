@@ -326,8 +326,16 @@ class LiveTransport:
                     frame_id = int(command.split()[1])
                     if frame_id == self.live_boundary_id:
                         self.live_seen = frame_id
+                        if getattr(self, "live_prefetch", False) and frame_id == 1:
+                            self.live_status("PREFETCH_HELD")
                 except (ValueError, IndexError):
                     log.warning(f"Niepoprawne potwierdzenie: {command!r}")
+            elif getattr(self, "live_prefetch", False) and (
+                command.startswith(("view ", "step "))
+                or command in ("next", "back")
+                or command in self.PRESETS
+            ):
+                self.live_status("LIVE_RESERVED")
             elif command.startswith("step "):
                 fields = command.split()
                 valid = (
@@ -351,6 +359,7 @@ class LiveTransport:
                 "enter",
                 "drop_checkpoint",
                 "release",
+                "adopt_prefetch",
             ):
                 self.live_queue_operation(command)
             elif command in ("next", "back") or command in self.PRESETS:
@@ -396,11 +405,13 @@ class LiveTransport:
         if not valid:
             self.live_status(f"CHECKPOINT_ERROR {request[:20]} {checkpoint[:64]} {code}")
             return
+        if operation == "release" and getattr(self, "live_prefetch", False):
+            self.live_prefetch = False
         self.live_request = int(request)
         self.live_generation = generation
         if operation == "checkpoint":
             self.live_entry_counter = int(checkpoint.rsplit("e", 1)[1])
-        if operation in ("checkpoint", "restore"):
+        if operation in ("checkpoint", "restore", "adopt_prefetch"):
             self.live_reserved = checkpoint
             self.live_reservation_request = int(request)
             if self.live_loop:
@@ -411,10 +422,17 @@ class LiveTransport:
         """Każda operacja zaczyna się po ACK poprzedniej granicy."""
         began = time.perf_counter()
         try:
-            if operation == "checkpoint":
+            if operation == "adopt_prefetch":
+                if not getattr(self, "live_prefetch", False):
+                    raise ValueError("Scena nie jest prefetchem")
+                metrics = {}
+                status = "PREFETCH_ADOPTED"
+            elif operation == "checkpoint":
+                self.live_prefetch = False
                 metrics = self.checkpoints.checkpoint(checkpoint)
                 status = "CHECKPOINT_READY"
             elif operation == "restore":
+                self.live_prefetch = False
                 if checkpoint not in self.checkpoints.entries:
                     raise KeyError("missing")
                 self.live_status(f"RESTORE_START {request} {checkpoint}")
@@ -428,6 +446,7 @@ class LiveTransport:
                 if int(request) > self.live_reservation_request:
                     self.checkpoints.protected = checkpoint
                     self.live_reserved = None
+                    self.live_prefetch = False
                 self.live_status(f"ENTRY_RELEASED {request} {checkpoint}")
                 return
             self.live_boundary_request = request

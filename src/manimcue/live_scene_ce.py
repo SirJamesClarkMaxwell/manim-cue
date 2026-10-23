@@ -168,7 +168,8 @@ class LiveSceneCE(LiveTransport, Scene):
 
     def live_publish(self, boundary=False, only_if_changed=False):
         began = time.monotonic()
-        self.renderer.update_frame(self)
+        if not (getattr(self, "live_prefetch", False) and self.live_frame_id):
+            self.renderer.update_frame(self)
         rendered = time.monotonic()
         camera = self.camera
         pixels = camera.pixel_array
@@ -246,6 +247,7 @@ def run_ce_worker(spec, shm_name, frame_lock, bootstrap_sender):
             shm = SharedMemory(name=shm_name)
             scene = scene_type()
             scene.live_buffer = FrameBuffer(shm, frame_lock, spec.width, spec.height)
+            scene.live_prefetch = spec.prefetch
             scene.live_bootstrap = bootstrap_sender
             try:
                 scene.live_cue = "setup"

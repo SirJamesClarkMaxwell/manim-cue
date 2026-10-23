@@ -481,6 +481,20 @@ class Player(QMainWindow):
     def load_current_media(self, start_paused: bool = False, reason: str = "initial") -> None:
         url = QUrl.fromLocalFile(str(self.current_file.resolve(strict=True)))
         slide_config = self.current_slide_config
+        engines = {
+            layer.engine
+            for slide in self.current_presentation_config.slides
+            for layer in slide.layers
+            if getattr(layer, "kind", None) == "live"
+        }
+        maximum = max(1 + len(slide.layers) for slide in self.current_presentation_config.slides)
+        preview = max(
+            1 + sum(layer.kind != "live" or bool(layer.thumbnail) for layer in slide.layers)
+            for slide in self.current_presentation_config.slides
+        )
+        self.live.pool.budget.configure(3 * maximum + preview + 5 + 2 * len(engines))
+        self.live.pool.configure(engines)
+        self.live.update_timer()
         reversed_slide = self.playing_reversed_slide
         base_video = slide_config.type == SlideType.Video or (
             slide_config.type == SlideType.Image

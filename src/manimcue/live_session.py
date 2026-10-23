@@ -24,6 +24,7 @@ class LiveSpec:
     fps: int = 60
     background_opacity: float = 1.0
     engine: Literal["manimgl", "ce-cairo"] = "manimgl"
+    prefetch: bool = False
 
 
 class LiveSession:
@@ -36,6 +37,9 @@ class LiveSession:
         self.state = "idle"
         self.error = None
         self._process = None
+        self._pool = None
+        self._waiting_spec = None
+        self._control = None
         self._shm = None
         self._socket = None
         self._pipe = None
@@ -47,15 +51,46 @@ class LiveSession:
         self._snapshot_metrics = []
         self.checkpoint_metrics = []
 
-    def start(self, spec: LiveSpec) -> None:
-        if self._process is not None:
+    def start(self, spec: LiveSpec, *, pool=None) -> None:
+        if self.running:
             raise RuntimeError("Poprzedni proces nie został odebrany przez poll()")
         if not Path(spec.scene_file).is_absolute() or spec.fps <= 0:
             raise ValueError("Wymagana absolutna ścieżka sceny i dodatni fps")
         if spec.engine not in ("manimgl", "ce-cairo"):
             raise ValueError(f"Nieznany silnik live: {spec.engine}")
-        size = buffer_size(spec.width, spec.height)
+        buffer_size(spec.width, spec.height)
         self.__init__()
+        self._pool = pool
+        if pool is not None:
+            self._waiting_spec = spec
+            self.state = "waiting_slot"
+            self._admit()
+            return
+        self._start_cold(spec)
+
+    def _admit(self):
+        worker = self._pool.take(
+            self._waiting_spec.engine, "prefetch" if self._waiting_spec.prefetch else "scene"
+        )
+        if worker is None:
+            return
+        spec, self._waiting_spec = self._waiting_spec, None
+        self._process, self._pipe = worker.process, worker.bootstrap
+        self._control, self._frame_lock = worker.control, worker.frame_lock
+        self._pool.budget.assign(
+            self._process.pid, "prefetch" if spec.prefetch else "scene", self.request_stop
+        )
+        self.state = "starting"
+        try:
+            self._shm = SharedMemory(create=True, size=buffer_size(spec.width, spec.height))
+            self._buffer = FrameBuffer(self._shm, self._frame_lock, spec.width, spec.height)
+            self._control.send((spec, self._shm.name))
+        except Exception:
+            self.request_stop()
+            raise
+
+    def _start_cold(self, spec):
+        size = buffer_size(spec.width, spec.height)
         ctx = mp.get_context("spawn")
         self._shm = SharedMemory(create=True, size=size)
         self._frame_lock = ctx.Lock()
@@ -104,8 +139,8 @@ class LiveSession:
                         code = self._socket.connect_ex(message)
                         if code not in (0, errno.EINPROGRESS, errno.EWOULDBLOCK, 10035):
                             raise OSError(code, "Połączenie z workerem")
-                    else:
-                        self._event(message)
+                    elif message != "POOL_READY":
+                        self._event(message.replace("POOL_ERROR", "ERROR bootstrap", 1))
             except (EOFError, BrokenPipeError):
                 self._pipe.close()
                 self._pipe = None
@@ -115,6 +150,8 @@ class LiveSession:
                 self._pipe = None
 
     def poll(self) -> list[str]:
+        if self._waiting_spec is not None:
+            self._admit()
         self._poll_bootstrap()
         if self._socket is not None:
             try:
@@ -151,6 +188,8 @@ class LiveSession:
             if self._process.exitcode is not None:
                 # Po exit code ostatnia diagnoza musi być odebrana przed zamknięciem IPC.
                 self._poll_bootstrap()
+                if self._pool is not None:
+                    self._pool.budget.release_after_exit(self._process.pid)
                 self._process.join(0)
                 if self.state != "error":
                     if self._stop_at is None:
@@ -167,7 +206,7 @@ class LiveSession:
     def send(self, command: str) -> None:
         if "\n" in command or "\r" in command:
             raise ValueError("Komenda musi zajmować jedną linię")
-        if self._process is not None:
+        if self.running:
             self._outgoing.extend((command + "\n").encode("utf-8"))
 
     def try_read_frame(self, *, acknowledge: bool = True) -> OwnedFrame | None:
@@ -183,8 +222,14 @@ class LiveSession:
         return frame
 
     def request_stop(self) -> None:
+        if self._waiting_spec is not None:
+            self._waiting_spec = None
+            self.state = "stopped"
+            self._events.append("STOPPED")
         if self._process is not None and self._stop_at is None:
             self._stop_at = time.monotonic() + 2
+            if self._pool is not None:
+                self._pool.budget.mark_retiring(self._process.pid)
             self.send("shutdown")
 
     @property
@@ -195,9 +240,12 @@ class LiveSession:
     @property
     def running(self) -> bool:
         """Proces jeszcze nieodebrany przez poll()."""
-        return self._process is not None
+        return self._process is not None or self._waiting_spec is not None
 
     def _cleanup(self):
+        if self._control is not None:
+            self._control.close()
+            self._control = None
         if self._socket is not None:
             self._socket.close()
             self._socket = None

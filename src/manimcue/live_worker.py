@@ -55,6 +55,7 @@ def run_worker(spec, shm_name, frame_lock, bootstrap_sender) -> None:
             },
         )
         scene.live_buffer = FrameBuffer(shm, frame_lock, spec.width, spec.height)
+        scene.live_prefetch = spec.prefetch
         scene.live_bootstrap = bootstrap_sender
         scene.run()
     except Exception as exc:  # noqa: BLE001 — nadzorca raportuje wyjątki kodu sceny

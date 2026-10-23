@@ -171,7 +171,9 @@ def run_decoder(spec: dict, connection) -> None:
                 for item in ImageSequence.Iterator(image):
                     began = time.perf_counter()
                     total += item.width * item.height * 4
-                    if total > 256 * 1024 * 1024:
+                    if total > min(256 * 1024 * 1024, media.get("max_frame_bytes", float("inf"))):
+                        if media.get("hold_first"):
+                            raise MemoryError("GIF przekracza budżet prefetcha")
                         raise ValueError("GIF przekracza limit 256 MiB RGBA")
                     rgba = item.convert("RGBA")
                     frames.append((duration, rgba.tobytes()))
@@ -214,6 +216,8 @@ def run_decoder(spec: dict, connection) -> None:
             container.seek(int(seek_time / float(stream.time_base)), stream=stream)
             iterator = iter(container.decode(stream))
         size = width * height * 4
+        if size > media.get("max_frame_bytes", float("inf")):
+            raise MemoryError("Klatka przekracza budżet prefetcha")
         memory = SharedMemory(create=True, size=HEADER + 2 * size)
         memory.buf[:HEADER] = bytes(HEADER)
         descriptor = {
@@ -240,7 +244,7 @@ def run_decoder(spec: dict, connection) -> None:
         while True:
             now = time.monotonic()
             struct.pack_into("<d", memory.buf, PROGRESS, now)
-            if control[0]:
+            if control[0] == 1:
                 return
             # Rodzic nic nie wysyła; poll() rzuca BrokenPipeError po jego śmierci, więc
             # osierocony dekoder kończy się zamiast działać w nieskończoność.
@@ -251,6 +255,10 @@ def run_decoder(spec: dict, connection) -> None:
                 position = control[3]
                 if playing:
                     anchor = now
+            if media.get("hold_first") and frame_id and control[0] != 2:
+                if connection.poll(0.002):
+                    connection.recv()
+                continue
             requested_playing = bool(control[1])
             if requested_playing != playing:
                 if playing:
@@ -345,9 +353,19 @@ def run_decoder(spec: dict, connection) -> None:
                 frame_id += 1
                 control[10] = frame_id
                 pending = None
-                if frames is not None and kind == "image":
+                if (
+                    frames is not None
+                    and kind == "image"
+                    and (not media.get("hold_first") or control[0] == 2)
+                ):
                     eof = True
                     connection.send({"type": "eof"})
+                if media.get("hold_first") and control[0] != 2:
+                    connection.send({"type": "held"})
+                    break
+            if frame_id and kind == "image" and control[0] == 2 and not eof:
+                eof = True
+                connection.send({"type": "eof"})
             if exhausted and target >= duration and not eof:
                 eof = True
                 if not announced:

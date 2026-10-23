@@ -14,29 +14,58 @@ POOL_SIZE = 4
 _pool = []
 _sources = weakref.WeakSet()
 _retiring_pool = []
+_budget = None
 
 
-def _spawn():
+def configure_budget(budget):
+    global _budget
+    _budget = budget
+    retire_live = budget.reclaimers.get("idle", lambda: None)
+
+    def retire_idle():
+        close_pool()
+        retire_live()
+
+    budget.reclaimers["idle"] = retire_idle
+
+
+def _spawn(role="idle"):
+    if _budget is not None and not _budget.try_acquire(role):
+        return None
     context = get_context("spawn")
     control = context.RawArray("d", [0] * 12)
     connection, child = context.Pipe()
     process = context.Process(target=run_pooled, args=(control, child), daemon=True)
-    process.start()
-    child.close()
+    try:
+        process.start()
+    except Exception:
+        if _budget is not None:
+            _budget.abort()
+        raise
+    finally:
+        child.close()
+    if _budget is not None:
+        _budget.register(process, role)
     return process, connection, control
 
 
-def _take():
+def _take(role="scene"):
     """Start procesu i importy (ok. 0,2–0,35 s) poza ścieżką wejścia na slajd."""
     while _pool:
         worker = _pool.pop(0)
         if worker[0].is_alive():
             break
         worker[1].close()
+        if _budget is not None:
+            _budget.release_after_exit(worker[0].pid)
+        worker[0].close()
     else:
-        worker = _spawn()
+        worker = _spawn(role)
     while len(_pool) < POOL_SIZE:
-        _pool.append(_spawn())
+        spare = _spawn()
+        if spare is None:
+            break
+        _pool.append(spare)
     return worker
 
 
@@ -45,12 +74,14 @@ def close_pool() -> None:
     while _pool:
         process, connection, _ = _pool.pop()
         connection.close()
+        if _budget is not None:
+            _budget.mark_retiring(process.pid)
         _retiring_pool.append(process)
 
 
 def process_counts(thumbnails=None) -> dict:
     """Kończący proces zajmuje miejsce aż do exit, nie tylko do żądania stop."""
-    counts = {"scene": 0, "preview": 0, "thumbnail": 0, "idle": 0, "retiring": 0}
+    counts = {"scene": 0, "preview": 0, "prefetch": 0, "thumbnail": 0, "idle": 0, "retiring": 0}
     for source in list(_sources):
         if source.process is not None and source.process.exitcode is None:
             counts[source.role] += 1
@@ -60,6 +91,8 @@ def process_counts(thumbnails=None) -> dict:
         if process.exitcode is None:
             counts["retiring"] += 1
         else:
+            if _budget is not None:
+                _budget.release_after_exit(process.pid)
             process.join(0)
             process.close()
             _retiring_pool.remove(process)
@@ -90,8 +123,11 @@ class Source:
         self.eof = False
         self.width = self.height = 0
         self.started = self.progress = 0.0
+        self.control = [0] * 12
+        self.waiting_slot = False
+        self.budget = _budget
 
-    def prepare(self, entry_id: int, media: dict) -> None:
+    def prepare(self, entry_id: int, media: dict, *, hold_first: bool = False) -> None:
         """Unieważnij stare wyniki; proces z puli nie wykonuje decode w UI."""
         self.request_close()
         self.generation += 1
@@ -101,14 +137,31 @@ class Source:
         self.status, self.error, self.eof = "preparing", None, False
         self.duration = None
         self.started = self.progress = time.monotonic()
-        self.media = dict(media)
-        self.process, self.connection, self.control = _take()
-        self.connection.send(self.media)
+        self.media = {**media, "hold_first": hold_first}
+        self.hold_first = hold_first
+        self.held = False
+        self.waiting_slot = True
+        self._admit()
+
+    def _admit(self):
+        worker = _take(self.role)
+        if worker is not None:
+            self.process, self.connection, self.control = worker
+            if self.budget is not None:
+                self.budget.assign(self.process.pid, self.role, self.request_close)
+            self.connection.send(self.media)
+            self.waiting_slot = False
 
     def poll(self, now: float, target: float | None, budget_ms: float) -> dict:
         """Kopiuj tylko najnowszy spójny slot, zachowując ostatni dobry obraz."""
         deadline = time.perf_counter() + min(1, max(0, budget_ms)) / 1000
         self.poll_closed(now)
+        if self.waiting_slot:
+            if now - self.started > 5:
+                self.waiting_slot = False
+                self.status, self.error = "error", "Przygotowanie przekroczyło 5 s"
+            else:
+                self._admit()
         if self.connection is not None and self.status != "error":
             if target is not None:
                 self.control[3] = target
@@ -137,6 +190,8 @@ class Source:
                 elif kind == "error":
                     self.status, self.error = "error", message["error"]
                     break
+                elif kind == "held":
+                    self.held = True
                 elif kind == "eof":
                     self.eof = True
             if self.memory is not None and time.perf_counter() < deadline:
@@ -169,7 +224,12 @@ class Source:
                             self.status = "ready"
             if self.status == "preparing" and now - self.started > 5:
                 self.status, self.error = "error", "Przygotowanie przekroczyło 5 s"
-            elif self.status != "preparing" and not self.eof and now - self.progress > 2:
+            elif (
+                self.status != "preparing"
+                and not self.hold_first
+                and not self.eof
+                and now - self.progress > 2
+            ):
                 self.status, self.error = "error", "Brak postępu dekodera przez 2 s"
             if self.status == "error":
                 self.request_close()
@@ -190,6 +250,16 @@ class Source:
             },
             **(self.frame or {}),
         }
+
+    def adopt(self, entry_id: int, now: float, paused: bool) -> None:
+        """Przekaż pierwszy raster bez resetu dekodera; zegar rusza w barierze."""
+        self.entry_id = entry_id
+        self.generation += 1
+        self.hold_first = False
+        self.progress = now
+        self.control[0] = 2
+        self.control[2] = now
+        self.control[1] = int(not paused)
 
     def play(self, anchor: float) -> None:
         """Zamów wspólną kotwicę czasu grupy."""
@@ -213,9 +283,12 @@ class Source:
 
     def request_close(self) -> None:
         """Zakończ proces bez join w UI; odroczenie zwolnienia uchwytu."""
+        self.waiting_slot = False
         if self.process is not None:
             if self.process.is_alive():
                 self.process.terminate()
+            if self.budget is not None:
+                self.budget.mark_retiring(self.process.pid)
             self.retired.append(self.process)
             self.process = None
         if self.connection is not None:
@@ -232,9 +305,11 @@ class Source:
             if process.is_alive():
                 pending.append(process)
             else:
+                if self.budget is not None:
+                    self.budget.release_after_exit(process.pid)
                 process.close()
         self.retired = pending
-        return self.process is None and not pending
+        return self.process is None and not self.waiting_slot and not pending
 
 
 class Thumbnails:
@@ -253,6 +328,7 @@ class Thumbnails:
         self.cancelled = False
         self.result = None
         self.bytes = 0
+        self.budget = _budget
 
     def configure(self, revision, requests):
         """Nowy deck unieważnia cache; ukrycie anuluje ekstrakcję, bez nowego spawnu."""
@@ -270,6 +346,8 @@ class Thumbnails:
             self.cancelled = True
             self.result = None
             self.worker[0].terminate()
+            if self.budget is not None:
+                self.budget.mark_retiring(self.worker[0].pid)
 
     def clear(self):
         self.cancel()
@@ -318,6 +396,8 @@ class Thumbnails:
                     self.cancel()
             if process.exitcode is None:
                 return events
+            if self.budget is not None:
+                self.budget.release_after_exit(process.pid)
             process.join(0)
             process.close()
             connection.close()
@@ -354,10 +434,20 @@ class Thumbnails:
                 if self.working_bytes > self.max_bytes:
                     self.cache[key] = {"error": "Kompozycja przekracza budżet miniatur"}
                     return events
+                if self.budget is not None and not self.budget.try_acquire("thumbnail"):
+                    return events
                 context = get_context("spawn")
                 connection, child = context.Pipe()
                 process = context.Process(target=run_thumbnail, args=(spec, child), daemon=True)
-                process.start()
-                child.close()
+                try:
+                    process.start()
+                except Exception:
+                    if self.budget is not None:
+                        self.budget.abort()
+                    raise
+                finally:
+                    child.close()
+                if self.budget is not None:
+                    self.budget.register(process, "thumbnail", self.cancel)
                 self.worker = process, connection, key, self.revision, now
         return events

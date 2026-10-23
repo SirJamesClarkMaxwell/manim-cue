@@ -1,13 +1,17 @@
 """Jednowątkowa koordynacja UI, bariery i mediów; bez zależności od okna GLFW."""
 
+import json
 import time
+
+from manimcue.live_pool import LivePool, ProcessBudget, deck_resources
 
 from .clock import media_time, new_clock, set_playing
 from .controller import reduce
 from .geometry import rect_at
 from .info import preview_target, timer_elapsed, update_timer
 from .live import LiveController
-from .sources_av import Source, Thumbnails, process_counts
+from .prefetch import Prefetch, live_spec
+from .sources_av import Source, Thumbnails, close_pool, configure_budget, process_counts
 from .stage import compose
 from .state import initial_state, snapshot
 from .textures import upload
@@ -19,7 +23,17 @@ class App:
     def __init__(self, manifest, options, source_factory=Source, uploader=upload, live=None):
         self.manifest, self.options = manifest, options
         self.source_factory, self.uploader = source_factory, uploader
-        self.live = live if live is not None else LiveController()
+        self.live_pool = None
+        if live is None and source_factory is Source:
+            self.live_pool = LivePool(ProcessBudget())
+            configure_budget(self.live_pool.budget)
+        self.live = live if live is not None else LiveController(pool=self.live_pool)
+        self.prefetch = (
+            Prefetch(self.live_pool)
+            if self.live_pool is not None and options.get("prefetch", True)
+            else None
+        )
+        self.adopted = {}
         self.started_at = time.monotonic()
         self.state = initial_state(manifest, self.started_at)
         deck, slide = (
@@ -61,6 +75,61 @@ class App:
         self.stage, self.stage_frames, self.stage_time = None, {}, 0.0
         self.held = None
         self._prepare("initial", self.started_at)
+
+    def _prefetch_target(self):
+        deck, index = self.state["index"]
+        slides = self.manifest["presentations"][deck]["slides"]
+        if self.state["reverse"] or index + 1 >= len(slides):
+            return None, None
+        slide = slides[index + 1]
+        resolution = self.state["resolution"]
+        token = (
+            id(self.manifest),
+            deck,
+            self.state["entry_id"],
+            index + 1,
+            json.dumps(
+                [
+                    slide,
+                    resolution,
+                    self.options.get("playback_rate", 1),
+                    self.options.get("skip_all", False),
+                ],
+                sort_keys=True,
+            ),
+        )
+        adjacent = []
+        for i, layer in enumerate(slide.get("layers", [])):
+            if layer["kind"] == "live" and layer.get("session_id"):
+                for old_index, old in enumerate(self._slide().get("layers", [])):
+                    session = self.live.sessions.get(old_index)
+                    if (
+                        old["kind"] == "live"
+                        and session is not None
+                        and session.state == "ready"
+                        and not session.stopping
+                        and layer["session_id"] == old.get("session_id")
+                        and live_spec(layer, resolution) == live_spec(old, resolution)
+                    ):
+                        adjacent.append(str(i))
+        rate = self.options.get("playback_rate", 1)
+        skip = self.options.get("skip_all", False)
+        target = {
+            **slide,
+            "resolution": resolution,
+            "adjacent": adjacent,
+            "rate": slide.get("rate", 1) * rate,
+            "loop": bool(slide.get("loop")) and not skip,
+            "layers": [
+                {
+                    **m,
+                    "rate": m.get("rate", 1) * rate,
+                    "loop": bool(m.get("loop") or slide.get("loop")) and not skip,
+                }
+                for m in slide.get("layers", [])
+            ],
+        }
+        return token, target
 
     def _slide(self):
         deck, slide = self.state["index"]
@@ -120,6 +189,10 @@ class App:
             if not preview or not media.get("thumbnail"):
                 return
             media = {"kind": "image", "file": media["thumbnail"]}
+        prepared = self.adopted.pop(key, None) if not preview else None
+        if prepared is not None and "spec" not in prepared:
+            sources[key] = prepared["source"]
+            return
         source = self.source_factory()
         source.role = "preview" if preview else "scene"
         source.prepare(self.state["entry_id"], media)
@@ -129,6 +202,12 @@ class App:
         self._close_sources(self.sources)
         old_frames, self.frames = self.frames, {}
         slide = self._slide()
+        if self.live_pool is not None:
+            limit, engines = deck_resources(
+                self.manifest["presentations"][self.state["index"][0]]["slides"]
+            )
+            self.live_pool.budget.configure(limit)
+            self.live_pool.configure(engines)
         media = dict(slide)
         if self.state["reverse"]:
             media["file"] = slide.get("rev_file", slide.get("file"))
@@ -161,7 +240,8 @@ class App:
                 "requested_playing": self.state["requested_playing"],
                 "now": now,
                 "preserve_live": preserve_live,
-            }
+            },
+            **({"prefetched": self.adopted} if self.adopted else {}),
         )
         for index, session in self.live.sessions.items():
             lease = self.live.leases.get(session)
@@ -228,7 +308,26 @@ class App:
         if event["type"] == "thumbnail_range":
             self.thumbnail_indices = event["indices"]
             return []
+        old_index = self.state["index"][:]
+        old_reverse = self.state["reverse"]
+        target_token = self._prefetch_target()[0] if self.prefetch is not None else None
         self.state, effects = reduce(self.state, event, now)
+        if self.prefetch is not None:
+            entering = any(effect["type"] == "prepare" for effect in effects)
+            if entering:
+                normal = (
+                    event["type"] in ("next", "eof", "iteration_end")
+                    and not old_reverse
+                    and not self.state["reverse"]
+                    and self.state["index"] == [old_index[0], old_index[1] + 1]
+                )
+                self.adopted = (
+                    self.prefetch.take(target_token, self.state["entry_id"]) or {} if normal else {}
+                )
+                if not normal:
+                    self.prefetch.cancel("navigation")
+            elif event["type"] in ("previous", "reverse", "replay", "quit", "close"):
+                self.prefetch.cancel("navigation")
         if (
             event["type"] == "next"
             and self.state.get("loop_exit_requested")
@@ -238,7 +337,10 @@ class App:
         for effect in effects:
             kind = effect["type"]
             if kind == "prepare":
-                self._prepare(event["type"], now, effect.get("preserve_live", False))
+                reason = event["type"]
+                if reason in ("eof", "iteration_end"):
+                    reason = "skip_all" if self.state.get("skip_all") else "auto_next"
+                self._prepare(reason, now, effect.get("preserve_live", False))
             elif kind == "start":
                 self.motion_clock = set_playing(self.motion_clock, True, now)
                 for source in self.sources.values():
@@ -260,6 +362,11 @@ class App:
                 pass
             elif kind == "begin_shutdown":
                 self.live.begin_shutdown()
+                if self.prefetch is not None:
+                    self.prefetch.cancel("shutdown")
+                if self.live_pool is not None:
+                    self.live_pool.begin_shutdown()
+                    close_pool()
                 self._close_sources(self.sources)
                 self._close_sources(self.preview_sources)
                 self.thumbnails.clear()
@@ -297,6 +404,9 @@ class App:
 
     def tick(self, now, process_input=None):
         """Budget mediów 4 ms; podgląd dostaje pozostały czas po głównych źródłach."""
+        if self.live_pool is not None:
+            self.live_pool.poll(now)
+            process_counts()
         if self.state.get("message") and now >= self.state.get("message_until", 0):
             self.dispatch(
                 {"type": "message_expired", "revision": self.state["message_revision"]}, now
@@ -390,6 +500,8 @@ class App:
         if self.state["preparing"] and (self.live.ready or now >= self.prepare_deadline):
             if now >= self.prepare_deadline:
                 self.errors.append("Timeout przygotowania 5 s")
+            if hasattr(self.live, "release_prefetch"):
+                self.live.release_prefetch()
             self.dispatch({"type": "ready"}, now)
         for key, source in self.preview_sources.items():
             remaining = (deadline - time.perf_counter()) * 1000
@@ -401,6 +513,12 @@ class App:
                 source.play(now)
                 self.preview_started.add(key)
                 self.preview_anchors[key] = now
+        if self.prefetch is not None:
+            if not self.state["preparing"] and not self.state.get("closing"):
+                token, target = self._prefetch_target()
+                if target is not None:
+                    self.prefetch.prepare(token, target)
+            self.prefetch.poll(now)
         active_time = media_time(self.motion_clock, now)
         for index in self.live.sessions:
             if str(index) in self.frames:
@@ -460,7 +578,8 @@ class App:
             notes=self._slide().get("notes", ""),
             elapsed=timer_elapsed(self.state["presenter_timer"], now),
             composition=self.composition,
-            errors=list(self.errors),
+            errors=list(self.errors)
+            + (self.live_pool.errors if self.live_pool is not None else []),
             active_live=self.live.active,
             loop=self._slide().get("loop", False),
             thumbnails={
@@ -471,7 +590,23 @@ class App:
                 }
                 for key, value in self.thumbnails.cache.items()
             },
-            process_counts=process_counts(self.thumbnails),
+            process_counts=self.live_pool.budget.snapshot()
+            if self.live_pool is not None
+            else process_counts(self.thumbnails),
+            live_pool={
+                "hits": self.live_pool.hits,
+                "misses": self.live_pool.misses,
+                "errors": list(self.live_pool.errors),
+            }
+            if self.live_pool is not None
+            else {},
+            prefetch={
+                "hits": self.prefetch.hits,
+                "bytes": self.prefetch.bytes,
+                "ready": sum(item["ready"] for item in self.prefetch.items.values()),
+            }
+            if self.prefetch is not None
+            else {},
             thumbnail_bytes=self.thumbnails.bytes
             + (self.thumbnails.working_bytes if self.thumbnails.worker else 0),
             clips=[
@@ -515,6 +650,10 @@ class App:
         return (
             self.state.get("closing")
             and self.live.closed
+            and (self.live_pool is None or self.live_pool.closed)
+            and not process_counts()["idle"]
+            and not process_counts()["retiring"]
+            and (self.prefetch is None or not self.prefetch.items and not self.prefetch.retiring)
             and not self.retired_sources
             and self.thumbnails.worker is None
         )

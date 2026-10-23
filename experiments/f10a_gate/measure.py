@@ -92,6 +92,41 @@ def measure(options: dict) -> dict:
     ]
     if not records:
         raise ValueError("Pusty ślad pomiarowy")
+    entries = [
+        record
+        for record in records
+        if record.get("event") == "live_entry" and not record.get("warmup")
+    ]
+    if entries:
+        groups = {}
+        for record in entries:
+            key = f"{record['engine']}/prefetch-{int(record['prefetch_enabled'])}/series-{record['series'] + 1}"
+            groups.setdefault(key, []).append(record)
+        result["live_entries"] = {}
+        for key, group in groups.items():
+            warm = [r["elapsed_ms"] for r in group if not r["cold_fallback"]]
+            cold = [r["elapsed_ms"] for r in group if r["cold_fallback"]]
+            result["live_entries"][key] = {
+                "count": len(group),
+                "warm_count": len(warm),
+                "cold_count": len(cold),
+                "p50_ms": _percentile(warm, 0.5),
+                "p95_ms": _percentile(warm, 0.95),
+                "max_ms": max(warm, default=None),
+                "cold_ms": cold,
+                "pool_hits": sum(r["pool_hit"] for r in group),
+                "prefetch_hits": sum(r["prefetch_hit"] for r in group),
+                "process_peak": max(r["process_counts"]["total"] for r in group),
+                "rss_peak_bytes": {
+                    role: max(r["rss_bytes"].get(role, 0) for r in group)
+                    for role in group[0]["rss_bytes"]
+                },
+                "vram_measured": all(r.get("vram_bytes") is not None for r in group),
+                "passes_latency": len(group) == 100
+                and len(warm) == 100
+                and _percentile(warm, 0.95) <= 500,
+            }
+        return result
     start = options.get(
         "start", min(record["time"] for record in records) + options.get("warmup", 5)
     )

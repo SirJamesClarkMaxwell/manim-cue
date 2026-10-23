@@ -30,6 +30,7 @@ def temporary_manim_config(tmp_path):
 # manim-slides: dowód odbioru fazy, nie regresja na każdy przebieg (ok. 190 s z 685 s).
 # Domyślnie pomijane (addopts w pyproject.toml); pełny przebieg: `pytest -m ""`.
 SLOW = (
+    "test_d48_window_measurement",
     "test_thirty_restore_trials",
     "test_rapid_twenty_roundtrips",
     "test_twenty_restarts",

@@ -15,6 +15,7 @@ from qtpy.QtWidgets import QGraphicsRectItem
 
 from manimcue.composition import SlideComposition
 from manimcue.live_entry import EntryHistory
+from manimcue.live_pool import LivePool, ProcessBudget
 from manimcue.live_session import LiveSession, LiveSpec
 from manimcue.player.input import gesture_mode
 from manimcue.slides.config import Keys, LiveLayer, SlideConfig
@@ -44,6 +45,8 @@ class LiveLayerController(QObject):
 
     def __init__(self, composition: SlideComposition) -> None:
         super().__init__()
+        self.pool = LivePool(ProcessBudget(64))
+        self.pool_error_count = 0
         self.composition = composition
         self.key: object = None
         # Bieżące mapowanie kompozycji; tożsamość procesu i cache przechodzą między indeksami.
@@ -150,7 +153,8 @@ class LiveLayerController(QObject):
                         layer.fps,
                         layer.background_opacity,
                         layer.engine,
-                    )
+                    ),
+                    pool=self.pool,
                 )
                 self.started[index] = time.monotonic()
             self.sessions[index] = session
@@ -180,9 +184,9 @@ class LiveLayerController(QObject):
 
     def waiting_for_entry(self) -> bool:
         """READY jest trwałe; trwające cue zostanie przerwane zgodnie z D10."""
-        return any(self.sessions[i].state == "starting" for i in self.entry_cues) or any(
-            history.waiting for history in self.histories.values()
-        )
+        return any(
+            self.sessions[i].state in ("waiting_slot", "starting") for i in self.entry_cues
+        ) or any(history.waiting for history in self.histories.values())
 
     def has_preparation(self) -> bool:
         return bool(self.entry_cues) or any(h.reserved for h in self.histories.values())
@@ -255,6 +259,10 @@ class LiveLayerController(QObject):
 
     def tick(self) -> None:
         now = time.monotonic()
+        self.pool.poll(now)
+        for message in self.pool.errors[self.pool_error_count :]:
+            self.error.emit(message)
+        self.pool_error_count = len(self.pool.errors)
         # Najpierw statusy wszystkich sesji, potem kosztowne obrazy (runda 9, p. 9).
         for index, session in self.sessions.items():
             history = self.histories.get(session)
@@ -277,7 +285,10 @@ class LiveLayerController(QObject):
                     self.observed.emit(f"live {index + 1}: koniec sekwencji")
                 if event.startswith("ERROR"):
                     self.fail(index, event)
-            if session.state == "starting" and now - self.started[index] > START_TIMEOUT:
+            if (
+                session.state in ("waiting_slot", "starting")
+                and now - self.started[index] > START_TIMEOUT
+            ):
                 self.fail(index, f"ERROR start: brak READY po {START_TIMEOUT:.0f} s")
                 session.request_stop()
             if history:
@@ -349,7 +360,11 @@ class LiveLayerController(QObject):
         self.update_timer()
 
     def update_timer(self) -> None:
-        busy = self.stopping or any(session.running for session in self.sessions.values())
+        busy = (
+            (not self.closing or not self.pool.closed)
+            or self.stopping
+            or any(session.running for session in self.sessions.values())
+        )
         if busy and not self.timer.isActive():
             self.timer.start(POLL_MS)
         elif not busy and self.timer.isActive():
@@ -508,6 +523,7 @@ class LiveLayerController(QObject):
     def begin_shutdown(self) -> None:
         """Zamykanie playera: zatrzymanie bez blokowania GUI, odbiór dalej przez timer."""
         self.closing = True
+        self.pool.begin_shutdown()
         self.active = None
         self.drag_from = None
         self.failed = set()
@@ -523,7 +539,8 @@ class LiveLayerController(QObject):
         """
         self.begin_shutdown()
         deadline = time.monotonic() + timeout
-        while self.stopping and time.monotonic() < deadline:
+        while (self.stopping or not self.pool.closed) and time.monotonic() < deadline:
+            self.pool.poll(time.monotonic())
             for session in list(self.stopping):
                 session.poll()
                 if not session.running:
