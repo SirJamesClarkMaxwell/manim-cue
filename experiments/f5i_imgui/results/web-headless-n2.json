@@ -1,0 +1,79 @@
+{
+  "window_s": 20.002,
+  "render": {
+    "count": 1134,
+    "fps": 56.69,
+    "p50_ms": 17.7,
+    "p95_ms": 18.9,
+    "max_ms": 42.6
+  },
+  "cpu_percent_one_core": 100.1,
+  "streams": {
+    "base": {
+      "count": 1100,
+      "fps": 54.99,
+      "p50_ms": 17.7,
+      "p95_ms": 19.5,
+      "max_ms": 66.1,
+      "presented_total": 1266,
+      "dropped_total": 105,
+      "decoded_total": 1377
+    },
+    "clip_1": {
+      "count": 1111,
+      "fps": 55.54,
+      "p50_ms": 17.7,
+      "p95_ms": 19.4,
+      "max_ms": 83.8,
+      "presented_total": 1278,
+      "dropped_total": 92,
+      "decoded_total": 1377
+    },
+    "clip_2": {
+      "count": 1095,
+      "fps": 54.74,
+      "p50_ms": 17.7,
+      "p95_ms": 20.0,
+      "max_ms": 64.8,
+      "presented_total": 1262,
+      "dropped_total": 110,
+      "decoded_total": 1375
+    },
+    "preview_base": {
+      "count": 1097,
+      "fps": 54.84,
+      "p50_ms": 17.7,
+      "p95_ms": 20.1,
+      "max_ms": 59.8,
+      "presented_total": 1264,
+      "dropped_total": 109,
+      "decoded_total": 1377
+    },
+    "preview_clip_1": {
+      "count": 1072,
+      "fps": 53.59,
+      "p50_ms": 17.8,
+      "p95_ms": 34.1,
+      "max_ms": 47.0,
+      "presented_total": 1239,
+      "dropped_total": 136,
+      "decoded_total": 1377
+    },
+    "preview_clip_2": {
+      "count": 1113,
+      "fps": 55.64,
+      "p50_ms": 17.7,
+      "p95_ms": 20.3,
+      "max_ms": 65.7,
+      "presented_total": 1279,
+      "dropped_total": 96,
+      "decoded_total": 1378
+    }
+  },
+  "info": true,
+  "clips": 2,
+  "live": false,
+  "platform": "web",
+  "webgl_renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 4060 (0x00002882) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+  "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/156.0.0.0 Safari/537.36 Edg/156.0.0.0"
+}

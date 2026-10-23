@@ -1,0 +1,125 @@
+{
+  "window_s": 20.012,
+  "render": {
+    "count": 4166,
+    "fps": 208.18,
+    "p50_ms": 3.5,
+    "p95_ms": 12.66,
+    "max_ms": 100.87
+  },
+  "cpu_percent_one_core": 352.0,
+  "streams": {
+    "base": {
+      "count": 1162,
+      "fps": 58.07,
+      "p50_ms": 16.66,
+      "p95_ms": 18.92,
+      "max_ms": 91.8,
+      "decoded_total": 1382,
+      "size": [
+        1920,
+        1080
+      ]
+    },
+    "clip_1": {
+      "count": 1162,
+      "fps": 58.07,
+      "p50_ms": 16.66,
+      "p95_ms": 18.54,
+      "max_ms": 80.9,
+      "decoded_total": 1382,
+      "size": [
+        1920,
+        1080
+      ]
+    },
+    "clip_2": {
+      "count": 1162,
+      "fps": 58.07,
+      "p50_ms": 16.66,
+      "p95_ms": 18.48,
+      "max_ms": 71.14,
+      "decoded_total": 1382,
+      "size": [
+        1920,
+        1080
+      ]
+    },
+    "clip_3": {
+      "count": 1162,
+      "fps": 58.07,
+      "p50_ms": 16.65,
+      "p95_ms": 18.47,
+      "max_ms": 62.47,
+      "decoded_total": 1382,
+      "size": [
+        1920,
+        1080
+      ]
+    },
+    "live": {
+      "count": 1167,
+      "fps": 58.32,
+      "p50_ms": 16.65,
+      "p95_ms": 22.21,
+      "max_ms": 62.72,
+      "state": "ready",
+      "error": null
+    },
+    "preview_base": {
+      "count": 1162,
+      "fps": 58.07,
+      "p50_ms": 16.66,
+      "p95_ms": 18.53,
+      "max_ms": 74.1,
+      "decoded_total": 1382,
+      "size": [
+        1920,
+        1080
+      ]
+    },
+    "preview_clip_1": {
+      "count": 1162,
+      "fps": 58.07,
+      "p50_ms": 16.65,
+      "p95_ms": 18.56,
+      "max_ms": 84.81,
+      "decoded_total": 1382,
+      "size": [
+        1920,
+        1080
+      ]
+    },
+    "preview_clip_2": {
+      "count": 1162,
+      "fps": 58.07,
+      "p50_ms": 16.64,
+      "p95_ms": 18.71,
+      "max_ms": 95.87,
+      "decoded_total": 1382,
+      "size": [
+        1920,
+        1080
+      ]
+    },
+    "preview_clip_3": {
+      "count": 1162,
+      "fps": 58.07,
+      "p50_ms": 16.64,
+      "p95_ms": 18.59,
+      "max_ms": 106.39,
+      "decoded_total": 1382,
+      "size": [
+        1920,
+        1080
+      ]
+    }
+  },
+  "info": true,
+  "clips": 3,
+  "live": true,
+  "resolution": [
+    1920,
+    1080
+  ]
+}

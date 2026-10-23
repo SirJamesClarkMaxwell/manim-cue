@@ -1,0 +1,51 @@
+<!doctype html>
+<!-- PoC ImGui w przeglądarce: Pyodide + imgui-bundle; ten sam stage.py co na PC. Uruchamia serve.py. -->
+<html lang="pl">
+<head>
+<meta charset="utf-8">
+<title>manim-cue: PoC ImGui (web)</title>
+<script src="https://cdn.jsdelivr.net/pyodide/v314.0.7/full/pyodide.js"></script>
+<style>
+    html, body { width: 100%; height: 100%; margin: 0; background: #000; color: #eee; font-family: sans-serif; }
+    #canvas { display: block; width: 100%; height: 100%; }
+    #loader { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; background: #222; }
+    /* Elementy <video> muszą być w dokumencie, żeby przeglądarka dekodowała i zgłaszała klatki. */
+    #videos { position: fixed; left: 0; top: 0; width: 2px; height: 2px; overflow: hidden; opacity: 0.01; z-index: -1; }
+    #videos video { width: 2px; height: 2px; }
+</style>
+</head>
+<body>
+<div id="loader">Ładowanie Pyodide…</div>
+<div id="videos"></div>
+<canvas id="canvas" tabindex="0"></canvas>
+<script>
+    const logs = [];
+    const status = text => { const el = document.getElementById("loader"); if (el) el.textContent = text; };
+    const report = body => fetch("/metrics", { method: "POST", body: JSON.stringify(body) });
+    const seconds = Number(new URLSearchParams(location.search).get("seconds") ?? 20);
+    setTimeout(() => report({ error: "timeout strony", log: logs.slice(-80) }), (seconds + 120) * 1000);
+
+    async function main() {
+        const canvas = document.getElementById("canvas");
+        canvas.addEventListener("contextmenu", event => event.preventDefault());
+        const pyodide = await loadPyodide({
+            stdout: line => { logs.push(line); console.log(line); },
+            stderr: line => { logs.push(line); console.error(line); },
+        });
+        pyodide.canvas.setCanvas2D(canvas);
+        pyodide._api._skip_unwind_fatal_error = true;
+        status("Instalacja imgui-bundle…");
+        await pyodide.loadPackage(["micropip", "numpy"]);
+        await pyodide.pyimport("micropip").install("imgui-bundle==1.93.0");
+        for (const name of ["stage.py", "sources_web.py", "web_main.py"]) {
+            pyodide.FS.writeFile(name, await (await fetch("/" + name)).text());
+        }
+        status("Start…");
+        pyodide.runPython("import sys; sys.path.insert(0, '.'); import web_main");
+        document.getElementById("loader").remove();
+        canvas.focus();
+    }
+    main().catch(error => { status("Błąd: " + error); report({ error: String(error), log: logs.slice(-80) }); });
+</script>
+</body>
+</html>

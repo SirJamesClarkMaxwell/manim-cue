@@ -1,0 +1,99 @@
+{
+  "window_s": 20.003,
+  "render": {
+    "count": 1130,
+    "fps": 56.49,
+    "p50_ms": 17.7,
+    "p95_ms": 18.9,
+    "max_ms": 58.6
+  },
+  "cpu_percent_one_core": 100.1,
+  "streams": {
+    "base": {
+      "count": 1078,
+      "fps": 53.89,
+      "p50_ms": 17.7,
+      "p95_ms": 20.9,
+      "max_ms": 58.9,
+      "presented_total": 1245,
+      "dropped_total": 125,
+      "decoded_total": 1379
+    },
+    "clip_1": {
+      "count": 1042,
+      "fps": 52.09,
+      "p50_ms": 17.8,
+      "p95_ms": 35.3,
+      "max_ms": 59.1,
+      "presented_total": 1209,
+      "dropped_total": 162,
+      "decoded_total": 1379
+    },
+    "clip_2": {
+      "count": 962,
+      "fps": 48.09,
+      "p50_ms": 17.9,
+      "p95_ms": 36.2,
+      "max_ms": 59.3,
+      "presented_total": 1129,
+      "dropped_total": 244,
+      "decoded_total": 1379
+    },
+    "clip_3": {
+      "count": 1079,
+      "fps": 53.94,
+      "p50_ms": 17.7,
+      "p95_ms": 20.8,
+      "max_ms": 59.3,
+      "presented_total": 1246,
+      "dropped_total": 121,
+      "decoded_total": 1377
+    },
+    "preview_base": {
+      "count": 1102,
+      "fps": 55.09,
+      "p50_ms": 17.7,
+      "p95_ms": 19.9,
+      "max_ms": 59.3,
+      "presented_total": 1269,
+      "dropped_total": 98,
+      "decoded_total": 1377
+    },
+    "preview_clip_1": {
+      "count": 1112,
+      "fps": 55.59,
+      "p50_ms": 17.7,
+      "p95_ms": 19.9,
+      "max_ms": 105.2,
+      "presented_total": 1276,
+      "dropped_total": 89,
+      "decoded_total": 1375
+    },
+    "preview_clip_2": {
+      "count": 1103,
+      "fps": 55.14,
+      "p50_ms": 17.7,
+      "p95_ms": 20.1,
+      "max_ms": 87.8,
+      "presented_total": 1270,
+      "dropped_total": 96,
+      "decoded_total": 1375
+    },
+    "preview_clip_3": {
+      "count": 1111,
+      "fps": 55.54,
+      "p50_ms": 17.7,
+      "p95_ms": 20.2,
+      "max_ms": 87.3,
+      "presented_total": 1278,
+      "dropped_total": 88,
+      "decoded_total": 1373
+    }
+  },
+  "info": true,
+  "clips": 3,
+  "live": false,
+  "platform": "web",
+  "webgl_renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 4060 (0x00002882) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+  "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/156.0.0.0 Safari/537.36 Edg/156.0.0.0"
+}

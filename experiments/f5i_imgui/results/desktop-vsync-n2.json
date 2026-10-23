@@ -1,0 +1,101 @@
+{
+  "window_s": 20.0,
+  "render": {
+    "count": 16598,
+    "fps": 829.89,
+    "p50_ms": 0.29,
+    "p95_ms": 8.41,
+    "max_ms": 72.5
+  },
+  "cpu_percent_one_core": 302.3,
+  "streams": {
+    "base": {
+      "count": 1174,
+      "fps": 58.7,
+      "p50_ms": 16.66,
+      "p95_ms": 17.05,
+      "max_ms": 63.37,
+      "decoded_total": 1382,
+      "size": [
+        1920,
+        1080
+      ]
+    },
+    "clip_1": {
+      "count": 1174,
+      "fps": 58.7,
+      "p50_ms": 16.66,
+      "p95_ms": 17.15,
+      "max_ms": 53.25,
+      "decoded_total": 1382,
+      "size": [
+        1920,
+        1080
+      ]
+    },
+    "clip_2": {
+      "count": 1174,
+      "fps": 58.7,
+      "p50_ms": 16.67,
+      "p95_ms": 17.23,
+      "max_ms": 49.02,
+      "decoded_total": 1382,
+      "size": [
+        1920,
+        1080
+      ]
+    },
+    "live": {
+      "count": 1181,
+      "fps": 59.05,
+      "p50_ms": 16.66,
+      "p95_ms": 17.55,
+      "max_ms": 48.14,
+      "state": "ready",
+      "error": null
+    },
+    "preview_base": {
+      "count": 1174,
+      "fps": 58.7,
+      "p50_ms": 16.65,
+      "p95_ms": 17.35,
+      "max_ms": 59.23,
+      "decoded_total": 1382,
+      "size": [
+        1920,
+        1080
+      ]
+    },
+    "preview_clip_1": {
+      "count": 1174,
+      "fps": 58.7,
+      "p50_ms": 16.65,
+      "p95_ms": 17.43,
+      "max_ms": 69.49,
+      "decoded_total": 1382,
+      "size": [
+        1920,
+        1080
+      ]
+    },
+    "preview_clip_2": {
+      "count": 1174,
+      "fps": 58.7,
+      "p50_ms": 16.65,
+      "p95_ms": 17.44,
+      "max_ms": 80.34,
+      "decoded_total": 1382,
+      "size": [
+        1920,
+        1080
+      ]
+    }
+  },
+  "info": true,
+  "clips": 2,
+  "live": true,
+  "resolution": [
+    1920,
+    1080
+  ]
+}
