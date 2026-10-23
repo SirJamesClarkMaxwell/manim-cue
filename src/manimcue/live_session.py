@@ -45,6 +45,7 @@ class LiveSession:
         self._events = []
         self._metrics = {}
         self._snapshot_metrics = []
+        self.checkpoint_metrics = []
 
     def start(self, spec: LiveSpec) -> None:
         if self._process is not None:
@@ -93,6 +94,9 @@ class LiveSession:
                             self._metrics = message["metrics"]
                         if "snapshot_metrics" in message:
                             self._snapshot_metrics = message["snapshot_metrics"]
+                        if "checkpoint_metric" in message:
+                            self.checkpoint_metrics.append(message["checkpoint_metric"])
+                            self.checkpoint_metrics[:] = self.checkpoint_metrics[-128:]
                     elif isinstance(message, tuple):
                         self._socket = socket.socket()
                         self._socket.setblocking(False)
@@ -166,7 +170,7 @@ class LiveSession:
         if self._process is not None:
             self._outgoing.extend((command + "\n").encode("utf-8"))
 
-    def try_read_frame(self) -> OwnedFrame | None:
+    def try_read_frame(self, *, acknowledge: bool = True) -> OwnedFrame | None:
         if self._shm is None:
             return None
         try:
@@ -174,7 +178,7 @@ class LiveSession:
         except ValueError as exc:
             self._event(f"ERROR {exc}")
             return None
-        if frame is not None and frame.boundary:
+        if acknowledge and frame is not None and frame.boundary:
             self.send(f"frame_seen {frame.frame_id}")
         return frame
 

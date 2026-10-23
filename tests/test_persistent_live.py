@@ -125,7 +125,13 @@ def initialized(player):
         player.live.sessions[0].state == "ready"
         and bool(player.live.last_frames)
         and not player.clips.preparing
+        and all(not history.reserved for history in player.live.histories.values())
     )
+
+
+def entry_names(sent):
+    """D39: nazwane wejście idzie teraz w skorelowanej komendzie enter."""
+    return [command.split()[-1] for command in sent if command.startswith("enter ")]
 
 
 @pytest.mark.gpu
@@ -224,12 +230,12 @@ def test_entry_cue_navigation_callbacks(qapp, make_player, action):
         key(player, Qt.Key.Key_Right)
     else:
         getattr(player, action)()
-    if action in ("next", "auto_next", "skip_all"):
-        pump(qapp, lambda: "flip" in sent)
-        assert sent.count("flip") == 1
+    if action in ("next", "auto_next", "skip_all", "replay"):
+        pump(qapp, lambda: "flip" in entry_names(sent))
+        assert entry_names(sent).count("flip") == 1
         assert player.live.active is None
     else:
-        assert "flip" not in sent and "back" not in sent
+        assert "flip" not in entry_names(sent) and "back" not in sent
 
 
 @pytest.mark.gpu
@@ -247,9 +253,9 @@ def test_live_only_static_barrier_pause_and_timeout(qapp, make_player):
     assert not player.clips.preparing and not player.clips.running
     assert "flip" not in sent and not player.live.entry_cues
     session.poll = original_poll
-    pump(qapp, lambda: session.state == "ready")
+    pump(qapp, lambda: not session.running)
     player.play_pause()
-    assert player.clips.running and "flip" not in sent
+    assert player.clips.running and "flip" not in entry_names(sent)
 
 
 @pytest.mark.gpu
@@ -262,11 +268,12 @@ def test_entry_waits_until_first_actual_start(qapp, make_player):
     player.current_file = player.current_slide_config.file
     player.load_current_media(start_paused=True, reason="next")
     assert not player.clips.running and "flip" not in sent
+    pump(qapp, lambda: not player.clips.preparing)
     player.play_pause()
-    assert sent.count("flip") == 1
+    pump(qapp, lambda: entry_names(sent).count("flip") == 1)
     player.play_pause()
     player.play_pause()
-    assert sent.count("flip") == 1
+    assert entry_names(sent).count("flip") == 1
 
 
 @pytest.mark.gpu

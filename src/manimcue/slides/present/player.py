@@ -343,7 +343,7 @@ class Player(QMainWindow):
 
             def media_status_changed(status: QMediaPlayer.MediaStatus) -> None:
                 self.media_player.setLoops(1)  # Otherwise looping slides never end
-                if status == QMediaPlayer.MediaStatus.EndOfMedia:
+                if status == QMediaPlayer.MediaStatus.EndOfMedia and not self.clips.preparing:
                     self.load_next_slide(reason="skip_all")
 
             self.media_player.mediaStatusChanged.connect(media_status_changed)
@@ -354,6 +354,7 @@ class Player(QMainWindow):
                 if (
                     status == QMediaPlayer.MediaStatus.EndOfMedia
                     and self.current_slide_config.auto_next
+                    and not self.clips.preparing
                 ):
                     self.load_next_slide(reason="auto_next")
 
@@ -363,7 +364,7 @@ class Player(QMainWindow):
 
             def on_position_changed(position: int) -> None:
                 # non-monotonicity in the position, when occurring outside of the loading of a new slide, indicates looping
-                if self.__termination_requested and self.__prev_pos > position:
+                if not self.clips.preparing and self.__termination_requested and self.__prev_pos > position:
                     if self.current_slide_config.auto_next:
                         self.load_next_slide(reason="auto_next")
                     else:
@@ -496,8 +497,8 @@ class Player(QMainWindow):
             self.current_presentation_config.resolution,
             reason,
         )
-        grouped = not reversed_slide and self.clips.enter(
-            slide_config, base_video, start_paused, self.playback_rate
+        grouped = self.clips.enter(
+            slide_config, base_video, start_paused, self.playback_rate, reversed_slide
         )
         if base_video:
             self.media_player.setSource(url)
@@ -549,7 +550,7 @@ class Player(QMainWindow):
             "auto_next": "przejście automatyczne", "skip_all": "przejście automatyczne",
         }.get(reason, "wejście")
         self.show_state_message(f"{action}: slajd {self.current_slide_index + 1}" +
-                                (" · live pozostaje w bieżącym stanie" if reason in ("previous", "reverse") else ""))
+                                (" · przygotowanie stanu live" if reason in ("previous", "reverse", "replay") and self.live.histories else ""))
 
     def load_previous_slide(self, reason: str = "previous") -> None:
         if self.current_slide_index > 0:
@@ -720,6 +721,12 @@ class Player(QMainWindow):
         # F5: w trakcie przygotowania wszystko i tak stoi na pierwszej klatce (runda 12, p. 2).
         if self.clips.preparing:
             return
+        if self.live.histories:
+            self.__prev_pos = -1
+            self.__termination_requested = False
+            self.__termination_achieved = False
+            self.load_current_slide(reason="replay")
+            return
         if self.clips.static_active:
             self.clips.replay()
             return
@@ -799,9 +806,11 @@ class Player(QMainWindow):
         revision = self.state_revision
         active = self.live.active
         ready = active is not None and self.live.sessions[active].state == "ready"
+        reserved = active is not None and self.live.histories.get(self.live.sessions[active]) is not None and self.live.histories[self.live.sessions[active]].reserved
         if self.live.handle_key(event, self.config.keys):
             message = "fokus: slajdy" if key == Qt.Key.Key_Escape else (
                 "live: autorepeat pominięty" if event.isAutoRepeat() else
+                "live: przygotowanie zarezerwowane, komenda pominięta" if reserved else
                 "live: wysłano cue" if ready else "live: zignorowano przed READY")
             self.show_state_message(message)
         else:
@@ -809,7 +818,7 @@ class Player(QMainWindow):
             if self.state_revision == revision:
                 after = self.presenter_snapshot()
                 if key in self.config.keys.REPLAY.ids:
-                    message = "powtórzenie slajdu · live bez powtórzenia" if not self.clips.preparing else "przygotowanie: powtórzenie pominięte"
+                    message = "replay: przygotowanie początku live" if self.live.histories else "powtórzenie slajdu · live bez powtórzenia"
                 elif self.__termination_requested and not self.__termination_achieved:
                     message = "zamówiono wyjście z pętli"
                 elif before == after:
@@ -846,22 +855,24 @@ class Player(QMainWindow):
             transport = "obraz"
         else:
             transport = "pauza"
-        live = (
-            ", ".join(
-                f"{i + 1}: "
-                + (
-                    "błąd"
-                    if i in self.live.failed
-                    else {"starting": "start", "ready": "gotowe", "error": "błąd"}.get(
-                        session.state, session.state
-                    )
-                )
-                for i, session in self.live.sessions.items()
-            )
-            or "brak"
-        )
+        live_states = []
+        for index, session in self.live.sessions.items():
+            history = self.live.histories.get(session)
+            if history:
+                text = history.degraded or history.status
+                if history.reserved and not history.waiting and history.pending_start is None:
+                    text += (" · stan gotowy, cue czeka na start" if index in self.live.entry_cues
+                             else " · stan gotowy, czeka na start")
+            else:
+                text = "błąd" if index in self.live.failed else {
+                    "starting": "start", "ready": "gotowe", "error": "błąd"
+                }.get(session.state, session.state)
+            live_states.append(f"{index + 1}: {text}")
+        live = ", ".join(live_states) or "brak"
         focus = "slajdy" if self.live.active is None else f"live {self.live.active + 1}"
         direction = "reverse · → odtworzy do przodu" if self.playing_reversed_slide else "do przodu"
+        if self.playing_reversed_slide and self.live.histories:
+            direction += "; baza reverse; live powtarza cue do przodu przy R"
         loop = (
             " · wyjście z pętli zamówione"
             if self.__termination_requested

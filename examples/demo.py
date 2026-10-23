@@ -162,7 +162,8 @@ class Demo(Slide):
                 "Trzy stałe prostokąty i kamery; poruszają się obiekty. Esc oddaje strzałki. "
                 "Spacja pauzuje bazę i klip; live działa dalej. S pokazuje stan na ekranie. "
                 "Podgląd następnego slajdu pokazuje miniaturę live. "
-                "Cofanie i replay nie cofają ani nie powtarzają cue live.",
+                "← przywraca stan live pozostawiony na poprzednim slajdzie; "
+                "V pokazuje ten sam stan z bazą reverse; R przywraca początek i powtarza cue.",
                 layers=[persistent.model_copy(), other.model_copy()],
             )
             self.play(Rotate(marker, PI / 2), run_time=2, rate_func=linear)
@@ -189,7 +190,8 @@ class Demo(Slide):
             self.next_slide(
                 notes=f"**{number}** — dwa panele live CE Cairo obok klipu Orbit; "
                 "kolejny slajd przejmuje te same procesy. Klik daje strzałki panelowi, "
-                "Esc oddaje slajdom. CE 2D nie obsługuje nawigacji kamerą.",
+                "Esc oddaje slajdom. ← i V przywracają pozostawiony stan CE; "
+                "R powtarza cue od checkpointu. CE 2D nie obsługuje nawigacji kamerą.",
                 layers=[
                     LiveLayer(
                         scene_file=Path(__file__).with_name("live_panel_ce.py"),

@@ -103,7 +103,15 @@ def test_two_ce_and_gl_animate_and_close(qapp, tmp_path):
         ]
     player = Player(Config(), [deck])
     try:
-        pump(qapp, lambda: all(s.state == "ready" for s in player.live.sessions.values()))
+        pump(
+            qapp,
+            lambda: all(
+                s.state == "ready"
+                and s in player.live.last_frames
+                and not player.live.histories[s].reserved
+                for s in player.live.sessions.values()
+            ),
+        )
         sessions = list(player.live.sessions.values())
         frames = {s: player.live.last_frames[s].frame_id for s in sessions}
         for s in sessions:
@@ -112,6 +120,24 @@ def test_two_ce_and_gl_animate_and_close(qapp, tmp_path):
             qapp, lambda: all(player.live.last_frames[s].frame_id > frames[s] + 2 for s in sessions)
         )
         assert len({s._process.pid for s in sessions}) == 3
+        player.load_next_slide()
+        pump(
+            qapp,
+            lambda: (
+                not player.clips.preparing
+                and all(not history.reserved for history in player.live.histories.values())
+            ),
+        )
+        assert list(player.live.sessions.values()) == sessions
+        player.previous()
+        pump(
+            qapp,
+            lambda: (
+                not player.clips.preparing
+                and all(not history.reserved for history in player.live.histories.values())
+            ),
+        )
+        assert not any(history.degraded for history in player.live.histories.values())
         player.close()
         player.live.shutdown()
         assert all(not s.running and s._shm is None for s in sessions)

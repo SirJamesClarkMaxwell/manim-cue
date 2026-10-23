@@ -133,20 +133,41 @@ printed on startup. The client also accepts `--port`. Embedded live workers use 
 ## How it works
 
 The player composites the base and ordered layers in one Qt scene shared by the main and
-current Info views. Each live panel runs manimgl in a separate process, with one application
+current Info views. Each live panel runs ManimGL or CE Cairo in a separate process, with one application
 thread per process. RGBA frames cross shared memory, while TCP carries cue commands and
 status. Adjacent slides with the same compatible `session_id` reuse a live process and its
-last frame. Base video and clips prepare their first frames behind a readiness barrier;
-live entry cues wait for READY before the group starts. D17 guarantees shared start and pause
+last frame. Each committed entry saves a checkpoint, including manual sequence history.
+Base video, clips and live checkpoint/restore operations prepare behind a readiness barrier;
+the group starts after the matching live boundary frame arrives. D17 guarantees shared start and pause
 for recorded layers, with accepted drift rather than frame locking; live continues during
 player pause. The next-slide preview uses independent muted video loops and static live thumbnails.
+
+For adjacent compatible sessions, **←** restores the live state left on the previous slide,
+including manual cues performed there. **V** restores that same boundary state while the base
+plays the previous slide in reverse and clips show their last frames. Live does not run backwards.
+**R** restores the checkpoint before the current entry and runs its `enter_cue` once, forwards,
+even when the base is in reverse. Without `enter_cue`, R only restores the checkpoint.
+Forward navigation after going back creates a new branch from the current live state.
+Loop repetitions and reverse-to-normal playback do not repeat live entry cues.
+
+Initial opening (including starting in the middle) builds a fresh scene without an entry cue;
+a cold forward transition runs the target cue after saving the fresh build. Earlier slides
+are never reconstructed. Gaps, different presentations and failed/stopping workers start a
+new generation. Layers without `session_id` keep their per-slide lifecycle without checkpoints.
+
+Info and the optional S overlay show checkpoint preparation, the restored beginning or state
+left on a slide, and entry cue start/completion. During preparation, including a paused start,
+manual live cues and camera gestures are rejected until the worker accepts entry start/release.
+Restore finishes while paused; the entry cue waits for playback. A five-second preparation
+timeout stops the uncertain worker and lets the base/clips continue. A persistent
+`stan live nieprzywrócony` message means the panel is stale; READY alone does not clear it.
 
 ## Examples and tests
 
 | File in `examples/` | Purpose |
 | --- | --- |
 | `orbit.py` | Reusable prerecorded Orbit clip; render first |
-| `demo.py` | Nine-slide tour: loops, live 2D/3D, clip motion, SceneView, persistent cues, transparency |
+| `demo.py` | Eleven-slide tour: loops, live 2D/3D, clip motion, SceneView, GL/CE checkpoints, transparency |
 | `live_panel.py` | Interactive 2D presets and 3D camera panel |
 | `live_three.py` | Deterministic entry cue for the three-source demonstration |
 | `live_receiver.py` | Shared-memory live receiver demonstration |
@@ -158,10 +179,20 @@ working OpenGL driver; window interaction and two-monitor behavior need a human 
 
 ## Limits and provenance
 
-Live entry cues are not undone by previous/reverse/replay slide navigation. Transparent live
+Checkpoints cover standard panel mobjects, shared children, geometry, styles, updater callable
+references and logical time, together with the sequence cursor/history. Compatible nodes
+interpolate for 0.6 s before exact graph restoration; this is not a reversed recording.
+Scene attributes, mutable closures, RNG and external resources are not restored or automatically
+detected. Repeatable replay requires deterministic cues and the same interruption pattern.
+The limit is 50 entry checkpoints and 256 MiB of accounted snapshot/history data, including
+working-copy reserve; it is not a process RSS limit. Unsupported data or a missing/evicted
+checkpoint leaves the last valid image with a persistent stale-state message and skips the cue.
+Partial restore failure stops the worker. There is no history across processes or presentations.
+Transparent live
 backgrounds and letterbox bars are supported; arbitrary translucent GL objects retain manimgl's
 shader blending behavior. Alpha in prerecorded CE/GL clips and reverse encoding is outside
-the supported contract. manimgl is the only live backend; CE is for prerecorded slides.
+the supported contract. CE live supports fixed-camera Cairo 2D panels; camera gestures and 3D
+remain outside that backend's contract.
 The next-slide preview freezes layer geometry at `rect_at(0)` and allows independent loop drift.
 Layered decks cannot be exported through the upstream file converters.
 

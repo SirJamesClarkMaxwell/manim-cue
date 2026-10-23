@@ -1949,3 +1949,124 @@ opierają się na dostarczonej pełnej rundzie 18 i walidacji kodu/testów.
     **Poprawka planu:** odświeżyć odsyłacze oraz zapisać identyfikator/hash zainstalowanego źródła CE obok wersji 0.22.0.
 
 **Werdykt:** nie zatwierdzać kontraktu w obecnej postaci. Adapter Cairo bez patchowania Manima jest wykonalny; blokują go przede wszystkim sprzeczny mechanizm tempa, nieustalona semantyka historii/back oraz zbyt szeroka gwarancja snapshotu. Pomiar nie jest fałszywy, ale potwierdza wyłącznie szybkie rysowanie prostych scen. Przegląd był read-only; nie uruchamiałem benchmarku ani nie zmieniałem plików.
+
+## Runda 20 — codex, 2026-10-23: kontrakt F5g (checkpointy live)
+
+**Pytania:** Czy checkpointy obu silników, rezerwacja, ACK, historia, generacje, bariera i fallback zapewniają zgodny i czytelny stan live po ←, V i R?
+
+**Co weszło:**
+
+1. Przyjęto osobny adapter grafu GL i bramkę updatera, współdzielenia i tożsamości dziecka, ponieważ get_state/undo nie zapewniają tej gwarancji.
+2. Przyjęto rezerwację od zamówienia przygotowania do przyjęcia enter/release przez worker, także w pauzie, ponieważ ręczne cue i view nie mogą zmienić zapisanego początku.
+3. Przyjęto jawny ACK po kompozycji aktualnej granicy oraz odbiór i ACK bez kompozycji granic anulowanych, ponieważ odrzucenie ACK blokuje worker.
+4. Przyjęto rozdzielenie generacji i przyczyny: zimne next/auto_next/skip_all zapisują build i grają cue celu, initial i zimne previous/V tylko zapisują build, a replay lokalnego początku gra cue celu, ponieważ pominiętych slajdów nie rekonstruujemy.
+5. Przyjęto stos wejść, natychmiastowe odłączenie przyszłości po cofnięciu i trwałą degradację po fallbacku, ponieważ pozycja nawigacji nie dowodzi odtworzenia sceny.
+6. Przyjęto konkretne limity i korelację generacja/wejście/żądanie; odrzucono retransmisje i cache wyników duplikatów, ponieważ jeden niezawodny strumień TCP nie wymaga ponownego wysyłania cue.
+7. Przyjęto jawny korpus i zasady autorstwa zamiast wykrywania zależności zamknięć i pól sceny, ponieważ ich semantyki nie da się automatycznie rozpoznać.
+8. Przyjęto blokadę view podczas rezerwacji oraz home po potwierdzonym checkpoint/restore, ponieważ gesty nie mogą przeplatać operacji stanu.
+9. Przyjęto rachunek aktywnej historii, checkpointów i rezerwy kopii roboczych na obsługiwanych typach; odrzucono gwarancję RSS i dowolnego deepcopy, ponieważ kod autora może alokować poza grafem.
+10. Przyjęto zastąpienie ścieżki replay wspólną barierą oraz osobną barierę live przy reverse, ponieważ baza nie może grać podczas restore.
+11. Przyjęto osobne komunikaty początku/pozostawionego stanu, niewysłania/przerwania/nieznanego wyniku i trwałą degradację nad READY, ponieważ gotowość transportu nie dowodzi zgodności panelu.
+12. Przyjęto macierz oczekiwanych operacji i rozdzielenie semantyki/pikseli/czasu, minimum 30 prób pomiarowych oraz budżet 24 h (stop 48 h) po bramce, ponieważ integracja wymaga osobnego pokrycia wyścigów.
+
+**Odpowiedź codex (bez zmian):**
+
+1. **[KRYTYCZNE] GL nie zapewnia obiecanego dokładnego odtworzenia grafu i updaterów.**
+
+   **Dowód:** `PLAN.md:832–839` odsyła do D37, a kryterium `PLAN.md:888–892` wymaga dokładnego grafu, referencji i updaterów w obu silnikach. GL zapisuje `get_state()` (`src/manimcue/live_scene.py:234–238`), a przywraca przez `undo()` (`:264`). W zainstalowanym ManimGL `SceneState.restore_scene()` używa `mob.become(mob_copy)` (`.venv/Lib/site-packages/manimlib/scene/scene.py:906–911`). `become()` domyślnie ma `match_updaters=False`, wyrównuje rodziny i przenosi dane wizualne (`.venv/Lib/site-packages/manimlib/mobject/mobject.py:718–740`). Snapshoty dodatkowo współdzielą wcześniejszą kopię na podstawie wizualnego `looks_identical()` (`scene.py:880–887`), które nie porównuje updaterów (`mobject.py:743–765`).
+
+   **Konsekwencja:** zmiana updatera bez zmiany obrazu może nie trafić do nowego snapshotu; przywrócenie wyglądu nie dowodzi przywrócenia updaterów ani tożsamości dzieci po zmianie topologii. „Użyć istniejących snapshotów” nie wystarcza do zaliczenia wspólnego kontraktu CE/GL.
+
+   **Poprawka planu:** jako pierwszą bramkę sprawdzić GL: zmianę updatera przy identycznym obrazie, usunięcie dziecka, współdzielone dziecko i referencję autora do przywracanego dziecka. Następnie albo rozszerzyć adapter snapshotów bez patchowania Manima, albo zawęzić wspólną gwarancję i kryterium 2. Nie deklarować dokładności przed tą bramką.
+
+2. **[KRYTYCZNE] Brakuje blokady między przygotowaniem checkpointu a wykonaniem wejścia.**
+
+   **Dowód:** `PLAN.md:825–828` zabrania przeplatania operacji z ręcznym cue „podczas przygotowania”. Po przygotowaniu `start_paused` pozostawia jednak cue oczekujące na start (`:818–819`). D20 nadal kieruje strzałki do aktywnego live (`SPEC.md:468–470`; `src/manimcue/live_layers.py:306–329`). Transport wykonuje komendy FIFO (`src/manimcue/live_transport.py:170`, `:232–233`), a dowolna oczekująca komenda przerywa zwykłe cue (`:264–266`).
+
+   **Konsekwencja:** po potwierdzeniu checkpointu można ręcznie zmienić scenę przed `enter`. Wejście zagra wtedy z innego stanu niż zapisany; replay nie powtórzy pierwotnego przebiegu. Podobny wyścig występuje między zwolnieniem bariery a obsłużeniem `enter` przez worker.
+
+   **Poprawka planu:** zdefiniować okres rezerwacji sceny: od przyjęcia checkpoint/restore do przyjęcia `enter`, także podczas oczekiwania w pauzie. Określić kolejność już zakolejkowanych komend i odrzucanie nowych. Dodać testy przez router klawiatury, również przy fokusie live: `R`, potem `→`/`←`, pauza i wznowienie.
+
+3. **[KRYTYCZNE] Nie wiadomo, jak potwierdzać granice operacji anulowanego wejścia.**
+
+   **Dowód:** `PLAN.md:810–813` wymaga odebrania, wstawienia do warstwy i potwierdzenia każdej granicy. Jednocześnie tylko najnowsze wejście może zmieniać bieżący stan interfejsu (`:825–830`). Worker blokuje się na `frame_seen` i po 2 s kończy błędem (`src/manimcue/live_transport.py:240–246`). Obecnie ACK jest automatycznie zamawiany już w `try_read_frame()`, przed wstawieniem obrazu (`src/manimcue/live_session.py:169–179`; `src/manimcue/live_layers.py:200–214`).
+
+   **Konsekwencja:** dla szybkiego A→B→A odrzucenie starej granicy może zablokować worker, a jej wyświetlenie może pokazać stan B na A. Obecny automatyczny ACK nie realizuje opisanej kolejności „wstaw, potem potwierdź”.
+
+   **Poprawka planu:** rozdzielić odbiór protokołu od prawa do kompozycji. Granice starej operacji w żywej generacji należy odebrać i potwierdzić bez wyświetlania; granicę aktualnej operacji wyświetlić przed ACK. Jawnie przypisać odpowiedzialność za ACK i przetestować status przed klatką oraz anulowanie między nimi.
+
+4. **[WAŻNE] Nowa generacja ma nieokreśloną politykę pierwszego cue.**
+
+   **Dowód:** `PLAN.md:765` daje świeży build bez cue dla `initial`; `:766` nakazuje cue dla `next`; `:775` kończy historię po przerwie, zmianie prezentacji lub błędzie. Obecny kontroler tworzy nowy proces, gdy nie może przejąć starego, lecz nadal zamawia cue na podstawie przyczyny `next/auto_next/skip_all` (`src/manimcue/live_layers.py:111–145`).
+
+   **Konsekwencja:** wejście do kolejnej prezentacji, powrót po slajdzie bez panelu i wejście po ERROR mogą oznaczać „nowa sesja bez cue” albo „nowa sesja z cue celu”. Nie wiadomo też, czy replay tego pierwszego wejścia ma uruchomić cue, które przy inicjalizacji celowo pominięto.
+
+   **Poprawka planu:** oddzielić przyczynę nawigacji od utworzenia generacji. Dopisać tabelę dla zimnego `next`, zimnego `previous/V`, przejścia między prezentacjami, wejścia po ERROR i replay lokalnego początku. Określić także zachowanie warstw bez `session_id`, które według D33 pozostają w D27 (`SPEC.md:599`).
+
+5. **[WAŻNE] Po cofnięciu nie określono, kiedy przestaje istnieć przyszła gałąź.**
+
+   **Dowód:** `PLAN.md:772` porzuca przyszłą gałąź dopiero przy ponownym wejściu do przodu. `:780–782` wymaga kolejnych cofnięć po kolejnych wpisach. `:855` chroni checkpoint bieżącego wejścia. Fallback po braku checkpointu pozostawia aktualny stan (`:860–865`), ale nie definiuje zmiany pozycji w historii.
+
+   **Konsekwencja:** po C→B→A nie wiadomo, czy checkpointy B/C nadal są legalnymi celami restore i kandydatami do eksmisji. Po nieudanym C→B kolejne `←`, `R`, `→` mogą korzystać z historii, która nie odpowiada rzeczywistemu stanowi procesu.
+
+   **Poprawka planu:** określić osobno bieżący wpis, stos poprzedników, odłączoną przyszłość i ważność checkpointów. Nieudany restore powinien jawnie oznaczać rozbieżność historii ze sceną. Dodać przebiegi `← ← →`, `R → V`, eksmisję wpisu pośredniego i dalszą nawigację po fallbacku.
+
+6. **[WAŻNE] Deduplikacja i unieważnianie identyfikatorów nie tworzą jeszcze pełnego protokołu.**
+
+   **Dowód:** `PLAN.md:787` wymaga unikalności `request_id` w generacji, ale `:800–802` ogranicza deduplikację do bieżącego wejścia. Komendy `:792–796` nie mają osobnego pola generacji ani wejścia; nie określono kodowania ich w tokenach. Nie zdefiniowano odpowiedzi na powtórny zapis istniejącego ID, powtórny drop ani spóźnione `enter` po porzuceniu gałęzi.
+
+   **Konsekwencja:** stary `enter` może zostać potraktowany jako nowa operacja po usunięciu rejestru deduplikacji. Samo odcięcie callbacków w GUI nie zapobiega mutacji sceny przez worker.
+
+   **Poprawka planu:** ustalić format identyfikatorów, zakres i czas przechowywania wyników oraz reguły dla usuniętych ID. Worker musi odrzucać operacje unieważnionych wejść. Podać konkretne maksymalne długości tokenów, linii i kolejki oraz sposób zamknięcia wejścia.
+
+7. **[WAŻNE] Przywrócenie stanu autora pozostaje ograniczone nawet w CE; automatyczne `unsupported` nie jest wiarygodną gwarancją.**
+
+   **Dowód:** CE kopiuje graf obiektów osiągalnych z list sceny i zachowuje referencje updaterów (`src/manimcue/live_scene_ce.py:63–78`); restore odtwarza słowniki tych obiektów, listy sceny i czas (`:80–88`). Nie zapisuje pól sceny autora. `PLAN.md:837–840` wyłącza zamknięcia, RNG i dowolne pola, ale mówi też o wykrywaniu nieobsługiwanej zawartości.
+
+   **Konsekwencja:** updater odczytujący zmienione `self.phase`, licznik w zamknięciu albo zasób zewnętrzny może działać poprawnie technicznie, lecz po restore dawać inny wynik. Nie musi wystąpić wyjątek pozwalający zwrócić `unsupported`. D10 dodatkowo nie integruje pominiętego czasu updaterów (`SPEC.md:658`), więc przerwany i pełny przebieg mogą mieć różne końce.
+
+   **Poprawka planu:** oprzeć gwarancję na jawnym korpusie i zasadach autorstwa, nie na obietnicy wykrywania wszystkich zależności. Oddzielić przywrócenie referencji updatera od przywrócenia jego zależności. Identyczny koniec replay wymaga tego samego sposobu przerwania albo cue deterministycznego względem stanu checkpointu.
+
+8. **[WAŻNE] D28 wymaga osobnej reguły dla kamery GL podczas operacji stanu.**
+
+   **Dowód:** `view` jest wykonywane natychmiast w `live_poll()`, poza kolejką cue (`src/manimcue/live_transport.py:234–235`). Kamera GL należy do snapshotu (`src/manimcue/live_scene.py:287–289`), a każda publikacja graniczna ustawia `live_view_home` (`:338–340`). CE ma `view` jako no-op (`SPEC.md:671–672`). Szkic blokuje ręczne cue, ale nie gesty kamery (`PLAN.md:825–826`).
+
+   **Konsekwencja:** pan/zoom podczas snapshotu lub animowanego restore może zmienić obraz, zostać nadpisany albo zmienić późniejsze działanie resetu. Dodanie granic checkpointów zmienia także momenty zapamiętywania „home”.
+
+   **Poprawka planu:** jawnie blokować gesty D28 przez okres operacji albo określić ich kolejność. Ustalić, czy checkpoint/restore aktualizuje home, i dodać test kamera→checkpoint→zmiana widoku→restore→reset. Zachować jawne ograniczenie CE.
+
+9. **[WAŻNE] Limit pamięci pomija istotne grafy i nie ma wykonalnej definicji rezerwy.**
+
+   **Dowód:** `PLAN.md:849–858` liczy snapshoty i historie oraz wymaga odmowy przed alokacją kopii. GL `undo()` tworzy dodatkowy snapshot w `redo_stack` (`.venv/Lib/site-packages/manimlib/scene/scene.py:669–672`). Animacja GL kopiuje targety (`src/manimcue/live_scene.py:259`); CE kopiuje stan początkowy animacji (`src/manimcue/live_scene_ce.py:99`) i słowniki podczas restore (`:82`).
+
+   **Konsekwencja:** można utrzymać limit checkpointów, a przekroczyć budżet przez redo i kopie robocze. Rozmiaru dowolnego `deepcopy` nie da się bezpiecznie wywnioskować wyłącznie z rozmiaru bieżącego grafu; kod kopiowania klas może alokować dodatkowe dane.
+
+   **Poprawka planu:** zdefiniować rachunek obejmujący aktywne undo/redo, snapshoty wejść i szczytowe kopie robocze, z deduplikacją wspólnych buforów. Ograniczyć rachunek do obsługiwanych typów. Bramka 4 h powinna najpierw wykazać konserwatywną rezerwę na korpusie, zanim zaakceptuje się liczbę 256 MiB.
+
+10. **[WAŻNE] Bariera replay musi zastąpić obecną ścieżkę restartu, a nie tylko ją uzupełnić.**
+
+    **Dowód:** obecny replay natychmiast wykonuje `setPosition(0)` i `play()` (`src/manimcue/slides/present/player.py:719–731`); klipy restartuje osobno (`src/manimcue/clip_layers.py:256–272`). Przy reverse `clips.enter()` jest pomijane (`player.py:499`). Szkic wymaga przygotowania wszystkich właściwych klatek przed startem (`PLAN.md:814–819`).
+
+    **Konsekwencja:** dołożenie samego restore pozostawi bazę grającą przez 0,6 s przywracania. Pozostawienie istniejących callbacków startu może też przedwcześnie wysłać cue. Dotyczy to szczególnie `V` po `R`, replay w reverse i `auto_next/skip_all` po reverse.
+
+    **Poprawka planu:** wymienić wszystkie ścieżki uruchomienia bazy i cue, które mają respektować nową barierę, oraz reset stanu pętli. Dodać ochronę przed callbackami starego odtwarzania podczas przygotowania. Samo „istniejący replay” nie definiuje już całej operacji.
+
+11. **[DROBNE] Pasek nie rozróżnia jeszcze poprawnie początku, końca i braku wykonania.**
+
+    **Dowód:** `PLAN.md:874` mówi ogólnie „przywrócono stan N”, choć previous przywraca stan pozostawiony na N, a replay jego początek. `:879` łączy błędy z „cue pominięte”, mimo że wysłane cue może być przerwane lub mieć nieznany wynik (`:802`, `:830`). Obecny widok nadal mapuje sesję READY na „gotowe” (`src/manimcue/slides/present/player.py:855`).
+
+    **Konsekwencja:** komunikat może sugerować zgodność live z bieżącą bazą albo niewykonanie cue, które już częściowo zagrało. Dwusekundowy komunikat nie wystarcza do wyjaśnienia trwałej rozbieżności.
+
+    **Poprawka planu:** użyć tekstów „przywrócono stan pozostawiony na N” i „przywrócono początek N”; oddzielić „niewysłane”, „przerwane” i „wynik nieznany”. Trwale pokazywać nieaktualność panelu i jej przyczynę, z priorytetem nad READY oraz zwykłymi komunikatami cue.
+
+12. **[WAŻNE] Kryteria są częściowo sprzeczne, a budżet 16 h wymaga ponownej estymacji po pierwszej bramce.**
+
+    **Dowód:** „dokładnie jedno cue na wejście/replay” (`PLAN.md:886–887`) nie uwzględnia `initial`, braku cue, anulowania i fallbacku. Kryterium animacji z klatką pośrednią (`:905`) nie wyłącza braku zgodnych widocznych węzłów. ≥10 prób (`:905–908`) daje słabą podstawę do interpretacji p95. Obecne testy nawigacji sprawdzają głównie wysłanie `"flip"` i brak `"back"` (`tests/test_persistent_live.py:199–232`); CE ponownie wykorzystuje te scenariusze (`tests/test_live_ce_player.py:53–66`). Budżet całego rozszerzenia to 16 h (`PLAN.md:919–921`).
+
+    **Konsekwencja:** wykonawca może spełnić liczniki bez poprawnego stanu albo nie zaliczyć legalnego restore bez widocznej interpolacji. Największe niewiadome — GL, rachunek pamięci i anulowanie — pozostają skumulowane w krótkim budżecie.
+
+    **Poprawka planu:** zastąpić ogólny licznik tabelą oczekiwanych operacji dla każdego scenariusza. Rozdzielić testy semantyki, pikseli i czasu; klatki pośredniej wymagać tylko dla odpowiedniej sceny. Po bramce snapshotów ponownie oszacować resztę. Bez utraty głównego celu można odroczyć retransmisje i rozbudowaną obsługę duplikatów, pozostawiając brak retransmisji, korelację oraz odrzucanie starych operacji. Ograniczyć gwarancję do jawnego korpusu paneli; nie wycinać izolacji generacji, ACK, fallbacku ani D3 bez zmiany decyzji.
+
+**Werdykt:** nie przekazywałbym jeszcze 5g do implementacji jako zamkniętego kontraktu. Podstawowa semantyka A→B→A, reverse→normalny plik i pętli jest sensowna oraz uwzględnia rundę 16. Blokują przede wszystkim zbyt mocna obietnica snapshotów GL oraz brak pełnej reguły rezerwacji sceny, obsługi anulowanych granic i historii po fallbacku.
+
+Przegląd był statyczny i read-only; niczego nie zmieniałem. Nie uruchamiałem testów ani pomiarów — wykonalność czasowa i pamięciowa pozostaje do wykazania.

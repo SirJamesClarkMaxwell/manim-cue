@@ -234,7 +234,9 @@ class LiveScene(LiveTransport, Scene):
     def save_state(self) -> None:
         """Historia sekwencji bez deduplikacji identycznych pozycji (D37)."""
         self.redo_stack = []
-        self.undo_stack.append(self.get_state())
+        self.undo_stack.append(
+            self.checkpoints.capture() if hasattr(self, "checkpoints") else self.get_state()
+        )
         self.undo_stack[:] = self.undo_stack[-50:]
 
     def rewind(self) -> None:
@@ -249,6 +251,11 @@ class LiveScene(LiveTransport, Scene):
         """
         if not self.undo_stack:
             log.info("Brak zapisanego stanu; nie ma czego cofac")
+            return
+        if hasattr(self, "checkpoints"):
+            self.checkpoints.reserve()
+            self.abort_cue = False
+            self.undo_stack.pop().animate(self)
             return
         t0 = time.perf_counter()
         state = self.undo_stack[-1]
@@ -338,6 +345,8 @@ class LiveScene(LiveTransport, Scene):
         if boundary:
             self.live_boundary_id = self.live_frame_id
             self.live_view_home = self.frame.copy()
+            if hasattr(self, "live_boundary_request"):
+                self.live_status(f"BOUNDARY {self.live_boundary_request} {self.live_frame_id}")
         published = time.monotonic()
         for name, elapsed in (
             ("render", rendered - began),

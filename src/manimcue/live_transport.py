@@ -1,12 +1,15 @@
 """Transport live współdzielony przez GL i CE, bez zależności od backendu."""
 
 import logging
+import re
 import select
 import socket
 import time
 from collections import deque
+from urllib.parse import unquote
 
 from manimcue import HOST
+from manimcue.live_checkpoint import CheckpointStore, UnsupportedSnapshot
 
 log = logging.getLogger(__name__)
 POLL_TIMEOUT = 1 / 60
@@ -26,6 +29,8 @@ class LineBuffer:
 
     def feed(self, chunk: bytes) -> None:
         self._data += chunk
+        if any(len(line) > 512 for line in self._data.split(b"\n")):
+            raise ValueError("Linia live przekracza 512 bajtów")
 
     def clear(self) -> None:
         self._data = b""
@@ -147,6 +152,13 @@ class LiveTransport:
         self.listener.setblocking(False)
         self.live_bootstrap.send(self.listener.getsockname())
         self.live_commands = deque()
+        self.checkpoints = CheckpointStore(self)
+        self.live_reserved = None
+        self.live_generation = None
+        self.live_request = 0
+        self.live_reservation_request = 0
+        self.live_boundary_request = "0"
+        self.live_entry_counter = 0
         self.live_seen = 0
         self.live_frame_id = 0
         # Runda 10: bariera czeka na ostatnią klatkę graniczną, nie na ostatnią w ogóle —
@@ -168,12 +180,28 @@ class LiveTransport:
                         # D28: zmiana widoku w bezczynności to zwykła klatka, bez bariery.
                         self.live_publish()
                 command = self.live_commands.popleft()
-                if command == "back":
+                entry = None
+                if isinstance(command, tuple):
+                    operation, request, checkpoint, *args = command
+                    if operation != "enter":
+                        self.live_state_operation(operation, request, checkpoint)
+                        continue
+                    if (
+                        checkpoint != self.live_reserved
+                        or int(request) < self.live_reservation_request
+                        or checkpoint not in self.checkpoints.entries
+                    ):
+                        self.live_status(f"CHECKPOINT_ERROR {request} {checkpoint} invalid")
+                        continue
+                    self.live_reserved = None
+                    entry = (request, checkpoint, args[0])
+                    command = unquote(args[0])
+                if command == "back" and entry is None:
                     self.live_cue = "back"
                     self.step_back()
                     self.live_publish(boundary=True)
                     continue
-                from_sequence = command == "next"
+                from_sequence = command == "next" and entry is None
                 if from_sequence:
                     command = self.advance()
                     if command is None:
@@ -185,8 +213,12 @@ class LiveTransport:
                 self.abort_cue = False
                 self.live_loop = command in self.LOOPS
                 self.live_status(f"CUE_START {command}")
+                if entry:
+                    self.live_status(f"ENTRY_CUE_START {entry[0]} {entry[1]} {entry[2]}")
+                interrupted = False
                 while True:
                     self.PRESETS[command](self)
+                    interrupted = interrupted or self.abort_cue
                     self.abort_cue = False
                     self.live_poll(0)
                     if not self.live_loop or self.live_commands:
@@ -195,6 +227,15 @@ class LiveTransport:
                 self.live_publish(boundary=True)
                 self.live_bootstrap.send({"metrics": self.live_metrics})
                 self.live_status(f"CUE_DONE {command}")
+                if interrupted and self.live_reserved is not None:
+                    self.live_status(
+                        f"CUE_INTERRUPTED {self.live_reservation_request} {self.live_reserved}"
+                    )
+                if entry:
+                    result = "interrupted" if interrupted else "completed"
+                    self.live_status(
+                        f"ENTRY_CUE_DONE {entry[0]} {entry[1]} {entry[2]} {result} {self.live_frame_id}"
+                    )
         finally:
             try:
                 self.live_bootstrap.send({"metrics": self.live_metrics})
@@ -229,13 +270,125 @@ class LiveTransport:
                         self.live_seen = frame_id
                 except (ValueError, IndexError):
                     log.warning(f"Niepoprawne potwierdzenie: {command!r}")
+            elif command.split(" ")[0] in (
+                "checkpoint",
+                "restore",
+                "enter",
+                "drop_checkpoint",
+                "release",
+            ):
+                self.live_queue_operation(command)
             elif command in ("next", "back") or command in self.PRESETS:
-                self.live_commands.append(command)
+                if self.live_reserved is None and len(self.live_commands) < 128:
+                    self.live_commands.append(command)
+                else:
+                    self.live_status("LIVE_RESERVED")
             elif command.startswith("view "):
-                self.live_view(command)
+                if self.live_reserved is None:
+                    self.live_view(command)
+                else:
+                    self.live_status("LIVE_RESERVED")
             else:
                 log.warning(f"Nieznana komenda: {command!r}")
         self.live_flush()
+
+    def live_queue_operation(self, command):
+        """Walidacja nieznanego cue poprzedza kolejkę i możliwość przerwania."""
+        fields = command.split()
+        operation = fields[0]
+        request, checkpoint = (fields + ["0", "invalid"])[1:3]
+        valid = (
+            len(fields) == (4 if operation == "enter" else 3)
+            and re.fullmatch(r"[1-9][0-9]{0,19}", request)
+            and re.fullmatch(r"g[0-9a-f]{1,32}_e[0-9]{1,20}", checkpoint)
+            and len(checkpoint) <= 64
+        )
+        code = "invalid"
+        if valid:
+            generation = checkpoint.split("_", 1)[0]
+            if self.live_generation is not None and generation != self.live_generation:
+                code = "stale_generation"
+                valid = False
+            elif (
+                int(request) <= self.live_request
+                or len(self.live_commands) >= 128
+                or operation == "enter"
+                and unquote(fields[3]) not in self.PRESETS
+                or operation == "checkpoint"
+                and int(checkpoint.rsplit("e", 1)[1]) <= self.live_entry_counter
+            ):
+                valid = False
+        if not valid:
+            self.live_status(f"CHECKPOINT_ERROR {request[:20]} {checkpoint[:64]} {code}")
+            return
+        self.live_request = int(request)
+        self.live_generation = generation
+        if operation == "checkpoint":
+            self.live_entry_counter = int(checkpoint.rsplit("e", 1)[1])
+        if operation in ("checkpoint", "restore"):
+            self.live_reserved = checkpoint
+            self.live_reservation_request = int(request)
+            if self.live_loop:
+                self.live_status(f"LOOP_WAIT {request} {checkpoint}")
+        self.live_commands.append(tuple(fields))
+
+    def live_state_operation(self, operation, request, checkpoint):
+        """Każda operacja zaczyna się po ACK poprzedniej granicy."""
+        began = time.perf_counter()
+        try:
+            if operation == "checkpoint":
+                metrics = self.checkpoints.checkpoint(checkpoint)
+                status = "CHECKPOINT_READY"
+            elif operation == "restore":
+                if checkpoint not in self.checkpoints.entries:
+                    raise KeyError("missing")
+                self.live_status(f"RESTORE_START {request} {checkpoint}")
+                metrics = self.checkpoints.restore(checkpoint)
+                status = "RESTORE_DONE"
+            elif operation == "drop_checkpoint":
+                self.checkpoints.entries.pop(checkpoint, None)
+                self.live_status(f"CHECKPOINT_DROPPED {request} {checkpoint}")
+                return
+            elif operation == "release":
+                if int(request) > self.live_reservation_request:
+                    self.checkpoints.protected = checkpoint
+                    self.live_reserved = None
+                self.live_status(f"ENTRY_RELEASED {request} {checkpoint}")
+                return
+            self.live_boundary_request = request
+            self.live_publish(boundary=True)
+            self.live_boundary_request = "0"
+            self.live_status(f"{status} {request} {checkpoint} {self.live_frame_id}")
+            self.live_bootstrap.send(
+                {
+                    "checkpoint_metric": {
+                        "operation": operation,
+                        "milliseconds": 1000 * (time.perf_counter() - began),
+                        "bytes": self.checkpoints.accounted_bytes(),
+                        "count": len(self.checkpoints.entries),
+                        **metrics,
+                    }
+                }
+            )
+        except (KeyError, MemoryError, UnsupportedSnapshot, ValueError) as exc:
+            log.warning("Checkpoint %s: %s", operation, exc)
+            code = (
+                "unsupported"
+                if isinstance(exc, UnsupportedSnapshot)
+                else (
+                    "limit"
+                    if isinstance(exc, MemoryError)
+                    else "missing"
+                    if isinstance(exc, KeyError)
+                    else "invalid"
+                )
+            )
+            self.live_status(f"CHECKPOINT_ERROR {request} {checkpoint} {code}")
+            if int(request) == self.live_reservation_request:
+                self.live_reserved = None
+        except Exception:
+            self.live_status(f"CHECKPOINT_ERROR {request} {checkpoint} restore_failed")
+            raise
 
     def live_barrier(self) -> None:
         deadline = time.monotonic() + 2

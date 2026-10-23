@@ -66,7 +66,7 @@ time excluding pauses; Info next-slide geometry stays at rect_at(0).
 | engine | "manimgl" or "ce-cairo" | "manimgl" | Explicit live backend, independent of deck engine | `engine="ce-cairo"` |
 | fps | positive int | 60 | Greater than zero | `fps=30` |
 | session_id | str or None | None | Unique per slide; compatible adjacent occurrences reuse process | `session_id="panel"` |
-| enter_cue | str or None | None | Nonempty single line; named cue on committed forward entry | `enter_cue="rotate"` |
+| enter_cue | str or None | None | Nonempty single line; named cue on forward entry and checkpoint replay | `enter_cue="rotate"` |
 | background_opacity | float | 1.0 | Finite [0,1]; camera and letterbox background | `background_opacity=0` |
 | active_border | BorderStyle or None | yellow 6px, opacity 1 | None disables drawing, not focus | `active_border=BorderStyle(color="cyan")` |
 | error_border | BorderStyle or None | #dc2828 6px, opacity 1 | None disables drawing, not error status | `error_border=None` |
@@ -77,10 +77,63 @@ For Cairo use `LiveLayer(scene_file=Path("examples/live_panel_ce.py"), scene_nam
 `size((width,height))` returns pixel dimensions, rounded and clamped to at least one pixel.
 Adjacent occurrences of a session must match resolved file, class, engine, fps, pixel size and
 background_opacity. Position, entry cue and border styles may differ. A gap starts a new
-generation and allows different settings. Forward next/auto-next/skip-all sends entry cues;
-previous/reverse/replay does not undo or repeat them. The retained frame keeps alpha and
+generation and allows different settings. Forward next/auto-next/skip-all saves a checkpoint
+before sending the target entry cue. Previous (←) and reverse (V) restore the checkpoint of
+the entry being left: the live state left on the target slide, including its manual cues.
+They do not run the target entry cue. Replay (R) restores the current entry's beginning and
+runs its entry cue once after the preparation barrier; without a cue it only restores.
+In reverse, the base stays in reverse and clips retain their end frames while the live cue
+runs forwards. Returning from reverse to normal playback and repeating a loop leave live alone.
+Forward entry after going back discards the old future and saves a new checkpoint.
+The retained frame keeps alpha and
 composites over the new base. The full rectangle captures clicks, including transparent pixels.
 The worker renders the whole default 16:9 camera isotropically, with letterbox bars.
+
+Checkpoint scope is one presentation instance, compatible adjacent `session_id` run and
+worker generation. Opening a presentation at any index saves the fresh build without running
+an entry cue. A cold forward transition (including after an error or a presentation boundary)
+saves the fresh build and runs the target cue; cold previous/reverse saves it without a cue.
+Replay of that local beginning runs the target cue. Earlier entries are not reconstructed.
+Without `session_id`, the per-slide worker lifecycle remains unchanged and R does not restore live.
+
+Preparation reserves the worker against manual next/back, named cues and GL camera gestures,
+including while waiting in `start_paused`. Restore completes while paused; entry cue execution
+waits for the first actual group start. The base/clips wait for the checkpoint/restore status
+**and its matching received frame**, then start together. Cancelled operations are drained and
+acknowledged without compositing their frames. Preparation has a single five-second deadline;
+the existing boundary acknowledgement timeout remains two seconds. Timeout stops the uncertain
+worker and lets recorded media proceed; late results cannot rejoin the composition.
+
+The shared Info/S status distinguishes `zapis stanu wejścia`, `checkpoint gotowy`,
+`przywrócono stan pozostawiony na N`, `przywrócono początek N`, cue sent/start/completion,
+interruption, unsent cue and unknown result. `stan live nieprzywrócony: <reason>` persists
+over ordinary READY/cue messages until a valid preparation succeeds. Missing/evicted states
+keep the last valid image and skip the entry cue. Partial restoration errors stop the worker.
+
+There are at most 50 entry checkpoints and 256 MiB of accounted snapshot/history data per
+worker, with shared snapshots counted once and a conservative working-copy reserve. This is
+not an RSS bound. Old unprotected entries may be evicted; the current entry and active restore
+are protected. Accounting includes the current data of original objects retained by checkpoints,
+even after removal from the scene; restore reserves for the largest source/target/original graph.
+No disk snapshot, cue retransmission or cross-generation restore is performed.
+The supported graph consists of standard panel mobjects and numeric/style data, scene lists,
+shared child references, updater callable references and logical time, plus sequence history.
+Scene attributes, mutable closures, RNG and external effects are outside the guarantee and
+cannot all be detected. Identical replay requires deterministic cues and identical interruption.
+
+For example, use the same layer on two adjacent slides:
+
+```python
+panel = LiveLayer(scene_file=Path("examples/live_panel_ce.py"), scene_name="Panel",
+                  engine="ce-cairo", session_id="panel", enter_cue="rotate")
+self.next_slide(layers=[panel.model_copy()])
+self.play(square.animate.shift(RIGHT))
+self.next_slide(layers=[panel.model_copy()])
+self.play(square.animate.shift(LEFT))
+```
+
+The author scene defines `rotate` in `PRESETS`. After the second entry, ← restores the state
+left on the first; R restores that entry's beginning and runs `rotate` forwards.
 
 Opacity guarantees apply to empty background and bars. Arbitrary translucent GL shapes,
 strokes and overlaps retain upstream shader blending behavior; no universal straight/premultiplied
@@ -235,6 +288,11 @@ Mouse controls in the player send `view orbit dx dy`, `view pan dx dy`, `view zo
 and `view reset` to the worker.
 
 Client: `uv run python -m manimcue.cue [options] command [command ...]`.
+Control lines are limited to 512 UTF-8 bytes and the worker queue to 128 operations.
+Embedded entry cue names use percent-encoded UTF-8 within that line limit; ordinary
+manual cue names retain their existing newline-delimited representation.
+`checkpoint`, `restore`, `enter`, `drop_checkpoint` and `release` are reserved embedded
+control prefixes; use other names for manual presets.
 
 | Argument | Type | Default | Validation / behavior | Example |
 | --- | --- | --- | --- | --- |
@@ -255,4 +313,4 @@ without kind remain readable. Exporting layered decks to upstream file converter
 
 `Config.keys` retains the upstream key mapping plus S for presenter state; duplicate effective
 key codes are rejected. `.manim-slides.toml` remains the configuration filename. See README
-for the complete default key table and SPEC.md for D17/D20/D27–D38 contracts.
+for the complete default key table and SPEC.md for D17/D20/D27–D41 contracts.

@@ -14,6 +14,7 @@ from qtpy.QtGui import QColor, QImage, QKeyEvent, QPen
 from qtpy.QtWidgets import QGraphicsRectItem
 
 from manimcue.composition import SlideComposition
+from manimcue.live_entry import EntryHistory
 from manimcue.live_session import LiveSession, LiveSpec
 from manimcue.slides.config import Keys, LiveLayer, SlideConfig
 from manimcue.slides.logger import logger
@@ -52,6 +53,8 @@ class LiveLayerController(QObject):
         self.images: dict[LiveSession, QImage] = {}
         self.last_frames: dict[LiveSession, object] = {}
         self.entry_cues: dict[int, str] = {}
+        self.histories: dict[LiveSession, EntryHistory] = {}
+        self.restore_images: dict[LiveSession, tuple] = {}
         self.active: int | None = None
         self.failed: set[int] = set()
         self.closing = False
@@ -77,6 +80,15 @@ class LiveLayerController(QObject):
             for index, session in self.sessions.items():
                 if session in self.images:
                     self.composition.set_layer_image(index, self.images[session])
+            if reason == "replay":
+                for index, session in self.sessions.items():
+                    if session in self.histories:
+                        self.remember_image(session)
+                        cue = self.histories[session].prepare(
+                            key, slide.layers[index].enter_cue, reason, time.monotonic()
+                        )
+                        if cue:
+                            self.entry_cues[index] = cue
             return
         adjacent = (
             isinstance(key, tuple)
@@ -139,33 +151,78 @@ class LiveLayerController(QObject):
                 self.started[index] = time.monotonic()
             self.sessions[index] = session
             self.identities[index] = identity
+            if layer.session_id is not None:
+                history = self.histories.setdefault(session, EntryHistory())
+                self.remember_image(session)
+                cue = history.prepare(key, layer.enter_cue, reason, time.monotonic())
+                if cue:
+                    self.entry_cues[index] = cue
             if session in self.images:
                 self.composition.set_layer_image(index, self.images[session])
-            if reason in ("next", "auto_next", "skip_all") and layer.enter_cue is not None:
+            if (
+                layer.session_id is None
+                and reason in ("next", "auto_next", "skip_all")
+                and layer.enter_cue is not None
+            ):
                 self.entry_cues[index] = layer.enter_cue
         for session in old.values():
             session.request_stop()
             self.stopping.append(session)
             self.images.pop(session, None)
             self.last_frames.pop(session, None)
+            self.histories.pop(session, None)
+            self.restore_images.pop(session, None)
         self.update_timer()
 
     def waiting_for_entry(self) -> bool:
         """READY jest trwałe; trwające cue zostanie przerwane zgodnie z D10."""
-        return any(self.sessions[i].state == "starting" for i in self.entry_cues)
+        return any(self.sessions[i].state == "starting" for i in self.entry_cues) or any(
+            history.waiting for history in self.histories.values()
+        )
+
+    def has_preparation(self) -> bool:
+        return bool(self.entry_cues) or any(h.reserved for h in self.histories.values())
 
     def cancel_unready_entries(self) -> None:
         """Timeout bariery usuwa tylko cue, nigdy player klipu."""
         self.entry_cues = {
             i: cue for i, cue in self.entry_cues.items() if self.sessions[i].state == "ready"
         }
+        for session, history in self.histories.items():
+            if history.waiting:
+                history.expected = None
+                history.reserved = False
+                history.degraded = "stan live nieprzywrócony: timeout, cue niewysłane"
+                session.request_stop()
+        self.entry_cues = {
+            i: cue for i, cue in self.entry_cues.items() if not self.sessions[i].stopping
+        }
 
     def start_entries(self) -> None:
         """Jednorazowa wysyłka przy faktycznym starcie grupy, bez przejęcia fokusu."""
         cues, self.entry_cues = self.entry_cues, {}
+        for index, session in self.sessions.items():
+            history = self.histories.get(session)
+            if (
+                history
+                and history.reserved
+                and not history.waiting
+                and history.pending_start is None
+            ):
+                checkpoint = history.stack[-1].checkpoint or history.reservation_checkpoint
+                if index in cues and not history.degraded:
+                    request = history.command("enter", checkpoint, cues[index])
+                    history.stack[-1].cue_state = "sent"
+                    history.stack[-1].cue_request = request
+                    history.status = f"wysłano cue {cues[index]}"
+                    self.cue_sent.emit(index, cues[index], time.perf_counter())
+                else:
+                    request = history.command("release", checkpoint)
+                history.pending_start = (request, checkpoint)
+                self.flush_history(session, history)
         for index, cue in cues.items():
             session = self.sessions[index]
-            if session.state == "ready" and not session.stopping:
+            if session not in self.histories and session.state == "ready" and not session.stopping:
                 session.send(cue)
                 self.cue_sent.emit(index, cue, time.perf_counter())
 
@@ -179,25 +236,86 @@ class LiveLayerController(QObject):
         self.images = {}
         self.last_frames = {}
         self.entry_cues = {}
+        self.histories = {}
+        self.restore_images = {}
+
+    def remember_image(self, session):
+        if session in self.images:
+            self.restore_images[session] = (self.images[session], self.last_frames[session])
+
+    def flush_history(self, session, history):
+        if session.state == "ready" and not session.stopping:
+            outgoing, history.outgoing = history.outgoing, []
+            for command in outgoing:
+                session.send(command)
 
     def tick(self) -> None:
         now = time.monotonic()
         # Najpierw statusy wszystkich sesji, potem kosztowne obrazy (runda 9, p. 9).
         for index, session in self.sessions.items():
+            history = self.histories.get(session)
             for event in session.poll():
-                if event.startswith("CUE_START "):
+                if history:
+                    history.accept(event)
+                    if history.degraded:
+                        self.entry_cues.pop(index, None)
+                        if session in self.restore_images:
+                            self.images[session], self.last_frames[session] = self.restore_images[
+                                session
+                            ]
+                            self.composition.set_layer_image(index, self.images[session])
+                notify = not (history and (history.reserved or history.degraded))
+                if event.startswith("CUE_START ") and notify:
                     self.observed.emit(f"live {index + 1}: start cue {event[10:]}")
-                elif event.startswith("CUE_DONE "):
+                elif event.startswith("CUE_DONE ") and notify:
                     self.observed.emit(f"live {index + 1}: koniec cue {event[9:]}")
-                elif event == "SEQUENCE_END":
+                elif event == "SEQUENCE_END" and notify:
                     self.observed.emit(f"live {index + 1}: koniec sekwencji")
                 if event.startswith("ERROR"):
                     self.fail(index, event)
             if session.state == "starting" and now - self.started[index] > START_TIMEOUT:
                 self.fail(index, f"ERROR start: brak READY po {START_TIMEOUT:.0f} s")
                 session.request_stop()
+            if history:
+                if history.waiting and now >= history.deadline:
+                    history.expected = None
+                    history.reserved = False
+                    history.degraded = "stan live nieprzywrócony: timeout, wynik nieznany"
+                    self.entry_cues.pop(index, None)
+                    session.request_stop()
+                self.flush_history(session, history)
         for index, session in self.sessions.items():
-            frame = session.try_read_frame()
+            history = self.histories.get(session)
+            frame = session.try_read_frame(acknowledge=False)
+            if history:
+                if frame is not None:
+                    history.held = frame
+                frame = history.held
+                if (
+                    frame is not None
+                    and frame.boundary
+                    and frame.frame_id not in history.boundaries
+                ):
+                    continue
+                history.held = None
+            display = frame is not None and not session.stopping
+            if frame is not None and history:
+                request = (
+                    history.boundaries.pop(frame.frame_id, None)
+                    if frame.boundary
+                    else history.started_restore
+                )
+                if history.waiting:
+                    display = (
+                        display
+                        and history.operation_valid
+                        and (
+                            history.expected[0] == request
+                            or (frame.frame_id == 1 and session not in self.images)
+                        )
+                    )
+                elif history.degraded:
+                    display = False
             if frame is not None:
                 # Bajty żyją w `frame`, a `last_frames` trzyma go do następnej klatki — obraz
                 # sesji bez kopii 5 MB na klatkę w wątku GUI.
@@ -208,10 +326,17 @@ class LiveLayerController(QObject):
                     frame.width * 4,
                     QImage.Format.Format_RGBA8888,
                 )
-                self.images[session] = image
-                self.last_frames[session] = frame
-                self.composition.set_layer_image(index, image)
-                self.frame_received.emit(index, frame, time.perf_counter())
+                if display:
+                    self.images[session] = image
+                    self.last_frames[session] = frame
+                    self.composition.set_layer_image(index, image)
+                    self.frame_received.emit(index, frame, time.perf_counter())
+                if frame.boundary:
+                    session.send(f"frame_seen {frame.frame_id}")
+                    if history and history.expected and request == history.expected[0]:
+                        history.received.add(frame.frame_id)
+            if history:
+                history.finish()
         for session in list(self.stopping):
             session.poll()
             if not session.running:
@@ -231,6 +356,18 @@ class LiveLayerController(QObject):
             return
         logger.error(f"Warstwa live {index + 1}: {event}")
         self.failed.add(index)
+        session = self.sessions[index]
+        if session in self.histories:
+            history = self.histories[session]
+            history.degraded = (
+                history.degraded or f"stan live nieprzywrócony: {event}; wynik nieznany"
+            )
+            history.expected = None
+            history.reserved = False
+            self.entry_cues.pop(index, None)
+            if session in self.restore_images:
+                self.images[session], self.last_frames[session] = self.restore_images[session]
+                self.composition.set_layer_image(index, self.images[session])
         if self.active == index:
             self.active = None
         if self.active is None:
@@ -325,6 +462,10 @@ class LiveLayerController(QObject):
     def send(self, command: str, repeat: bool = False) -> None:
         # Tylko do gotowej sceny: klik i strzałka w trakcie startu nie kolejkują cue po READY.
         session = self.sessions[self.active]
+        history = self.histories.get(session)
+        if history and history.reserved:
+            self.observed.emit("live: przygotowanie zarezerwowane, komenda ręczna pominięta")
+            return
         if session.state == "ready" and not repeat:
             session.send(command)
 

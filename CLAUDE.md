@@ -6,7 +6,7 @@
    trzy pułapki, na których szkic już padł, kryteria akceptacji fazy 0 i decyzje D1-D19.
    Fazy 0 dotyczyło pięć rund adwersaryjnej recenzji; **nie wyprowadzaj tych faktów od nowa i nie
    zmieniaj decyzji bez powodu.**
-2. **`PLAN.md`** — fazy. F5d-f: kryteria 1–4 wykonane, próba człowieka pozostaje; F4–F6a czekają na próbę, 6b na decyzję o zależności. 7.0 (CE 0.22) zamknięta; 7a: kontrakt domknięty rundą 19, adapter Cairo 2D wdrożony, wyniki testów/pomiarów i ograniczenia w `PLAN.md` (sekcja 7a) i `experiments/f7a_cairo/`; próba człowieka przed fazą 8.
+2. **`PLAN.md`** — fazy. F5d-f: kryteria 1–4 wykonane, próba człowieka pozostaje; F5g: kontrakt domknięty rundą 20 (D39–D41), stan implementacji, testów i pomiarów w `reports/REPORT-5g.md`; próba człowieka pozostaje. F4–F6a czekają na próbę, 6b na decyzję o zależności. 7.0 (CE 0.22) zamknięta; 7a: kontrakt domknięty rundą 19, adapter Cairo 2D wdrożony, wyniki testów/pomiarów i ograniczenia w `PLAN.md` (sekcja 7a) i `experiments/f7a_cairo/`; próba człowieka przed fazą 8.
 3. **`REVIEW-LOG.md`** — rundy recenzji codex; runda 7 zawiera kontrakt fazy 2.
 
 ## Zasady

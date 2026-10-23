@@ -451,8 +451,10 @@ def test_active_border_follows_moving_live_layer(qapp, tmp_path: Path) -> None:
     controller = player.live
     # Bez procesu: do geometrii obwódki sesja nie jest potrzebna.
     controller.shutdown()
-    from types import SimpleNamespace
-    controller.sessions = {0: SimpleNamespace(state="ready")}
+    from manimcue.live_session import LiveSession
+    session = LiveSession()
+    session.state = "ready"
+    controller.sessions = {0: session}
     controller.click(0)
     player.clips.seconds = lambda: 1.0
     player.clips.move()

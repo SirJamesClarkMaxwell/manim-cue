@@ -235,10 +235,10 @@ def test_demo_repeated_cue_has_same_end_and_real_animation(qapp):
 
 
 def test_state_preparing_pause_timeout_and_focus(qapp, tmp_path):
-    from types import SimpleNamespace
-
     from qtpy.QtCore import QEvent, Qt
     from qtpy.QtGui import QKeyEvent
+
+    from manimcue.live_session import LiveSession
 
     player = make_player([image_deck(tmp_path, [])])
     try:
@@ -246,7 +246,9 @@ def test_state_preparing_pause_timeout_and_focus(qapp, tmp_path):
         group.preparing = True
         group.requested_playing = True
         group.pending = {"live"}
-        player.live.sessions = {0: SimpleNamespace(state="starting")}
+        session = LiveSession()
+        session.state = "starting"
+        player.live.sessions = {0: session}
         player.live.active = 0
         player.update_presenter_state()
         assert "start zamówiony" in player.state_overlay.text()

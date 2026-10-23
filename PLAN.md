@@ -536,8 +536,8 @@ Stan kryteriów prób F4-F6a: prelegent nie potwierdził ani nie odrzucił pozos
 
 **Cel:** D33. Jedno `→` uruchamia naraz animację bazy CE, cue w scenie live i klip innej sceny
 CE; sceny stoją, ruszają się tylko animacje. Proces live przechodzi przez sąsiednie slajdy.
-**Bez** cofania cue wejścia i replay live (osobny etap, protokół checkpointów — runda 16), pauzy
-live, zegara głównego, ruchu warstw.
+W samym etapie 5b bez cofania cue wejścia i replay live; aktualne checkpointy definiuje
+F5g / D39–D41. Nadal bez pauzy live, zegara głównego i ruchu warstw.
 
 **Projekt:**
 - Model: `LiveLayer.session_id`, `LiveLayer.enter_cue`; walidacja ciągów (D33) po renderze
@@ -636,7 +636,7 @@ wykona przy ← / →, czy operacja się udała i w którym momencie prezentacji
 | Zdarzenie | Informacja dla prelegenta |
 |---|---|
 | → | wznowienie / zamówiony start / wyjście z pętli / nowy slajd / reverse→normal |
-| ←, V, R | zatwierdzona akcja albo granica; live bez cofania/replay (D33) |
+| ←, V, R | zatwierdzona akcja albo granica; checkpointy live według F5g / D39–D41 |
 | Spacja | transport grupy, zamiar podczas przygotowania albo koniec |
 | Pętla, auto_next, skip_all | aktualny transport, lokalny indeks po automatycznym przejściu |
 | Koniec decku | brak następnego slajdu albo zamknięcie według istniejącej opcji |
@@ -734,6 +734,232 @@ Wykonawca: codex w głównym drzewie bez worktree; zmiany bez commitu.
 `faulthandler_timeout=60`: **434 passed, 2 skipped**, 334,39 s. Orbit/Demo wyrenderowane
 w CE i GL (Demo: 9 slajdów); setup PowerShell wykonany dwukrotnie offline, Bash — składnia
 poprawna. Kryterium 5, dwa monitory i pomiar wpływu Info pozostają do próby człowieka.
+
+## Faza 5g — cofanie i replay cue live (kontrakt)
+
+**Status:** kontrakt domknięty rundą 20; implementacja i dowody w śledzonym `reports/REPORT-5g.md`.
+Zastępuje odroczenie checkpointów D33/D37 wyłącznie w zakresie F5g; próba człowieka osobno.
+
+**Cel:** w sąsiednim ciągu `session_id` prelegent wraca do stanu live pozostawionego na
+poprzednim slajdzie i może ponownie zagrać wejście bieżącego slajdu. GL i CE mają ten sam
+protokół i semantykę; zachowują proces, obraz z alfą i mapowanie sesja → indeks (D33/D35).
+Zgodność dotyczy stanów na granicach wejść, nie odwrócenia animacji ani zgodności każdej
+klatki live z plikiem bazy. Ręczne zmiany na N są częścią stanu N, jeśli poprzedzają wejście
+na N+1; ręczne zmiany wykonane na N+1 znikają po powrocie na N.
+
+**Jednostka historii:** `entry_id` oznacza zatwierdzone wejście, nie numer slajdu ani nazwę cue.
+Klucz checkpointu: instancja prezentacji w playerze, `session_id`, generacja procesu i
+`entry_id`; ten sam plik otwarty dwukrotnie ma różne instancje. Przed wejściem na N zapisujemy
+`before(N)`: stan po domknięciu poprzedniego cue, przed `enter_cue` N, kursor sekwencji i
+całą dostępną historię `next/back` D37. Zapis także przy braku `enter_cue`, aby objąć ręczne
+cue na takim slajdzie. Checkpoint jest niemutowalny, odtwarzalny wielokrotnie; nie dodaje wpisu
+do historii D37 i nie jest implementowany przez wysłanie `back`. Odtworzenie odrzuca późniejszą
+historię sekwencji. Wpis wejścia rozróżnia: przygotowany, cue niewysłane, wysłane, rozpoczęte,
+zakończone, przerwane, pominięte, błąd; samo pole `enter_cue` nie dowodzi wykonania.
+
+**Semantyka zatwierdzonych zdarzeń playera:**
+
+| Przyczyna | Stan live i działanie |
+|---|---|
+| `initial`, także start od wskazanego indeksu | Świeży build, checkpoint lokalnego początku po READY; bez automatycznego cue jak dotąd. Brak rekonstrukcji pominiętych slajdów; pasek mówi „nowa sesja, bez historii wcześniejszych wejść”. |
+| `next`, `auto_next` przy zmianie N → N+1 | Domknąć cue N, zapisać `before(N+1)`, po przygotowaniu uruchomić `enter_cue` celu raz. Bez cue pozostawić zapisany stan. |
+| `skip_all` | Te same kroki dla każdego rzeczywiście zatwierdzonego wejścia wywołanego callbackiem, bez syntetycznych cue dla nieodwiedzonych indeksów. Nie scalać szeregu wejść w jedno. |
+| `previous` (`←`) N+1 → N | Odtworzyć **before(N+1)**: stan pozostawiony na N, łącznie z ręcznymi zmianami na N. Nie wykonywać wejścia N. Baza gra normalny plik N od początku; klipy zgodnie z dotychczasowym normalnym wejściem. |
+| `reverse` (`V`) N+1 → N | Ten sam checkpoint co dla `←`. Baza gra reverse **N**, klipy pozostają końcowymi klatkami N. Live pokazuje stan graniczny N, nie odwraca cue N ani N+1 w czasie pliku. |
+| `reverse_to_normal` na N | Bez checkpointu, restore i cue; zachować live N. Także gdy źródłem był callback `auto_next`/`skip_all`; rozstrzyga zatwierdzona przyczyna, nie źródłowy klawisz. |
+| replay (`R`) na N | Odtworzyć **before(N)** tego samego wejścia, odrzucając ręczne zmiany na N; ponownie uruchomić jego `enter_cue` raz po barierze. Bez cue tylko restore. Baza/klipy restartują według istniejącego replay. W reverse baza nadal gra reverse N, klipy zachowują dotychczasową semantykę; live powtarza cue do przodu, co pasek nazywa wprost. |
+| Ponowne wejście do przodu po cofnięciu | Nowe `entry_id` i nowy checkpoint z aktualnego N, ponowne cue N+1. Porzucić przyszłą gałąź wejść, bez odtwarzania dawnego końca N+1. |
+| Powtórzenie pętli slajdu / zamówienie jej końca | Bez zapisu, restore i ponownego cue. Dopiero rzeczywista zmiana slajdu podlega regułom powyżej. |
+| Brak sąsiada, wznowienie `→`, pauza | Bez nowego wejścia i bez restore; akcja graniczna nie zmienia historii. |
+| Przerwa w ciągu, inna prezentacja, ERROR/stopping | D33: stary proces i checkpointy kończą życie. Powrót z tym samym ID tworzy świeżą generację; żadnego restore między generacjami ani odtwarzania przez ponowne wykonanie wszystkich cue. |
+| Zamknięcie | Anulowanie przygotowania, shutdown i zwolnienie historii; bez cue/restore. |
+
+Oś A → B → A: po zakończeniu/przerwaniu cue A zapis `before(B)`; cue B i ewentualne ręczne
+zmiany B; `←`/`V` domyka B i przywraca `before(B)`; dopiero potem startuje normalny/reverse
+plik A. Przy kolejnym `→` powstaje nowe wejście B. `before(A)` zostaje do replay A i cofnięcia
+A → poprzednik, dopóki mieści się w limicie. Kolejne cofnięcia korzystają z kolejnych wpisów,
+nie z checkpointu slajdu docelowego. Brak wpisu (np. start od środka lub nowa generacja)
+oznacza jawny fallback, nigdy próbę zgadywania stanu z indeksu slajdu.
+
+**Protokół TCP:** rozszerzenie wspólnego `LiveTransport`, nadal linie
+UTF-8 zakończone LF, bez przesyłania grafu sceny przez TCP/SHM. Identyfikatory to ograniczone
+tokeny ASCII bez białych znaków; `request_id` jest unikalny w generacji. Istniejące ręczne
+`next/back`, nazwy presetów, `view`, `shutdown` i `frame_seen` zachowują znaczenie.
+
+| Komenda | Odpowiedź / zobowiązanie |
+|---|---|
+| `checkpoint <request_id> <checkpoint_id>` | `CHECKPOINT_READY <request_id> <checkpoint_id> <frame_id>` po zapisie i publikacji granicy. Ten sam ID nie nadpisuje istniejącego snapshotu. |
+| `restore <request_id> <checkpoint_id>` | `RESTORE_START <request_id> <checkpoint_id>`, potem `RESTORE_DONE <request_id> <checkpoint_id> <frame_id>` dopiero po dokładnym odtworzeniu stanu, kursora i historii oraz publikacji granicy. |
+| `enter <request_id> <checkpoint_id> <cue_name>` | Skorelowane `ENTRY_CUE_START <request_id> <checkpoint_id> <cue_name>` i `ENTRY_CUE_DONE <request_id> <checkpoint_id> <cue_name> <completed|interrupted> <frame_id>`. Walidacja presetu przed abort; nieznana nazwa daje błąd bez przerwania bieżącego cue. |
+| `drop_checkpoint <request_id> <checkpoint_id>` | `CHECKPOINT_DROPPED <request_id> <checkpoint_id>`; zwolnić niepotrzebny wpis/gałąź. |
+| `release <request_id> <checkpoint_id>` | `ENTRY_RELEASED <request_id> <checkpoint_id>` po przyjęciu końca rezerwacji bez cue; bieżący checkpoint jest chroniony. |
+| Błąd operacji | `CHECKPOINT_ERROR <request_id> <checkpoint_id> <code>`; kody: `missing`, `stale_generation`, `unsupported`, `limit`, `invalid`, `restore_failed`. Brak statusu DONE/READY dla nieudanej operacji. |
+
+Nowe prefiksy są zastrzeżone, parser odrzuca błędną liczbę pól/za długie ID i nie traktuje ich
+jak nazw presetów. Szczegół błędu trafia do diagnostyki, kod do stanu 5c. CUE_DONE starego
+protokołu nie potwierdza nowej operacji. Komendy skorelowane nie są retransmitowane: worker przyjmuje wyłącznie rosnące numery
+żądań w generacji, powtórzenie lub cofnięcie numeru daje `invalid` bez mutacji. Bez automatycznej retransmisji cue po utracie połączenia; wynik pozostaje nieznany.
+
+Każda granica ma dodatkowy status `BOUNDARY <request_id|0> <frame_id>`; `0` oznacza
+READY/ręczne cue, nie operację stanu. Kontroler może dzięki temu odebrać klatkę przed DONE
+i nadal rozpoznać granicę anulowanego wejścia. Nazwa cue w `enter` i ENTRY_CUE_* jest
+kodowana procentowo UTF-8, aby zachować istniejące nazwy ze spacjami i polskimi znakami.
+
+**Kolejność, bariery i przerwanie:**
+- READY nadal oznacza build + pierwszą klatkę, nie bezczynność ani przygotowane wejście.
+  Po READY i odbiorze jego granicy kontroler zamawia checkpoint/restore. Poprawna komenda
+  stanowa przerywa zwykłe cue według D10: finish/cleanup **całego callable**, logiczny koniec
+  play bez symulowania pominiętego dt updaterów. D9 dla live LOOPS: czekać do granicy
+  powtórzenia. Blokujący kod autora nie staje się przerywalny dzięki checkpointom.
+- Stara granica po D10 musi zostać odebrana i potwierdzona `frame_seen` przed publikacją
+  kolejnej. Także CHECKPOINT_READY/RESTORE_DONE wskazują własny `frame_id`; kontroler czeka
+  na pasującą klatkę, wstawia ją do właściwej warstwy i potwierdza odbiór. Status bez klatki
+  nie zwalnia przygotowania. `frame_id` nigdy nie cofa się wraz z czasem sceny.
+- D31 obejmuje teraz przygotowanie live również w ciepłej sesji, nad bazą statyczną,
+  podczas replay i reverse (obecne pominięcie `clips.enter` dla reverse wymaga osobnej
+  ścieżki bariery live). Baza/klipy stoją na właściwych klatkach początkowych/końcowych;
+  po gotowości wszystkich w jednym ticku start grupy i `enter`, jeśli wymagane.
+  Restore nie czeka na „play”: kończy się również przy `start_paused`; cue wejścia czeka
+  na pierwszy rzeczywisty start. Pauza w przygotowaniu zmienia zamiar, nie kolejkuje kopii cue.
+- Deadline przygotowania: 5 s od żądania przejścia, łącznie z READY, domknięciem i restore,
+  bez restartowania licznika po każdym statusie. Zachować timeout odbioru granicy 2 s.
+  Po deadline anulować niewysłane cue, odłączyć tę warstwę od bariery, baza/klipy kontynuują
+  według zamiaru. Zatrzymać niepewną sesję, aby spóźnione restore/cue nie zmieniło obrazu;
+  jej statusy/klatki nie wracają do kompozycji. Nowa generacja dopiero przy kolejnym wejściu.
+- Szybkie A → B → A: operacje stanu jednej sesji wykonują się kolejno, bez przeplatania
+  snapshotu i restore z ręcznym cue; podczas przygotowania ręczne cue są odrzucane z komunikatem.
+  Zatwierdzone wejścia zachowują kolejność checkpointów, lecz start/cue anulowanego wejścia
+  nie jest wysyłany. Kontroler odcina callbacki przez generację, `entry_id` i `request_id`;
+  dopiero najnowsze wejście może zwolnić barierę i zmienić bieżący komunikat. Przerwane już
+  wysłane cue ma wynik `interrupted`, nie „anulowane przed wysłaniem”.
+
+**Odtworzenie i oba silniki:** użyć istniejących snapshotów D37: wspólny adapter grafu `PanelSnapshot` z mapą oryginałów, wspólnym memo i jawnym
+odtworzeniem słowników oraz krawędzi; GL nie używa `get_state/undo` dla checkpointów.
+Osobna otoczka checkpointu przechowuje kursor i historię D37 (do 50 pozycji); snapshot sceny
+sam nie obejmuje historii transportu. Nie kopiować procesu, socketu, renderera ani Qt.
+Zakres CE pozostaje standardowym panelem Cairo 2D D38, bez nowych obietnic dla kamery/3D;
+GL tylko stan wspierany przez jego mechanizm D37. Zasoby zewnętrzne, mutowalne zamknięcia,
+RNG i dowolne pola autora nie są automatycznie cofane. Sceny zależne od nich nie mają gwarancji
+identycznego replay; nieobsługiwany typ danych kończy operację błędem, ale zależności updaterów od pól sceny,
+I/O i zamknięć nie są wykrywane. Gwarancja obejmuje standardowe węzły panelu,
+numeryczne tablice, style, add/remove, współdzielone dzieci i referencje updaterów;
+identyczny replay wymaga deterministycznego cue i tego samego sposobu przerwania. Bez forkowania/łatania Manima i bez serializacji na dysk.
+
+**Wybór animacji:** restore animowany przez 0,6 s na zgodnych węzłach, następnie dokładny stan,
+jak ręczny back D3/D37; dotyczy także przygotowania replay. Widoczny ruch wyjaśnia prelegentowi
+cofnięcie i zachowuje decyzję D3 przeciw ostremu skokowi. Zmiana topologii domyka się na końcu.
+Baza pozostaje wtedy zatrzymana, pasek mówi „przywracanie”; nie obiecujemy reverse oryginalnego
+cue ani wspólnej trajektorii z reverse bazy. D17 gwarantuje wspólny start po przygotowaniu,
+nie frame-lock. Ręczne back nadal animuje według D3; spacja nadal nie pauzuje działającego live.
+
+**Pamięć i fallback:** maksymalnie 50 checkpointów wejść i 256 MiB rozliczonej pamięci
+snapshotów na proces live, łącznie z grafami historii D37 utrzymywanymi przez checkpointy;
+w rachunku są też bieżące dane oryginałów utrzymywanych przez snapshoty, nawet po usunięciu
+ze sceny. Rezerwa restore obejmuje największy z grafu sceny, zapisanej kopii i bieżących oryginałów;
+wspólne dane liczyć raz, nie tylko rozmiar listy. Limit nie jest obietnicą RSS całego Manima.
+Pomiar/konserwatywny rachunek grafu bez pickle; jeśli backend nie potrafi bezpiecznie rozliczyć
+snapshotu, `unsupported`. Bramką implementacji jest wykazanie rachunku na korpusie obu silników.
+Przy przekroczeniu usuwać najstarsze niebieżące checkpointy, raportować ich ID przez
+`CHECKPOINT_EVICTED <checkpoint_id> limit`. Nie usuwać checkpointu bieżącego wejścia ani
+używanego restore. Jeśli nadal brak miejsca (także pojedynczy zbyt duży zapis), `limit`,
+bez niepotwierdzonego checkpointu i bez automatycznego cue tego wejścia. Zapis tymczasowy
+też wymaga rezerwy w limicie; brak rezerwy oznacza odmowę przed alokacją kopii.
+
+Brak/eksmisja checkpointu: pozostawić ostatni poprawny obraz i stan, cue replay pominąć,
+wyraźnie pokazać „stan live nieprzywrócony”; nawigacja bazy/klipów działa. Błąd restore po
+częściowej mutacji: nie publikować częściowego wyniku jako sukcesu, zachować ostatni obraz
+GUI, oznaczyć panel jako nieaktualny i zatrzymać proces (ERROR bez przejęcia). Przywracanie
+nie jest transakcją efektów ubocznych autora. Przerwa ciągu/nowa prezentacja daje nowy build,
+a nie fałszywe „przywrócono”. Bez globalnego cache sesji i bez restartu udającego restore.
+
+**Stan 5c:** Info i nakładka korzystają z tego samego `presenter_snapshot`; stan operacji
+osobno od `session.state == ready` i transportu bazy. Krótki wynik ~2 s, ale degradacja
+„nieaktualny / bez checkpointu” zostaje do następnego poprawnego przygotowania.
+
+| Zdarzenie | Tekst (z numerem warstwy i slajdu/prezentacji) |
+|---|---|
+| Zapis / potwierdzony zapis | „live: zapis stanu wejścia” / „checkpoint gotowy” |
+| Restore / odebrana granica DONE | „live: przywracanie stanu N” / „przywrócono stan N” |
+| Replay | „replay: przywracanie początku N” → „wysłano cue X” → „start cue X” → „koniec cue X” |
+| Replay podczas reverse | „baza reverse; live powtarza cue do przodu” |
+| D10 / D9 | „cue przerwane i domknięte” / „oczekiwanie na koniec powtórzenia live” |
+| Pauza / anulowanie wejścia | „stan gotowy, cue czeka na start” / „wejście anulowane, cue niewysłane” |
+| Brak historii / limit / błąd / timeout | Konkretna przyczyna + „stan live nieprzywrócony; cue pominięte”, nigdy „gotowe” jako wynik restore |
+| Eksmisja / nowa generacja | „starszy checkpoint usunięty: limit” / „nowa sesja, wcześniejszy stan niedostępny” |
+| Ręczne cue podczas przygotowania | „live przygotowuje stan — klawisz pominięty” |
+
+**Kryteria akceptacji (offscreen, po przyjęciu i implementacji):**
+1. Dla GL i CE przez rzeczywiste callbacki playera: A → B → A (`←` oraz `V`), replay A/B,
+   replay w reverse, reverse_to_normal, auto_next/skip_all także w reverse, wznowienie,
+   pętla i granice. Liczniki wejść/START/DONE potwierdzają jedno cue dla udanego next/replay z nazwą i zamiarem startu,
+   zero dla initial, braku nazwy, anulowania, fallbacku, pętli i powrotu. Replay podczas przygotowania pozostaje ignorowane jak dotąd.
+2. Przed B ręczne next/nazwane cue na A, po B dalsze next/back/nazwane cue; powrót daje dokładny
+   graf, referencje, kursor i historię A. Replay B dwukrotnie daje ten sam początek i koniec
+   na deterministycznym panelu; brak enter_cue także odtwarza ręczne zmiany. Korpus D37:
+   grupy, współdzielone dzieci, add/remove, style, updatery i czas; piksele wnętrza ±2/255,
+   krawędzie 2 px, geometria i tożsamości sprawdzone niezależnie od pikseli.
+3. TCP: podzielone/sklejone linie, błędne ID/nazwa, odrzucenie powtórzeń, nieaktualna generacja,
+   disconnect i opóźnione statusy. DONE nie wystarcza bez odebranej wskazanej granicy;
+   frame_seen nie pozwala nadpisać granicy, timeout 2 s zachowany. Nieznane cue nie przerywa.
+4. Baza+live bez klipów, baza statyczna, ciepły/zimny start, start_paused, pauza w przygotowaniu,
+   replay i reverse: kolejność READY → checkpoint/restore+odbiór → start grupy/enter;
+   deadline 5 s i brak spóźnionego cue. Dwa play/wait przerwane według D10 oraz LOOPS według D9.
+5. ≥20 szybkich A → B → A, zmiana indeksu warstwy, dwie sesje na slajdzie, mieszane CE/GL,
+   dwie prezentacje z tym samym ID, przerwa ciągu, ERROR/stopping i zamknięcie podczas restore:
+   brak obcych klatek/statusów, brak przejęcia starej generacji i wycieków procesów/SHM.
+6. Wstrzyknięte unsupported/restore_failed/missing, eksmisja 51. wpisu i przekroczenie limitu
+   bajtów, także jeden zbyt duży snapshot: zgodny fallback i tekst obu widoków 5c. Po 100 wejściach
+   limity liczby/bajtów utrzymane, drop/shutdown zwalnia snapshoty i ich historie.
+7. ≥30 prób na silnik: restore z klatką pośrednią dla widocznych zgodnych węzłów, nominalnie 0,6 s; raport p50/p95/max komenda
+   → odebrana granica, osobno zapis/przygotowanie/odtworzenie i pamięć. Cel dla prostego panelu
+   restore 0,6 ±0,1 s; przekroczenie raportować, nie ukrywać pod czasem wysłania. Raport wspólnego
+   startu trzech warstw osobno, bez wymogu ±1 klatka. GUI poll/try_read_frame <50 ms.
+8. Regresje F0–F5d-f/7a i upstreamu zielone, progi GL F2 i CE D38 nieobniżone. Zaktualizować
+   obecne testy „brak cue dla replay” i tekst D33 dopiero przy wdrożeniu przyjętego kontraktu.
+   Osobna próba człowieka po implementacji: czytelność cofania/replay/statusu w prawdziwym oknie
+   i na dwóch monitorach; offscreen nie zalicza tej próby.
+
+**Poza zakresem:** retransmisje i rozbudowany cache duplikatów; seek/frame-lock/zegar główny, reverse cue klatka
+po klatce, pauza live, cofanie efektów I/O/RNG/zamknięć, odtwarzanie dowolnego grafu Pythona,
+CE OpenGL/3D/animowana kamera, historia między procesami/prezentacjami/przerwanymi ciągami,
+rekonstrukcja pominiętych slajdów, dyskowy cache i nowe ustawienia użytkownika.
+
+**Uściślenia rundy 20 (normatywne, pierwszeństwo nad skrótem powyżej):**
+- Rezerwacja obejmuje przygotowanie, gotowość w pauzie i czas do przyjęcia `enter` lub
+  `release` dla wejścia bez cue. Polecenia ręczne już odebrane przed rezerwacją są domykane
+  FIFO; nowe `next/back`, presety i `view` są odrzucane. Nawigacja playera pozostaje możliwa.
+- Jedna generacja to jeden socket/proces. Token checkpointu `g<hex>_e<decimal>` (≤64 ASCII),
+  żądanie dodatnia liczba dziesiętna (≤20 cyfr), linia ≤512 bajtów, kolejka ≤128 operacji.
+  Monotoniczne numery żądań odrzucają duplikaty; bez retransmisji. `release <request> <id>`
+  zamyka rezerwację bez cue. Zmiana bieżącego ID unieważnia stare `enter`; drop jest
+  idempotentny, ponowny checkpoint istniejącego ID jest `invalid`. Generację sprawdza worker.
+- ACK należy do kontrolera: aktualny obraz wstawia przed ACK; starą granicę nadal odbiera
+  i potwierdza, bez wstawienia. Status i wskazana klatka mogą dotrzeć w dowolnej kolejności.
+- Zimne next/auto_next/skip_all (także po ERROR i między prezentacjami) zapisują build i
+  wykonują cue celu; initial oraz zimne previous/V zapisują build bez cue. Replay lokalnego
+  początku wykonuje cue celu. Warstwy bez session_id pozostają w D27, bez checkpointów F5g.
+- Cofnięcie usuwa bieżący wpis ze stosu po zamówieniu restore jego before; kolejne cofnięcie
+  korzysta z kolejnego poprzednika. Przyszłość jest odłączona natychmiast, jej checkpointy
+  zwalniane po wykonaniu restore. Replay nie przesuwa stosu. Brak wpisu i nieudany restore
+  przesuwają pozycję nawigacji, ale trwale oznaczają panel jako nieaktualny; nie zgadujemy
+  checkpointu. Zapis wykonany po rozbieżności nie usuwa degradacji i nie odblokowuje cue;
+  odzyskanie zgodności wymaga restore wcześniejszego poprawnego wpisu albo nowej generacji.
+- GL home aktualizuje się na opublikowanej granicy; view podczas rezerwacji jest blokowane.
+  CE view pozostaje no-op. Test: kamera→checkpoint→view→restore→reset.
+- Limit 256 MiB dotyczy rozliczonego grafu snapshotów i aktywnego undo/redo oraz konserwatywnej
+  rezerwy 4× graf bieżącego panelu na zapis/restore/interpolację. Nie jest limitem RSS.
+  Dane typów spoza korpusu dają unsupported przed kopią; brak miejsca daje limit przed kopią.
+  Współdzielone snapshoty historii liczymy raz, także po drop i eksmisji.
+- Replay ładuje bazę/klipy od początku przez tę samą barierę, resetuje pętle i odcina stare
+  callbacki; reverse przygotowuje tylko bazę/live, zachowując końcowe klatki klipów.
+- Stan mówi „przywrócono stan pozostawiony na N” lub „przywrócono początek N”; odróżnia
+  cue niewysłane, przerwane i wynik nieznany. Trwałe „stan live nieprzywrócony: powód” ma
+  pierwszeństwo nad READY. Info i nakładka czytają ten sam stan.
+
+**Budżet implementacji:** 24 h po bramce: snapshot/rachunek GL+CE 6 h, transport/rezerwacja/ACK
+5 h, player/bariera/status 6 h, korpus/pomiary/regresje/dokumentacja 7 h. Stop i raport przy
+48 h, bez rozszerzania zakresu. Próba człowieka osobno. Bramki nie zaliczają kryteriów bez dowodu.
+
 
 ## Faza 7 — live w CE
 
@@ -997,8 +1223,8 @@ CPU i latencja bez zmian; CE 1080p bez deklarowanego progu w 7a.
    Offscreen nie zalicza projektora, dwóch monitorów ani odczucia fokusu — osobna próba
    prelegenta po implementacji; nie jest warunkiem wdrożenia adaptera.
 
-**Poza zakresem:** OpenGL CE = 7b (osobny adapter/kontrakt), CE 3D, cofanie cue wejścia
-przy nawigacji slajdów/replay (checkpointy D33), serializacja dowolnego stanu Pythona,
+**Poza zakresem 7a:** OpenGL CE = 7b (osobny adapter/kontrakt), CE 3D; checkpointy przy
+nawigacji/replay są osobno w F5g / D39–D41. Nadal poza zakresem serializacja dowolnego stanu Pythona,
 fork/patch Manima, zegar główny i seek, dowolna przezroczysta treść poza D35.
 
 **Domknięcie rundy 19 (D36–D38, wiążące):**

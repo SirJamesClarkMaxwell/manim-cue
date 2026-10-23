@@ -52,6 +52,7 @@ class ClipGroup(QObject):
         self.frames: dict[int, QVideoFrame] = {}
         self.entry = 0
         self.preparing = False
+        self.reverse = False
         self.pending: set = set()
         self.requested_playing = True
         self.static_base = False
@@ -78,17 +79,27 @@ class ClipGroup(QObject):
         """Grupa nad bazą statyczną (obraz): sama trzyma stan odtwarzania."""
         return bool(self.layers) and self.static_base
 
-    def enter(self, slide: SlideConfig, base_video: bool, start_paused: bool, rate: float) -> bool:
+    def enter(
+        self,
+        slide: SlideConfig,
+        base_video: bool,
+        start_paused: bool,
+        rate: float,
+        reverse: bool = False,
+    ) -> bool:
         """Nowy slajd; True, gdy grupa przejmuje start bazy (przygotowanie pierwszej klatki)."""
         self.clear()
-        if not self.needed(slide) and not (self.live and self.live.entry_cues):
+        if (reverse or not self.needed(slide)) and not (self.live and self.live.has_preparation()):
             return False
         self.layers = slide.layers
         self.static_base = not base_video
         self.requested_playing = not start_paused
         self.preparing = True
+        self.reverse = reverse
         entry = self.entry
         for index, layer in enumerate(slide.layers):
+            if reverse:
+                continue
             if not (isinstance(layer, ClipLayer) and layer.is_video):
                 continue
             self.composition.show_placeholder(index)
@@ -289,6 +300,8 @@ class ClipGroup(QObject):
         return (self.elapsed_ms + (self.clock.elapsed() if self.running else 0)) / 1000
 
     def move(self) -> None:
+        if self.reverse:
+            return
         t = self.seconds()
         for index, layer in enumerate(self.layers):
             if layer.keyframes:
@@ -312,6 +325,7 @@ class ClipGroup(QObject):
         self.base_frame = None
         self.layers = []
         self.preparing = False
+        self.reverse = False
         self.pending = set()
         self.motion.stop()
         self.running = False

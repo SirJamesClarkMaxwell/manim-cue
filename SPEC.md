@@ -615,6 +615,8 @@ przy każdym slajdzie (D27) to też największy zmierzony koszt zmiany slajdu: ~
 - **Poza D33 (osobny etap, protokół checkpointów — runda 16 p. 3-5):** cofanie cue wejścia przy
   `←`/`V` i ponowne cue przy replay. Do tego czasu wejście od tyłu zostawia live w bieżącym stanie;
   `back` (D3) cofa tylko cue z sekwencji `next`, nie nazwane `enter_cue`.
+  **Aktualizacja F5g:** powyższe odroczenie i ciepły start bez bariery zastępują D39–D41;
+  ←/V odtwarzają pozostawiony stan, R początek wejścia i cue, także w ciepłej sesji.
 - Bez zmian: fokus (D20; cue wejścia nie przejmuje fokusu), brak pauzy live (D17 dla live to tylko
   wspólny start; spacja pauzuje bazę i klipy), brak zegara głównego, podgląd Info z miniaturami.
 
@@ -666,13 +668,41 @@ cue wraca przed next. CE zachowuje oryginalne obiekty, graf submobjects, listy s
 geometrię/style i referencje updaterów we wspólnym memo; zakres to standardowe panele
 2D. Kopie targetów zachowują odniesienie bound updatera do żywej sceny zamiast kopiować IPC.
 Bez serializacji zamknięć/zasobów i dowolnych klas użytkownika. Interpolacja zgodnych węzłów
-0,6 s, potem dokładne odtworzenie grafu. D33 checkpointy nadal odroczone.
+0,6 s, potem dokładne odtworzenie grafu. Odroczenie checkpointów D33 zastąpione przez D39–D41.
 
 **D38. Zamknięty zakres panelu fazy 8.** D28 CE (pan/zoom/reset), animowana kamera,
 3D i dowolny graf snapshotu odroczone; view w CE jest no-op. D35 obejmuje puste tło
 i pasy, nie dowolną półprzezroczystą treść. Cel CE: 60 różnych odebranych klatek/s
 przy 960×540, 480×270, 538×648 (30 s, ≥60T−2), idle <5% rdzenia i p95 <100 ms,
 trzy pełne przebiegi Qt; brak zaliczenia na podstawie mikrobenchmarku.
+
+## Decyzje F5g (2026-10-23, runda 20)
+
+**D39. Checkpointy wejść live.** Zastępuje odroczenie D33/D37 dla sąsiednich sesji:
+before(N) zawiera graf, kursor i historię D37; previous/V odtwarza before opuszczanego
+wejścia, replay before bieżącego i cue celu. Powrót nie gra cue; ponowne next tworzy
+nową gałąź. Initial bez cue; zimne next z cue celu, zimne previous/V bez cue; replay
+lokalnego początku z cue celu. Bez session_id nadal D27. Bez rekonstrukcji wcześniejszych
+slajdów, między generacjami, prezentacjami i przerwami. Reverse live nie odwraca czasu.
+
+**D40. Graf i pamięć checkpointu.** Osobny adapter bez get_state/undo GL: wspólne memo,
+oryginały i krawędzie, style/geometria/updatery/czas standardowego panelu, potem dokładny
+restore po interpolacji 0,6 s zgodnych węzłów D3. Zależności updaterów, pola sceny,
+I/O i RNG poza gwarancją; nie obiecujemy ich wykrywania. Do 50 checkpointów, 256 MiB
+rozliczonych snapshotów/historii i rezerwa 4× bieżący graf na kopie robocze; bez limitu RSS.
+Rachunek obejmuje utrzymywane oryginały także poza sceną; rezerwa restore uwzględnia ich
+bieżący rozmiar obok rozmiaru sceny i zapisanego grafu.
+Nieobsługiwane typy albo brak rezerwy oznaczają odmowę przed kopią. Po braku checkpointu
+zachować obraz i trwałą degradację; częściowo nieudany restore zatrzymuje proces.
+
+**D41. Rezerwacja, korelacja i bariera.** Operacje stanu są FIFO po D10/D9, rezerwacja
+blokuje ręczne cue i GL view także w pauzie, aż worker przyjmie enter/release. Nowe wejście
+unieważnia stare enter. Jedna generacja/socket, ID wejścia i monotoniczne ID żądań; bez
+retransmisji i cache duplikatów. Aktualna granica jest komponowana przed ACK, anulowana
+odbierana i potwierdzana bez kompozycji. Status bez wskazanej klatki nie zwalnia bariery.
+D31 obejmuje ciepłe sesje, replay i reverse; deadline 5 s całego przygotowania, ACK 2 s.
+Timeout odcina i zatrzymuje niepewny proces, baza/klipy kontynuują. Info i nakładka
+pokazują tę samą operację, początek/pozostawiony stan oraz trwałą degradację nad READY.
 
 ---
 

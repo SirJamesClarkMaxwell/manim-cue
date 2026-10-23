@@ -14,6 +14,7 @@ from manim import Animation, Mobject, Scene, tempconfig
 from manim.renderer.cairo_renderer import CairoRenderer
 
 from manimcue.frame_buffer import FrameBuffer
+from manimcue.live_checkpoint import CheckpointStore
 from manimcue.live_transport import LiveTransport
 
 
@@ -53,6 +54,10 @@ class LiveCairoRenderer(CairoRenderer):
             animation.finish()
             animation.clean_up_from_scene(scene)
         scene.update_mobjects(0)
+        # Skończone animacje nie mogą zatrzymywać kopii poza rezerwą checkpointów.
+        scene.animations = []
+        scene.moving_mobjects = []
+        scene.static_mobjects = []
         self.static_image = None
         self.num_plays += 1
 
@@ -100,7 +105,7 @@ class SnapshotAnimation(Animation):
         self.pairs = [
             (original, start, target)
             for original, start, target in zip(snapshot.originals, starts, snapshot.copies)
-            if original.points.shape == target.points.shape
+            if original.points.size and original.points.shape == target.points.shape
         ]
 
     def interpolate_mobject(self, alpha):
@@ -122,6 +127,7 @@ class LiveSceneCE(LiveTransport, Scene):
         self.abort_cue = False
         self.undo_stack = []
         self.snapshot_metrics = []
+        self.checkpoints = CheckpointStore(self)
 
     def construct(self):
         if not hasattr(self, "live_buffer"):
@@ -142,7 +148,7 @@ class LiveSceneCE(LiveTransport, Scene):
 
     def save_state(self):
         began = time.perf_counter()
-        self.undo_stack.append(SceneSnapshot(self))
+        self.undo_stack.append(self.checkpoints.capture())
         self.undo_stack[:] = self.undo_stack[-50:]
         self.snapshot_metrics.append({"snapshot_ms": 1000 * (time.perf_counter() - began)})
         self.snapshot_metrics[:] = self.snapshot_metrics[-50:]
@@ -151,17 +157,10 @@ class LiveSceneCE(LiveTransport, Scene):
         if not self.undo_stack:
             return
         state = self.undo_stack.pop()
-        began = time.perf_counter()
-        animation = SnapshotAnimation(state)
-        prepared = time.perf_counter()
+        self.checkpoints.reserve()
         self.abort_cue = False
-        self.play(animation)
-        restoring = time.perf_counter()
-        state.restore(self)
-        self.snapshot_metrics[-1].update(
-            prepare_ms=1000 * (prepared - began),
-            restore_ms=1000 * (time.perf_counter() - restoring),
-        )
+        metrics = state.animate(self)
+        self.snapshot_metrics[-1].update(metrics)
         self.live_bootstrap.send({"snapshot_metrics": self.snapshot_metrics})
 
     def live_view(self, command):
@@ -197,6 +196,7 @@ class LiveSceneCE(LiveTransport, Scene):
         self._live_last_pixels = payload
         if boundary:
             self.live_boundary_id = self.live_frame_id
+            self.live_status(f"BOUNDARY {self.live_boundary_request} {self.live_frame_id}")
         published = time.monotonic()
         for name, elapsed in (
             ("render", rendered - began),
