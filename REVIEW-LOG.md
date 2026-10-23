@@ -1811,3 +1811,141 @@ klucz sesji, wymóg `rect`, mierzalność ≤ 50 ms, diagnoza uwag z próby, bud
 zgodnie z CLAUDE.md; połączenie do API zablokowane przez sandbox (socket error 10013,
 fallback HTTPS również bez połączenia). Nowa odpowiedź nie powstała; rozstrzygnięcia powyżej
 opierają się na dostarczonej pełnej rundzie 18 i walidacji kodu/testów.
+
+
+## Runda 19 — codex, 2026-10-23: kontrakt F7a (adapter live Cairo)
+
+**Pytania:** Czy zegar, lifecycle, historia, alfa i izolacja silników zapewniają panel live CE w decku fazy 8 bez patchowania Manima?
+
+**Co weszło:**
+
+1. Przyjęto monotoniczne terminy, sleep i live_poll(0); select pozostaje tylko w idle i barierach, ponieważ timeout Windows oblał pomiar F2.
+2. Przyjęto własne CairoRenderer.play: compile/begin, pętla live, finish/cleanup i publikacja bez writera; sekcje skip są odrzucane, aby nie omijać zegara.
+3. Przyjęto D10 domykające animacje i czas logiczny bez integracji pominiętego dt niezależnych updaterów, zgodnie z GL.
+4. Przyjęto macierz wait CE: statyczne bez renderu, updater/warunek dynamiczne, frozen bez updaterów, frozen+warunek błąd; wcześniejszy warunek zachowuje faktyczny czas.
+5. Przyjęto mapę oryginał–stan ze wspólnym memo i odtworzeniem krawędzi; odrzucono gwarancję dowolnego grafu/niestandardowych pól, bo celem jest jawny korpus paneli 2D.
+6. Przyjęto wspólną politykę CE/GL: zapis tylko przed next, historia związana z pozycją sekwencji, maksymalnie 50 wpisów bez deduplikacji pozycji; nazwane cue nie dodają historii, więc back przywraca stan sprzed ostatniego next.
+7. Przyjęto osobny pomiar snapshotu, przygotowania i odtworzenia oraz pamięci; czas back liczymy do odebranej granicy, ponieważ sam run_time nie obejmuje pracy przygotowawczej.
+8. Przyjęto worker jako właściciela setup/construct/tear_down z finalizerem dokładnie raz i zachowaniem pierwotnego wyjątku; construct należy do bazy, shutdown przerywa callable wyjątkiem kontrolnym.
+9. Przyjęto import autora przed narzuceniem konfiguracji na cały lifecycle i test izolacji procesów; gwarancja bez GL dotyczy infrastruktury, bo autor może sam importować oba silniki.
+10. Przyjęto 60 fps jako cel do pomiaru pełnego toru Qt w trzech niezależnych przebiegach o zmiennej kolejności, ponieważ mikrobenchmark nie mierzy transportu.
+11. Przyjęto porównanie kolejnych pikseli pełnej treści podczas nieokresowego ruchu, maski z tolerancją krawędzi 2 px i koloru 2/255 oraz asymetryczne narożniki i jawny podział pasów.
+12. Przyjęto kombinacje nieznanego cue, zamknięcia podczas play, błędu ciepłej sesji, dwóch CE i zmiany krycia między generacjami, ponieważ pojedyncze testy nie pokrywają integracji.
+13. Przyjęto bramki i budżet 16 h (stop 32 h); odroczono pan/zoom/reset, animowaną kamerę i dowolny graf snapshotu, bo nie są potrzebne panelowi fazy 8.
+14. Przyjęto aktualizację odsyłaczy i hash źródła CE, ponieważ numery linii szkicu były nieaktualne.
+
+**Odpowiedź codex (bez zmian):**
+
+1. **[KRYTYCZNE] Plan wraca do zegara, który już oblał pomiar na Windows.**
+
+   **Dowód:** `PLAN.md:887` proponuje `select` z timeoutem jednej klatki. Tymczasem `PLAN.md:183–187` dokumentuje około 29 fps wskutek zaokrąglania timeoutu; działające rozwiązanie używa `time.sleep` i nieblokującego odczytu gniazda (`src/manimcue/live_scene.py:573–579`).
+
+   **Konsekwencja:** szybki render Cairo nie zapewni proponowanych 60 odebranych klatek/s.
+
+   **Poprawka planu:** zachować istniejący mechanizm terminów: zegar monotoniczny, `sleep` do terminu, `live_poll(0)`, pomijanie spóźnionych terminów. `select` z timeoutem zostawić do bezczynności i barier.
+
+2. **[WAŻNE] Sterowanie `play()` bez patchowania CE jest wykonalne, ale granica nadpisania jest niedookreślona.**
+
+   **Dowód:** CE przekazuje `play()` przez `manager.py:260` do renderera. `renderer/cairo_renderer.py:123–134` wykonuje begin, przygotowuje obraz statyczny i wybiera osobno frozen wait albo `play_internal()`. `update_frame()` jest oddzielne od `render()` i kopiującego `get_frame()` (`:139`, `:183–195`). Jednak renderer przed każdym play odtwarza `skip_animations` i przelicza pomijanie (`:78–79`); sekcja może ponownie je włączyć (`:269–270`).
+
+   **Konsekwencja:** samo nadpisanie `play_internal()` oraz wyłączenie cache nie kontroluje całego przebiegu. `next_section(skip_animations=True)` może naruszyć założenia zegara mimo poprawnej konfiguracji startowej.
+
+   **Poprawka planu:** wskazać dokładnie odpowiedzialność podklasy renderera: polityka skip dla każdego play, frozen wait, begin/cleanup i publikacja. Jawnie odrzucać albo ignorować sekcje pomijające animacje. `format=none` i `disable_caching=True` są właściwe: pierwsze wyłącza wyjście, drugie hashowanie — to osobne warunki (`_config/output_plan.py:266`, `cairo_renderer.py:88–104`).
+
+3. **[WAŻNE] D10 nie definiuje końcowego stanu updaterów.**
+
+   **Dowód:** plan wymaga `finish()`/cleanup i doprowadzenia czasu logicznego do końca (`PLAN.md:852–860`). CE `Animation.finish()` wykonuje interpolację do 1 i wznawia updatery (`animation/animation.py:216–227`), ale dodatnie `dt` dociera do updaterów przez `Scene.update_to_time()` (`scene/scene.py:1714–1724`). Zwykłe zakończenie pętli wykonuje jeszcze `update_mobjects(0)` (`:1412–1413`).
+
+   **Konsekwencja:** animowany `Transform` osiągnie koniec, lecz niezależny updater przesuwający obiekt przez `dt` pozostanie w stanie chwili przerwania. Sam skok `Scene.time` tego nie naprawia. Określenie „stan końcowy całego cue” jest za szerokie.
+
+   **Poprawka planu:** określić, czy D10 domyka wyłącznie animacje, czy również integruje brakujące `dt` updaterów. Najmniejszy zakres zgodny z obecnym GL: domknięcie animacji bez symulowania pominiętego czasu updaterów. Dodać test animacji równoległej z niezależnym updaterem i kolejnego play odczytującego `Scene.time`.
+
+4. **[WAŻNE] „Statyczne `wait` ze `stop_condition`” nie odpowiada klasyfikacji CE.**
+
+   **Dowód:** CE traktuje obecność `stop_condition` jako powód aktualizowania sceny (`scene/scene.py:461–471`). `Wait` odrzuca jednoczesne `stop_condition` i `frozen_frame=True` (`animation/animation.py:615`). Plan żąda statycznego/dynamicznego stop_condition oraz zachowania frozen frame (`PLAN.md:865`, `:980`).
+
+   **Konsekwencja:** implementator nie wie, czy ma zachować semantykę CE, czy wprowadzić nową optymalizację „nieruchomy obraz, ale aktywny warunek”.
+
+   **Poprawka planu:** rozpisać macierz: zwykłe statyczne wait, wait z updaterem, wait z warunkiem bez ruchu, frozen wait oraz niedozwolone połączenie frozen+warunek. Dla warunku zakończonego wcześniej zdefiniować czas logiczny jako faktycznie odczekany, bez skoku do maksymalnego czasu.
+
+5. **[KRYTYCZNE] Snapshot obiecuje zachowanie grafu obiektów, ale nie podaje mechanizmu, który to zapewnia.**
+
+   **Dowód:** `PLAN.md:915–921` gwarantuje referencje autora, współdzielone dzieci i dokładne relacje grup. CE `Mobject.copy()` to `deepcopy` (`mobject/mobject.py:1016–1029`); `Transform.begin()` kopiuje cel i wyrównuje strukturę źródła (`animation/transform.py:200–211`). Wyrównanie może tworzyć dodatkowe submobjecty (`mobject/mobject.py:3204–3228`).
+
+   **Konsekwencja:** osobne kopie dwóch grup ze wspólnym dzieckiem mogą utracić współdzielenie. Transformowanie rodzica i dziecka osobnymi animacjami może aktualizować ten sam obiekt wielokrotnie. Przywrócenie list sceny/foreground nie przywraca automatycznie grafu ani wszystkich referencji.
+
+   **Poprawka planu:** najpierw osobna bramka snapshotu: mapa oryginał→stan, wspólne memo kopiowania i jawne odtworzenie krawędzi grafu. Określić obsługiwane pola oraz updaterów. Nie przedstawiać `Restore`/`Transform` jako gotowego rozwiązania tej gwarancji; przy ograniczeniu budżetu zawęzić snapshot do udokumentowanego korpusu panelu.
+
+6. **[WAŻNE] Cofanie nazwanych cue jest niespójne już między kontraktem a istniejącym GL.**
+
+   **Dowód:** D33 wyklucza cofanie nazwanych `enter_cue` (`SPEC.md:615–617`), podobnie `PLAN.md:921`. Obecny live GL wywołuje `save_state()` przed każdym presetem, również nazwanym (`live_scene.py:425–437`). `step_back()` zmniejsza kursor i cofa ostatni snapshot (`:363–367`).
+
+   **Konsekwencja:** po `next → nazwany enter_cue → back` kursor cofnie sekwencję, ale obraz cofnie nazwane cue. CE nie może jednocześnie zachować tej implementacji i deklarowanej semantyki D33.
+
+   **Poprawka planu:** dodać ten konkretny test i ustalić wspólną politykę historii. Snapshot musi być powiązany z pozycją sekwencji albo należy jawnie zmienić kontrakt. Uwzględnić też limit historii: GL ogranicza ją do 50 stanów i deduplikuje (`manimlib/scene/scene.py:660–667`); CE nie ma określonego limitu ani zasad deduplikacji.
+
+7. **[WAŻNE] Koszt cofania CE nie został zmierzony, a wynik GL nie jest przenośny.**
+
+   **Dowód:** GL współdzieli niezmienione kopie między snapshotami (`manimlib/scene/scene.py:880–887`), a rewind tworzy dodatkowe kopie celów (`live_scene.py:332`). CE dodatkowo kopiuje cel wewnątrz `Transform.begin()` (`animation/transform.py:205`). Mikrobenchmark mierzy wyłącznie render i jedną kopię pikseli (`experiments/f7a_cairo/measure.py:100–109`).
+
+   **Konsekwencja:** budżet 0,6 s animacji nie obejmuje przygotowania snapshotów, wyrównania geometrii ani pamięci. Wyniku „0,2 ms + 1–2 ms” z D10 GL nie można użyć dla CE.
+
+   **Poprawka planu:** zmierzyć osobno snapshot, przygotowanie Transform, przywrócenie i pamięć po wielu cue; uwzględnić grupę o zmienionej liczbie dzieci. Gwarancję czasu rewind liczyć od komendy do odebranej klatki końcowej, z osobnym raportem pracy przygotowawczej.
+
+8. **[WAŻNE] Bootstrap i sprzątanie po błędzie pozostają opisem intencji.**
+
+   **Dowód:** `PLAN.md:838–839` wymaga respektowania lifecycle. CE manager uruchamia setup przed blokiem `try`; przy wyjątku z construct abortuje encode jobs i ponownie rzuca wyjątek, bez dojścia do tear_down (`manager.py:153–175`). Obecny worker sprząta zasoby specyficzne dla GL: `scene.file_writer`, `scene.camera.ctx.release()` (`live_worker.py:56–60`).
+
+   **Konsekwencja:** proste podmienienie `run()` na `render()` nie daje obiecanego sprzątania przy błędzie build/cue. Bez określenia roli `construct()` autor może też przypadkowo ominąć pętlę live własnym nadpisaniem.
+
+   **Poprawka planu:** określić własność lifecycle i backendowego finalizera, dokładnie jeden cleanup oraz zachowanie oryginalnego wyjątku. Ustalić, że bazowe `construct()` prowadzi build i pętlę cue, a jego nadpisanie jest poza kontraktem lub walidowane. Shutdown podczas animacji ma przerywać pętlę bez wykonywania reszty callable; shutdown podczas blokującego import/build wymaga nadzorcy i kill.
+
+9. **[WAŻNE] Izolacja silników jest właściwym kierunkiem, lecz konfiguracja CE wymaga dłuższego zakresu ochrony.**
+
+   **Dowód:** worker importuje obecnie GL przed plikiem autora (`live_worker.py:15–25`). CE `tempconfig` mutuje globalny singleton i przy wyjściu go przywraca (`_config/__init__.py:75–88`); renderer nadal czyta globalny config podczas kolejnych play (`cairo_renderer.py:88`, `:274`). Plan mówi o konfiguracji przed konstrukcją, lecz nie określa jej ponownego narzucenia po imporcie autora ani utrzymania przez całą sesję (`PLAN.md:866`, `:927–928`).
+
+   **Konsekwencja:** moduł autora ustawiający `config.renderer`/cache/wyjście może unieważnić konfigurację workera. Krótki `tempconfig` tylko wokół konstruktora również nie wystarczy.
+
+   **Poprawka planu:** import autora, następnie narzucenie obowiązkowych ustawień live i utrzymanie ich przez cały lifecycle. Dodać równoległy test dwóch procesów CE z różnymi wymiarami/fps/kryciem oraz GL obok. Procesy spawn izolują singletony; sam wspólny import `manim` i `manimlib` nie jest dowodem konfliktu. Gwarancję „bez GL” ograniczyć do importów infrastruktury — plik autora może sam importować oba silniki. Migracja v2/v3→GL i jawny v4 są sensowne.
+
+10. **[WAŻNE] Mikrobenchmark jest poprawnie opisany, ale nie uzasadnia proponowanych progów.**
+
+    **Dowód:** 30 klatek rozgrzewki i 240 próbek są rzeczywiście odrzucane/zapisywane, a mediana i p95 liczone poprawnie (`measure.py:63–64`, `:99–119`). Cały przebieg trwał jednak tylko 8,21 s (`results.json:16838`), z ustaloną kolejnością rozmiarów i przypadków (`measure.py:79`, `:86`). Aktualizacja geometrii jest poza stoperem; kopia dotyczy obszaru treści, nie całego payloadu panelu (`:100–104`). Rzeczywisty transport kopiuje pełny bufor, a odbiornik dodatkowo go odwraca (`frame_buffer.py:55–56`, `:103–108`).
+
+    **Konsekwencja:** tabela jest wiarygodnym wynikiem krótkiego mikrobenchmarku, nie pomiarem stabilności 60 fps, kosztu SHM ani wielu warstw. Dużo wolniejszy render treści 538×303 niż 960×540 pozostaje niewyjaśniony. Teza raportu, że zapas „uzasadnia” 60 fps (`REPORT.md:46`), jest mocniejsza niż dane.
+
+    **Poprawka planu:** pozostawić 60 fps jako cel produktowy do sprawdzenia. Powtórzyć pomiar w kilku niezależnych przebiegach ze zmienioną kolejnością, mierzyć pełny payload i cały tor Qt. Raportować rozrzut między przebiegami oraz maksimum/opóźnione klatki. Nie sumować osobnych p95 — obecny skrypt słusznie liczy p95 sum sparowanych próbek.
+
+11. **[WAŻNE] Kryteria offscreen nie mają jeszcze wystarczająco precyzyjnych wyroczni.**
+
+    **Dowód:** `PLAN.md:975–996` wymaga „dokładnej maski”, „różnych klatek”, pierwszej klatki i zgodności alfy. `Wait` z warunkiem może nie zmieniać obrazu; rotacja może okresowo powtarzać obraz. Panel 538×648 ma treść 538×303, czyli 345 wierszy pasów (`PLAN.md:894`), a więc asymetryczny podział pasów.
+
+    **Konsekwencja:** licznik frame_id może zaliczyć duplikaty; hash całego obrazu nie opisuje regularności ruchu. „Dokładna maska” nie określa tolerancji antyaliasingu. Symetryczna scena nie wykryje odwrócenia ani przesunięcia pasa o piksel.
+
+    **Poprawka planu:** ustalić sposób liczenia zmian pikseli, obszar pomiarowy, ciągły ruch przez całe 30 s i tolerancję rasteryzacji. Dodać asymetryczne narożniki i jawne współrzędne treści dla nieparzystych pasów. Dla alfy sprawdzać rzeczywiste złożenie Qt nad znaną bazą, również miniaturę i klatkę zachowaną D33. Wymiar bufora ma wynikać z rozdzielczości decku i rect, zgodnie z `LiveLayer.size()`, nie z aktualnego rozmiaru okna.
+
+12. **[WAŻNE] Część wskazanych przypadków już istnieje; brakuje ich istotnych kombinacji.**
+
+    **Dowód:** błąd build, nieznana komenda, shutdown i D33 są już wymienione (`PLAN.md:976`, `:982–990`). Rozdział nie żąda jednak wprost: nieznanego `enter_cue`, zamknięcia playera podczas aktywnego play, błędu ciepłej sesji podczas przejęcia, dwóch jednocześnie animujących warstw CE ani zmiany krycia na granicy dwóch generacji.
+
+    **Konsekwencja:** można zaliczyć wszystkie pojedyncze kryteria i nadal uzyskać zawieszony start grupy, odziedziczony błędny proces lub nieaktualny obraz po zmianie slajdu.
+
+    **Poprawka planu:** dopisać te kombinacje z oczekiwanym wynikiem: nieznane cue nie abortuje bieżącego, zamknięcie odbiera wszystkie procesy/SHM, ERROR/stopping nie podlega przejęciu, przerwa pozwala zmienić krycie, sąsiedni ciąg tego zabrania. Zachować rozróżnienie: offscreen sprawdza routing zdarzeń, próba człowieka — rzeczywisty fokus i projektor.
+
+13. **[WAŻNE] Budżet 12 h nie ma podstaw dla zadeklarowanego zakresu.**
+
+    **Dowód:** `PLAN.md:1004–1006` przydziela snapshotowi zachowującemu graf 2 h, a całemu korpusowi, pomiarom i regresjom 3 h. Jednocześnie zakres obejmuje nowy backend, zegar, wszystkie odmiany wait, rewind, kamerę, normalizację alfy, migrację formatu, miniatury i D33.
+
+    **Konsekwencja:** największe niewiadome mają sztywne małe estymaty, zanim wykonano dowód wykonalności. Limit 24 h może zostać osiągnięty przy częściowo zintegrowanym adapterze.
+
+    **Poprawka planu:** podzielić na bramki z osobnymi estymatami po wyniku: lifecycle/zegar/alfa → panel i transport → integracja D33 → rozszerzenia. Dla celu fazy 8 można odroczyć pan/zoom/reset, obsługę animowanej kamery i snapshot dowolnego grafu, ograniczając gwarancję do jawnego korpusu panelu seminarium. Zachować D10, podstawowe cofanie potrzebnych cue, miniaturę, błędy i D33. To wymaga jawnego zawężenia deklaracji zachowania D1–D35.
+
+14. **[DROBNE] Część odsyłaczy CE nie odpowiada obecnemu plikowi.**
+
+    **Dowód:** plan wskazuje `update_frame:159`, `render:194`, `add_frame:217` (`PLAN.md:846–848`); obecne `update_frame` zaczyna się w `cairo_renderer.py:139`, a `render` wywołuje `get_frame()` w `:184`; kopia jest wewnątrz `get_frame:195`.
+
+    **Konsekwencja:** dowód wygląda na dokładniejszy, niż jest, i utrudnia późniejszą implementację.
+
+    **Poprawka planu:** odświeżyć odsyłacze oraz zapisać identyfikator/hash zainstalowanego źródła CE obok wersji 0.22.0.
+
+**Werdykt:** nie zatwierdzać kontraktu w obecnej postaci. Adapter Cairo bez patchowania Manima jest wykonalny; blokują go przede wszystkim sprzeczny mechanizm tempa, nieustalona semantyka historii/back oraz zbyt szeroka gwarancja snapshotu. Pomiar nie jest fałszywy, ale potwierdza wyłącznie szybkie rysowanie prostych scen. Przegląd był read-only; nie uruchamiałem benchmarku ani nie zmieniałem plików.

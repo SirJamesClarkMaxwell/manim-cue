@@ -48,7 +48,7 @@ class FrameBuffer:
         if shm.size < buffer_size(width, height):
             raise ValueError("Niepoprawny rozmiar pamięci")
 
-    def publish(self, pixels: bytes, frame_id: int, boundary: bool = False) -> None:
+    def publish(self, pixels: bytes | memoryview, frame_id: int, boundary: bool = False) -> None:
         size = self.width * self.height * 4
         if len(pixels) != size or frame_id <= 0:
             raise ValueError("Niepoprawna klatka")
@@ -105,5 +105,6 @@ class FrameBuffer:
             self.lock.release()
         self.last_id = fid
         # Odwrócenie poza blokadą: API odbiornika używa lewego górnego rogu.
-        pixels = b"".join(pixels[y * stride : (y + 1) * stride] for y in range(height - 1, -1, -1))
+        view = memoryview(pixels)
+        pixels = b"".join(view[y * stride : (y + 1) * stride] for y in range(height - 1, -1, -1))
         return OwnedFrame(fid, width, height, stamp, bool(flag), pixels)

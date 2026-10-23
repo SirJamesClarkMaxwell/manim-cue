@@ -720,11 +720,15 @@ class BaseSlide:
         width, height = layer.size(self._resolution)
         scene_file = Path(layer.scene_file).resolve()
         key = hashlib.sha256(scene_file.read_bytes())
-        key.update(f"{scene_file}|{layer.scene_name}|{width}x{height}|{layer.background_opacity}|straight-rgba-v2".encode())
+        key.update(
+            f"{scene_file}|{layer.scene_name}|{width}x{height}|{layer.background_opacity}|"
+            f"{layer.engine}|{layer.fps}|ce-0.22-live-v1|straight-rgba-v2".encode()
+        )
         path = folder / f"live_{key.hexdigest()[:16]}.png"
         if not use_cache or not path.exists():
             frame = capture_first_frame(
-                LiveSpec(str(scene_file), layer.scene_name, width, height, layer.fps, layer.background_opacity)
+                LiveSpec(str(scene_file), layer.scene_name, width, height, layer.fps,
+                         layer.background_opacity, layer.engine)
             )
             Image.frombytes("RGBA", (width, height), frame.pixels).save(path)
         return path

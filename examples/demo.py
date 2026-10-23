@@ -184,3 +184,33 @@ class Demo(Slide):
             ],
         )
         self.play(marker.animate.move_to((3, 2.5, 0)), run_time=3, rate_func=linear)
+
+        for number in (10, 11):
+            self.next_slide(
+                notes=f"**{number}** — dwa panele live CE Cairo obok klipu Orbit; "
+                "kolejny slajd przejmuje te same procesy. Klik daje strzałki panelowi, "
+                "Esc oddaje slajdom. CE 2D nie obsługuje nawigacji kamerą.",
+                layers=[
+                    LiveLayer(
+                        scene_file=Path(__file__).with_name("live_panel_ce.py"),
+                        scene_name="Panel",
+                        engine="ce-cairo",
+                        session_id="ce-panel",
+                        enter_cue="rotate",
+                        rect=(0.02, 0.1, 0.45, 0.6),
+                        background_opacity=0,
+                    ),
+                    LiveLayer(
+                        scene_file=Path(__file__).with_name("live_three_ce.py"),
+                        scene_name="ThreePanel",
+                        engine="ce-cairo",
+                        session_id="ce-three",
+                        enter_cue="flip",
+                        rect=(0.5, 0.1, 0.28, 0.6),
+                    ),
+                    ClipLayer(
+                        file=slide_file(orbit_json, 0), rect=(0.8, 0.1, 0.18, 0.6), loop=True
+                    ),
+                ],
+            )
+            self.play(Rotate(marker, PI / 2), run_time=2)

@@ -67,9 +67,10 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("scene_file")
     parser.add_argument("scene_name")
+    parser.add_argument("--engine", choices=("manimgl", "ce-cairo"), default="manimgl")
     args = parser.parse_args()
     app = QApplication(sys.argv[:1])
-    receiver = Receiver(LiveSpec(str(Path(args.scene_file).resolve()), args.scene_name))
+    receiver = Receiver(LiveSpec(str(Path(args.scene_file).resolve()), args.scene_name, engine=args.engine))
     receiver.show()
     return app.exec()
 

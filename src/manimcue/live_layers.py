@@ -106,6 +106,7 @@ class LiveLayerController(QObject):
                 width,
                 height,
                 layer.background_opacity,
+                layer.engine,
             )
             reused = next(
                 (
@@ -132,6 +133,7 @@ class LiveLayerController(QObject):
                         height,
                         layer.fps,
                         layer.background_opacity,
+                        layer.engine,
                     )
                 )
                 self.started[index] = time.monotonic()

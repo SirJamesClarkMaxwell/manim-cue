@@ -36,9 +36,13 @@ def slides_file(data_folder: Path) -> Iterator[Path]:
 
 
 @pytest.fixture(scope="session")
-def manimgl_config(data_folder: Path) -> Iterator[Path]:
-    # Fork: w upstreamie plik leży w korzeniu repo, tutaj w danych testowych.
-    yield (data_folder / "custom_config.yml").resolve(strict=True)
+def manimgl_config(tmp_path_factory) -> Iterator[Path]:
+    # Izolowany katalog CliRunner nie dziedziczy custom_config.yml z korzenia.
+    path = tmp_path_factory.mktemp("manimgl-config") / "custom_config.yml"
+    cache = (Path(__file__).resolve().parents[2] / ".cache" / "manimgl").as_posix()
+    path.write_text(f"camera:\n  background_color: '#000000'\ndirectories:\n  cache: {cache}\n",
+                    encoding="utf-8")
+    yield path
 
 
 @pytest.fixture(scope="session")

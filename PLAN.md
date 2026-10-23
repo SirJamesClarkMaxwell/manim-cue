@@ -1,8 +1,8 @@
 # manim-cue — plan rozwoju
 
-Stan (2026-10-22): **fazy 0-3 i 7.0 (CE 0.22) zamknięte; 4, 5, 6a po pierwszej próbie
-prelegenta (uwagi niżej), 6b czeka na decyzję o `greenlet`. Aktywna: 5c (druga próba), potem
-5d-5f.** Kierunek zmieniony 2026-10-21 decyzjami D13-D19 w `SPEC.md`: projekt staje się forkiem
+Stan (2026-10-23): **fazy 0–3 i 7.0 zamknięte; F5d-f oraz F7a mają wdrożenie
+i zaliczone kryteria automatyczne. F4–F6a oraz F5d-f/F7a czekają na próbę człowieka,
+6b na decyzję o `greenlet`; faza 8 dopiero po próbie w oknie na komputerze prelegenta.** Kierunek zmieniony 2026-10-21 decyzjami D13-D19 w `SPEC.md`: projekt staje się forkiem
 manim-slides 5.7.0, rozszerzonym o warstwy i wstrzykiwany live.
 Rundy 6-7 recenzji (codex) przebudowały fazy 2-9; decyzje D20-D22.
 
@@ -825,11 +825,226 @@ animacji — mapowanie indeksów się nie zmienia.
   Wykonawca: codex (`workspace-write`, osobny worktree), ~18 min; przegląd diffu — Claude.
 - Odstępstwo fazy 1 dotyczące pinu `<0.22` zamknięte. Nie rozszerzono zakresu fazy.
 
-### 7a — adapter live Cairo (zarys; kontrakt po 7.0)
+### 7a — adapter live Cairo (kontrakt)
 
-Zegar, publikacja klatek w trakcie `play()` do strumienia F2, przerwanie (D10), `wait()`,
-wyłączony cache, brak plików filmu, korpus scen D22. Ryzyko: progi F2 (960×540 ≥ 60 fps)
-liczone pod GPU; Cairo rysuje na CPU — najpierw pomiar, potem osobne progi do decyzji.
+**Cel:** autorska scena CE 0.22 Cairo 2D pracuje bez okna w istniejącej warstwie live,
+obok GL i klipów; zachowuje D1–D3, D9–D10, D17, D20–D35 w opisanym niżej zakresie.
+Kontrakt domknięty rundą 19; poniższy projekt uwzględnia ograniczenia D36–D38.
+
+**Ustalenia z kodu zainstalowanego CE 0.22.0** (ścieżki względem
+`.venv/Lib/site-packages/manim/`; punkty zaczepienia przez podklasy, bez zmian upstreamu):
+- `scene/scene.py:1188` przekazuje `play()` do managera; `manager.py:234` →
+  `renderer.play(scene, ...)` (`:260`). `Scene.render()` (`scene/scene.py:304`) też idzie
+  przez managera, a nie starą samodzielną pętlę `construct`. Bootstrap musi respektować
+  setup/construct/tear_down i sprzątanie na wyjątku, nie zakładać API sprzed 0.22.
+- `renderer/cairo_renderer.py:77` kompiluje animacje, wywołuje begin, przygotowuje
+  obraz statyczny i woła `scene.play_internal()`. `scene/scene.py:1384` iteruje po czasie
+  offline i wykonuje finish/cleanup; `:1714` (`update_to_time`) liczy dt z `last_t`,
+  aktualizuje animacje, mobjecty i updatery sceny. Adapter zastępuje tę pętlę zegarem
+  monotonicznym: t od początku play, dt od ostatniej aktualizacji, t ograniczone do duration;
+  spóźnione terminy pomija zamiast wydłużać cue. Między cue nie aktualizuje updaterów.
+- `renderer/cairo_renderer.py:139` (`update_frame`) rysuje do kamery, `:183` (`render`)
+  robi dodatkowo `get_frame().copy()` i `add_frame`; `:197` (`add_frame`) zwiększa czas
+  o liczbę klatek/fps i woła writer. Projekt: własna podklasa renderera dla live używa
+  `update_frame` i publikuje `camera.pixel_array`, bez ścieżki add_frame. `renderer.time`
+  (odczytywane przez `Scene.time`, `scene/scene.py:286`) dostaje aktywny czas sceny z zegara,
+  także przed updaterami; nie może naliczać drugi raz czasu publikacją klatki.
+- D10: po przerwaniu pętli trzeba wykonać `animation.finish()` i
+  `clean_up_from_scene` jak `scene/scene.py:1409`, wyzerować static_image i opublikować
+  stan **po cleanup całego cue**. Flaga abort zostaje do końca callable: dalsze play
+  przechodzą begin/finish/cleanup bez czekania, dalsze wait nie czekają. Nie rzucać wyjątku
+  przerywającego callable przed kolejnymi play. Dowolny blokujący kod Pythona autora
+  nie jest kooperacyjnie przerywalny. D9 ma pierwszeństwo dla LOOPS: zwykła komenda
+  kończy bieżące powtórzenie; shutdown działa od razu. Nieznana komenda/view/frame_seen
+  nie ustawia abort. Czas logiczny domkniętego play dochodzi do jego końca, czas ścienny
+  po D10 nie musi; następne play ma nowy punkt odniesienia zegara.
+- `wait()` (`scene/scene.py:1242`) buduje Wait; `:1312` rozpoznaje statyczne czekanie,
+  renderer (`cairo_renderer.py:147`, `:239`) wtedy omija play_internal i powiela klatkę.
+  W live potrzebna osobna kooperacyjna obsługa obu ścieżek: statyczne wait czeka i czyta
+  komendy bez renderowania wnętrza, dynamiczne aktualizuje updatery i publikuje klatki;
+  stop_condition jest dynamiczne według CE i sprawdzane co tick; frozen_frame zachowane,
+  ale jego połączenie ze stop_condition odrzuca CE.
+- Konfiguracja **przed** konstrukcją: renderer=cairo, format=none, disable_caching=True,
+  preview/live_preview/enable_gui=False, bez zakresu `-n` i skip_animations. Samo wyłączenie
+  cache nie wyłącza filmu. `_config/render_session.py:64` rozwiązuje format,
+  `_config/output_plan.py:266` daje dla NONE brak artefaktu i segment_cache_dir;
+  `scene/scene.py:229` utrwala plan/ustawienia writera. `scene_file_writer.py:469`, `:504`
+  chronią zapis warunkiem is_video; `cairo_renderer.py:97` omija hashowanie przy
+  disable_caching. `write_to_movie` nie jest już opcją CE. Brak filmu/segmentów/PNG
+  końcowego sprawdzamy po procesie; cache zasobów TeX/tekstu nie jest cache filmu.
+- `camera/camera.py:91` ustala wymiary, kanały RGBA uint8 i krycie; `:250` dopasowuje
+  frame_shape do pikseli. Renderujemy izotropowy kadr 16:9 dopasowany do panelu D34
+  (zaokrąglenie do pikseli), nie rozciągnięty do pionowego bufora. `:275` inicjalizuje
+  tło z koloru i background_opacity; `:591` daje macierz y w dół, `:769` odwraca RGB
+  na wejściu Cairo — nie zamieniać ponownie kanałów gotowego pixel_array.
+  D35: puste tło i pasy mają kolor kamery i alfę z LiveLayer; transport straight RGBA.
+  Cairo ARGB32 używa premultiplikacji, lecz inicjalizacja tła CE zapisuje RGBA wprost:
+  nie zakładać jednolitej reprezentacji wszystkich pikseli przy częściowej alfie.
+  **Pierwsza bramka implementacji:** tło/pasy 0/0.5/1 nad znaną bazą ±2/255, także
+  kolorowe; jeżeli wymagają normalizacji, robi ją adapter poza Manimem i mierzy jej koszt.
+  Nie rozszerza to D35 na dowolną półprzezroczystą treść/krawędzie; nie łatać kamery CE.
+- `interactive_embed` (`scene/scene.py:1419`, `:1439`) wymaga OpenGLRenderer i okna,
+  `interact` (`:1523`) obsługuje interaktywny shell/wątek. Nie stanowi pętli Cairo live
+  i nie wchodzi do adaptera. Jeden wątek aplikacji na proces; animacje używają terminów
+  monotonicznych, `sleep` i `live_poll(0)`, a `select` z timeoutem tylko idle i bariery.
+
+Źródło CE 0.22.0: SHA256 `renderer/cairo_renderer.py` = `040a1dbbbff6fc02cf1ffe65d6ab5ea7b37948b3eb01f127f4101f4bfd70663b`.
+
+**Pomiar przed kontraktem (2026-10-23, Windows, CE 0.22.0):**
+`experiments/f7a_cairo/measure.py`, metodologia w README, surowe próbki i środowisko
+w `results.json`. 30 klatek rozgrzewki + 240 próbek/przypadek, pełne przerysowanie
+bez static_image, osobno kopia RGBA z odwróceniem wierszy do bufora D21.
+Panel demo: round(0.28×1920) × round(0.6×1080) = **538×648**, treść **538×303** + pasy.
+Poniżej rotate Panel 2D; pozostałe geometrie D22 i pulse/sweep są w JSON.
+
+| bufor | render mediana/p95 [ms] | kopia mediana/p95 [ms] | p95 razem [ms] | przepustowość razem [kl./s] |
+|---|---|---|---|---|
+| 960×540 | 0,407 / 0,486 | 0,095 / 0,109 | 0,589 | 1875,5 |
+| 480×270 | 0,225 / 0,255 | 0,013 / 0,015 | 0,269 | 4117,3 |
+| 538×648 | 2,257 / 3,478 | 0,144 / 0,261 | 3,801 | 452,2 |
+
+To przepustowość render+copy bez limitu zegara, **nie odebrane różne klatki F2**.
+Brak kosztów aktualizacji geometrii, TCP, blokady, publikacji SHM, odbioru i Qt; znaczna
+zmienność CPU w małym/pionowym panelu, bez ekstrapolacji na złożone sceny/1080p.
+TeX pominięty jawnie: MiKTeX wymaga konfiguracji. SlowBuild/wyjątki/idle mają reprezentanta
+geometrii, nie mierzą semantyki; 3D wyłączone. Pomiar nie zalicza żadnego testu adaptera.
+
+**Projekt:**
+- API autora: `from manimcue.live_scene_ce import LiveSceneCE`; podklasa sceny CE 2D,
+  `build_objects()`, `PRESETS: dict[str, callable(self)]`, `SEQUENCE`, `LOOPS`, zwykłe
+  `self.play`/`self.wait` z CE. Bez automatycznego tłumaczenia mobjectów manimgl.
+  `→`/next przesuwa kursor, nazwa presetu z TCP nie przesuwa (D2); koniec sekwencji
+  SEQUENCE_END, `←`/back na początku bez zmiany. Osobny moduł nie importuje GL.
+- D3 wymaga własnego snapshotu CE, nie `Scene.save_state` z manimgl: przed cue z next zachować
+  tożsamości i kopie rodzin mobjectów oraz listy sceny/foreground.
+  back interpoluje każdy zgodny węzeł dokładnie raz przez własną Animation przez 0,6 s,
+  następnie dokładnie przywraca listy (w tym dodane/usunięte obiekty) i relacje grup. Referencje
+  autora do oryginalnych obiektów pozostają ważne. Nie serializujemy socketów/rendererów,
+  plików ani dowolnych pól użytkownika. Wymagane przypadki: grupy, współdzielony członek,
+  add/remove i ponowne next; back dotyczy sekwencji, nie nazwanych enter_cue (D33).
+- `LiveLayer.engine: Literal["manimgl", "ce-cairo"] = "manimgl"` i analogiczne pole
+  **na końcu** LiveSpec (zachowanie istniejących argumentów pozycyjnych). Brak pola
+  w decku v2/v3 oznacza GL. Nowy zapis z wyborem silnika: format v4, migracja v2/v3
+  do GL; starszy player odrzuca v4 zamiast uruchomić scenę CE jako GL. kind="live"
+  pozostaje bez zmian. Nie wybierać silnika przez import i zgadywanie klasy.
+- Worker wybiera backend przed pierwszym importem Manima i pliku autora, czyści argv,
+  waliduje klasę odpowiedniej bazy, uruchamia spawn bez Qt. Engine trafia do obu
+  tożsamości D33 (`config.py:546`, `live_layers.py:101`), LiveSpec i klucza miniatury.
+  Nie zmieniać silnika istniejącego procesu. Nadal wymagane: ścieżka, klasa, fps,
+  rozmiar i krycie; pozycja/style/miniatura nie restartują sesji.
+- Wspólny protokół bez zmian: lokalny TCP, bajty do pełnej linii UTF-8, next/back,
+  nazwy cue, shutdown, frame_seen, view; statusy READY/CUE_START/CUE_DONE/SEQUENCE_END/ERROR.
+  SharedMemory v1 + przekazany Lock D21, RGBA8 **bottom-up** (Cairo jest top-down,
+  więc adapter odwraca wiersze); OwnedFrame zostaje top-down. Render poza blokadą,
+  kopiowanie payloadu i nagłówka pod tą samą blokadą, odczyt GUI acquire(False).
+  READY dopiero po build i pierwszej publikacji boundary. Bariera frame_seen na starcie,
+  końcu/przerwaniu i back, timeout 2 s; zwykłe klatki view bez bariery. Nieznana komenda
+  nie przerywa, klient EOF nie zabija sceny; zachować kolejność klient-przed-listenerem.
+  Shutdown kooperacyjnie do 2 s, potem kill; restart ma świeże IPC; ERROR z klasą i cue.
+- D33/enter_cue, D31 i D17 bez zmian: ciąg sąsiednich slajdów przejmuje żywy proces
+  i ostatni obraz, przerwa tworzy nową generację; bez ID działa D27. Cue wejścia tylko
+  przy zatwierdzonym wejściu do przodu, po READY przy wspólnym starcie, bez fokusu;
+  brak READY przez 5 s usuwa live z bariery. Ciepła sesja nie blokuje startu; pauza
+  bazy/klipów nie pauzuje live. Brak zegara głównego/seek/frame-lock.
+- Klawiatura/fokus D20 zostają w playerze: przygotowanie na wejściu, aktywacja kliknięciem,
+  strzałki do aktywnej gotowej warstwy, Esc/klik poza/zmiana slajdu/dezaktywacja aplikacji
+  zwalnia; autorepeat odrzucony, przed READY klawisze nie są kolejkowane. Info i główne
+  okno to jeden obszar aktywności, podgląd następnego slajdu używa miniatury.
+- D28 w CE odroczone: view jest jawnym no-op, nie przerywa cue ani bariery; pan/zoom/reset,
+  animowana kamera oraz CE 3D nie należą do panelu 2D fazy 8.
+- Miniatura: istniejący `capture_first_frame` przez ten sam worker i engine
+  (`slides/slide/base.py:710`), pierwsza klatka po READY, PNG straight RGBA z alfą/pasami
+  identycznymi jak live. Klucz: dotychczasowe dane + engine, fps, CE 0.22 i wersja
+  generatora/interpretacji alfy; zmiana importowanej zależności nadal wymaga flush.
+
+**Progi CE — cele akceptacyjne do sprawdzenia pełnym pomiarem:**
+pomiar nie uzasadnia obniżenia do 30 fps w prostych scenach. Osobne minimum
+CE: 60 różnych odebranych kl./s przy 960×540, 480×270 i 538×648 dla ciągłego ruchu D22
+oraz Panel 2D; okno 30 s po rozgrzewce, liczba ≥ 60·T − 2 według D26. Statycznego wait
+i idle nie obejmuje licznik różnych klatek. CPU idle < 5% jednego rdzenia,
+p95 komenda → odebrana zmieniona klatka < 100 ms w ciepłej sesji, zimny start osobno.
+To cele sprawdzane pełnym pomiarem po implementacji, nie wnioski z samego renderu.
+Osobno raportować update/render/kopię/normalizację alfy/publish/odbiór, liczniki surowe
+zamrożone na końcu okna. **Progi manimgl F2 zostają:** 960×540 60, 1920×1080 30,
+CPU i latencja bez zmian; CE 1080p bez deklarowanego progu w 7a.
+
+**Kryteria akceptacji (offscreen, po implementacji):**
+1. Round-trip v4 CE/GL i migracja v2/v3 do GL, błędny engine/klasa → diagnoza; oba silniki
+   w jednym decku bez importu Manima/Qt przez moduły transportu na poziomie modułu.
+2. Porty 2D korpusu D22: first frame, narożniki, ruch 5 s w 4,9–5,2 s z klatkami pośrednimi;
+   dwa play przerwane w połowie → CUE_DONE < 1 s i końcowy x=4; nieznana komenda nie przerywa;
+   LOOPS kończy powtórzenie na granicy. D1–D3: kursor, nazwane cue, animowany back 0,6 s
+   (tolerancja 0,1 s) z klatką pośrednią i dokładną maską końcową, add/remove/grupy/referencje.
+3. Wait 1,5 s w 1,4–1,7 s bez klatek wnętrza; updater wait 2 s → przesunięcie 2 ±0,1 jednostki;
+   idle 2 s bez ruchu/publikacji. Stop_condition bez ruchu i z updaterem, frozen_frame,
+   przerwanie wait i kolejne play/wait w cue; sztuczny zegar ze spóźnieniem bez dryfu dt.
+   Zmiana obrazu przed frozen wait jest publikowana na początku, identyczna klatka nie jest powielana.
+4. TCP split/multi/UTF-8/reconnect, READY po SlowBuild ≥3 s; ERROR w build bez READY
+   i w cue z treścią. Granice nie nadpisane przed frame_seen, timeout 2 s, shutdown podczas
+   wait/pętli/build/importu, restart ze świeżym IPC i brak procesu/SHM po 20 cyklach.
+   Metody GUI poll/try_read_frame <50 ms także podczas build.
+5. Engine w obu tożsamościach sesji i cache miniatur; mieszany deck CE+GL z klipami:
+   przejęcie PID/obrazu na sąsiednim slajdzie, rozłączenie ciągu, błąd niespójności,
+   enter_cue raz tylko do przodu, pauza w przygotowaniu/timeout 5 s, routing fokusu D20.
+6. 16:9 i okrąg bez deformacji w trzech rozmiarach; jawny no-op view,
+   view podczas cue i po SEQUENCE_END bez zerwania bariery. Tło/pasy 0/0.5/1, kolorowe
+   tło, miniatura i ostatnia klatka nad nową bazą ±2/255. Bramka alfy przed dalszą integracją.
+7. Zero artefaktów filmu/segmentów po wielu play i shutdown (przy podłożonej pułapce
+   na otwarcie encodera), disable_caching nie wywołuje hash/cache lookup; także drugi start.
+   TeX: kompilacja CE lub jawny skip środowiskowy, żadnego cichego zaliczenia.
+8. Pełny zestaw F0–F5d-f/7.0/upstream zielony oraz 30 s odbiornika Qt offscreen z przyjętymi
+   osobno progami CE. Panel 2D rotate/pulse/sweep i ThreePanel mają porty CE w demo testowym.
+   Offscreen nie zalicza projektora, dwóch monitorów ani odczucia fokusu — osobna próba
+   prelegenta po implementacji; nie jest warunkiem wdrożenia adaptera.
+
+**Poza zakresem:** OpenGL CE = 7b (osobny adapter/kontrakt), CE 3D, cofanie cue wejścia
+przy nawigacji slajdów/replay (checkpointy D33), serializacja dowolnego stanu Pythona,
+fork/patch Manima, zegar główny i seek, dowolna przezroczysta treść poza D35.
+
+**Domknięcie rundy 19 (D36–D38, wiążące):**
+- Renderer kontroluje cały play: compile/begin, frozen wait, finish/cleanup; nie uruchamia
+  encodera ani hashowania; next_section(skip_animations=True) jest błędem.
+- D10 kończy animacje i czas logiczny, nie symuluje brakującego dt updaterów; zwykły
+  wait bez ruchu nie publikuje wnętrza, warunek zawsze jest dynamiczny, frozen+warunek
+  odrzuca CE; wcześniejszy warunek kończy czas w chwili spełnienia.
+- Snapshot obejmuje standardowe Mobject/VMobject paneli 2D: geometrię, style, updatery
+  (referencje callable), listy scene/foreground i krawędzie submobjects; wspólne memo
+  zachowuje tożsamości, nie kopiuje stanu zamknięć ani dowolnych zasobów Pythona.
+  Przy back interpolujemy każdy zgodny węzeł raz bez podwójnej transformacji dziecka,
+  potem odtwarzamy dokładny graf; zmiana liczby dzieci jest w korpusie.
+- Oba silniki zapisują historię tylko przed next, powiązaną z kursorem, 50 pozycji
+  bez deduplikacji; back po next → nazwane cue wraca przed next (D33).
+- Worker narzuca config po imporcie autora na cały lifecycle; setup/build/cue/tear_down
+  mają jeden finalizer, pierwotny wyjątek ma pierwszeństwo; construct nie wolno nadpisywać.
+  Shutdown podczas play przerywa callable, blokujący import/build kończy nadzorca po 2 s.
+- Testy integracyjne obejmują nieznany enter_cue bez abort, zamknięcie podczas play,
+  ERROR/stopping bez przejęcia, dwie animujące CE i GL obok, krycie między generacjami.
+- Piksele liczymy przez porównanie kolejnych obrazów treści, nie frame_id; 30 s ciągłego
+  nieokresowego ruchu, trzy przebiegi ze zmienną kolejnością wymiarów, rozrzut/max/opóźnienia.
+  Maski: tolerancja krawędzi 2 px, wnętrze ±2/255; asymetryczne narożniki.
+  Dla 538×648 treść 538×303 zaczyna się w (0,172), dolny pas ma 173 wiersze.
+  Bufor wynika z rect i rozdzielczości decku, nie rozmiaru okna; alfa sprawdzana w Qt.
+- Back mierzymy od komendy do odbioru granicy (cel 0,6 ±0,1 s dla panelu), osobno
+  snapshot/przygotowanie/odtworzenie i pamięć po wielu cue; wyniki GL nie zastępują CE.
+
+**Budżet implementacji:** ~16 h, stop i raport przy 32 h; bramki lifecycle/zegar/alfa
+4 h → snapshot i panel/transport 4 h → D33/miniatura/demo 3 h → korpus/pomiary/regresje
+5 h. Po każdej bramce sprawdzenie pozostałego budżetu; brak zwiększania limitu w trakcie.
+Próba człowieka osobno. Odroczone: D28 CE, animowana kamera, dowolne grafy spoza korpusu.
+
+
+**Wynik (2026-10-23, Windows 11, CE 0.22.0):**
+- Kryteria 1–8 w części automatycznej zaliczone; pełny `uv run --frozen pytest -q -p no:cacheprovider`:
+  **506 passed, 3 skipped, 57 warnings in 470.60s (0:07:50)**. Dowody test po teście w `REPORT-7a.md`.
+- 18 okien 30 s (dwie geometrie × trzy rozmiary × trzy przebiegi): 1799–1800 różnych
+  odebranych klatek, 59,967–60 fps. Dodatkowa próba końcowej ścieżki 960×540:
+  1798 klatek, 59,933 fps; wszystkie 19 okien spełniają ≥60T−2. CPU idle ≤0,8% rdzenia,
+  najgorsze p95 komendy 25,64 ms; progi GL F2 bez zmian.
+- `Orbit` (1 slajd) i `Demo` (11 slajdów, dwa panele CE na 10–11) wyrenderowane w CE,
+  oba polecenia z kodem 0. README/API po angielsku; `.venv` bez zmian źródeł.
+- Próba człowieka: **otwarta** (projektor, dwa monitory, fizyczny fokus i płynność);
+  D28 CE, animowana kamera i dowolny graf spoza korpusu odroczone jawnie D38.
+  Czas i odstępstwa w `REPORT-7a.md`; budżet 16 h / stop 32 h nieprzekroczony.
 
 ## Faza 8 — integracja z seminarium
 

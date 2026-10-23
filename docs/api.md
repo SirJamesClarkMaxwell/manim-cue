@@ -59,10 +59,11 @@ time excluding pauses; Info next-slide geometry stays at rect_at(0).
 | Field | Type | Default | Validation / behavior | Example |
 | --- | --- | --- | --- | --- |
 | kind | literal str | "live" | Must be live | `kind="live"` |
-| scene_file | FilePath | required | Existing Python file with LiveScene subclass | `scene_file=Path("examples/live_panel.py")` |
-| scene_name | str | required | Class looked up by worker; must inherit LiveScene | `scene_name="Panel"` |
+| scene_file | FilePath | required | Existing Python file with the selected engine's live subclass | `scene_file=Path("examples/live_panel.py")` |
+| scene_name | str | required | Class must inherit LiveScene (GL) or LiveSceneCE (Cairo) | `scene_name="Panel"` |
 | rect | Rect | (0,0,1,1) | Inside frame; sets worker resolution | `rect=(0.55,0.1,0.4,0.4)` |
 | keyframes | list[Keyframe] | [] | Strictly increasing t; scales rendered panel | `keyframes=[Keyframe(t=0, rect=(0,0,1,1))]` |
+| engine | "manimgl" or "ce-cairo" | "manimgl" | Explicit live backend, independent of deck engine | `engine="ce-cairo"` |
 | fps | positive int | 60 | Greater than zero | `fps=30` |
 | session_id | str or None | None | Unique per slide; compatible adjacent occurrences reuse process | `session_id="panel"` |
 | enter_cue | str or None | None | Nonempty single line; named cue on committed forward entry | `enter_cue="rotate"` |
@@ -72,18 +73,19 @@ time excluding pauses; Info next-slide geometry stays at rect_at(0).
 | thumbnail | FilePath or None | None | Generated first-frame PNG during render | `thumbnail=None` |
 
 Example: `LiveLayer(scene_file=Path("examples/live_panel.py"), scene_name="Panel", background_opacity=0)`.
+For Cairo use `LiveLayer(scene_file=Path("examples/live_panel_ce.py"), scene_name="Panel", engine="ce-cairo")`.
 `size((width,height))` returns pixel dimensions, rounded and clamped to at least one pixel.
-Adjacent occurrences of a session must match resolved file, class, fps, pixel size and
+Adjacent occurrences of a session must match resolved file, class, engine, fps, pixel size and
 background_opacity. Position, entry cue and border styles may differ. A gap starts a new
 generation and allows different settings. Forward next/auto-next/skip-all sends entry cues;
 previous/reverse/replay does not undo or repeat them. The retained frame keeps alpha and
 composites over the new base. The full rectangle captures clicks, including transparent pixels.
-The worker renders the whole default 16:9 GL camera isotropically, with letterbox bars.
+The worker renders the whole default 16:9 camera isotropically, with letterbox bars.
 
 Opacity guarantees apply to empty background and bars. Arbitrary translucent GL shapes,
 strokes and overlaps retain upstream shader blending behavior; no universal straight/premultiplied
 conversion is promised. Transport and thumbnails use straight RGBA. Thumbnail cache keys
-include source bytes, class, size, opacity and pixel interpretation version; changes in imported
+include source bytes, class, engine, fps, size, opacity, CE adapter version and pixel interpretation version; changes in imported
 modules require clearing the deck cache.
 
 ## BorderStyle
@@ -143,6 +145,69 @@ Animate ordinary geometry, e.g. `self.play(view.animate.scale(0.5), run_time=2)`
 (no additional seek validation; use finite nonnegative values). Copies share playback/decoder state. Transform/become
 between distinct sources guarantees geometry and opacity, not source transfer.
 
+## LiveSceneCE (CE 0.22 Cairo)
+
+Import `LiveSceneCE` from `manimcue.live_scene_ce`. Use `engine="ce-cairo"` in the
+LiveLayer pointing to its subclass. CE and manimgl panels may coexist in the same deck.
+The worker imports and configures its own engine in a separate spawned process, with
+no application threads, window, encoder or movie cache. Keep `construct()` inherited;
+override `build_objects()` and optionally CE `setup()` / `tear_down()`.
+
+```python
+from manim import RIGHT, Square
+from manimcue.live_scene_ce import LiveSceneCE
+
+class Panel(LiveSceneCE):
+    def build_objects(self):
+        self.square = Square()
+        self.add(self.square)
+
+    def move(self):
+        self.play(self.square.animate.shift(RIGHT), run_time=1)
+        self.wait(0.5)
+
+    PRESETS = {"move": move}
+    SEQUENCE = ["move"]
+    LOOPS = set()
+```
+
+All three class fields default to empty containers in CE. Cues use ordinary CE
+animations and waits. Static waits publish a changed starting image once, then produce
+no repeated interior frames; updater waits and
+`stop_condition` waits update on the live clock. `frozen_frame=True` suppresses updaters;
+combining it with a stop condition is rejected by CE. A condition that ends early advances
+logical time only by the elapsed duration. Between cues updaters and logical time freeze.
+`next_section(skip_animations=True)` is rejected. Mutating renderer/output configuration
+during build/cues and overriding the renderer or `construct()` are outside the author API.
+
+On interruption, all remaining plays in the callable finish without waiting, and logical
+time reaches their end; skipped updater dt is not simulated. Shutdown instead exits the
+callable immediately. Blocking Python code requires the supervisor's two-second kill fallback.
+Errors include the scene and cue; teardown runs once, preserving the original error.
+
+Back retains original standard Mobject/VMobject identities, shared submobject edges,
+scene/foreground lists, logical scene time, geometry, styles and callable updater references. It interpolates
+each compatible node once for 0.6 s, then restores the exact saved graph, including changed
+child counts and added/removed objects. New or structurally incompatible geometry appears
+at the final boundary. Python attributes outside the mobject graph, closure state and
+external resources are not checkpoints. History stores up to 50 sequence positions;
+named cues add no entries. Back after next → named cue returns before next in both engines.
+Mobject copies and animation targets retain references to the running LiveSceneCE in bound
+updaters; cloning the live scene or its IPC resources is unsupported.
+
+The CE camera is fixed 2D; view commands are ignored. Animated cameras, pan/zoom/reset,
+3D, arbitrary custom object graphs and arbitrary translucent-content correction are deferred.
+The whole camera is letterboxed into `LiveLayer.size(deck_resolution)`, preserving alpha
+of empty background/bars. A 538×648 panel contains 538×303 content at (0,172).
+First-frame thumbnails use the same worker and straight RGBA as live. Source dependencies
+still require a cache flush when changed. JSON v4 records engine; v2/v3 migrate to manimgl.
+
+`LiveSpec(scene_file, scene_name, width=960, height=540, fps=60,
+background_opacity=1.0, engine="manimgl")` keeps existing positional arguments intact.
+Use `LiveSession.start(spec)`, `poll()`, `send(command)`, `try_read_frame()` and
+`request_stop()` from `manimcue.live_session`; GUI calls do not wait for build or rendering.
+`capture_first_frame(spec, timeout=120)` is a blocking utility for offline thumbnail creation.
+
 ## LiveScene and cue protocol
 
 Import `LiveScene` from `manimcue.live_scene` (manimgl only). Do not override construct;
@@ -182,7 +247,7 @@ Client: `uv run python -m manimcue.cue [options] command [command ...]`.
 ## Rendered models and compatibility
 
 `SlideConfig` contains all next_slide fields plus required `file: FilePath` and
-`rev_file: FilePath`. `PresentationConfig` contains `version: int=3` (newer versions rejected),
+`rev_file: FilePath`. `PresentationConfig` contains `version: int=4` (newer versions rejected),
 `slides: list[SlideConfig]` (required, nonempty), `resolution: tuple[positive int,positive int]`
 (default 1920×1080), and `background_color: Color` (black). `from_file(Path)` resolves stored
 paths and validates session runs; `to_file(Path)` serializes the current paths without rebasing. v2 live layers
@@ -190,4 +255,4 @@ without kind remain readable. Exporting layered decks to upstream file converter
 
 `Config.keys` retains the upstream key mapping plus S for presenter state; duplicate effective
 key codes are rejected. `.manim-slides.toml` remains the configuration filename. See README
-for the complete default key table and SPEC.md for D17/D20/D27–D35 contracts.
+for the complete default key table and SPEC.md for D17/D20/D27–D38 contracts.

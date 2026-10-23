@@ -7,6 +7,7 @@ import time
 from dataclasses import dataclass
 from multiprocessing.shared_memory import SharedMemory
 from pathlib import Path
+from typing import Literal
 
 from manimcue.frame_buffer import FrameBuffer, OwnedFrame, buffer_size
 from manimcue.live_worker import run_worker
@@ -22,6 +23,7 @@ class LiveSpec:
     height: int = 540
     fps: int = 60
     background_opacity: float = 1.0
+    engine: Literal["manimgl", "ce-cairo"] = "manimgl"
 
 
 class LiveSession:
@@ -42,12 +44,15 @@ class LiveSession:
         self._stop_at = None
         self._events = []
         self._metrics = {}
+        self._snapshot_metrics = []
 
     def start(self, spec: LiveSpec) -> None:
         if self._process is not None:
             raise RuntimeError("Poprzedni proces nie został odebrany przez poll()")
         if not Path(spec.scene_file).is_absolute() or spec.fps <= 0:
             raise ValueError("Wymagana absolutna ścieżka sceny i dodatni fps")
+        if spec.engine not in ("manimgl", "ce-cairo"):
+            raise ValueError(f"Nieznany silnik live: {spec.engine}")
         size = buffer_size(spec.width, spec.height)
         self.__init__()
         ctx = mp.get_context("spawn")
@@ -84,7 +89,10 @@ class LiveSession:
                 while self._pipe.poll(0):
                     message = self._pipe.recv()
                     if isinstance(message, dict):
-                        self._metrics = message["metrics"]
+                        if "metrics" in message:
+                            self._metrics = message["metrics"]
+                        if "snapshot_metrics" in message:
+                            self._snapshot_metrics = message["snapshot_metrics"]
                     elif isinstance(message, tuple):
                         self._socket = socket.socket()
                         self._socket.setblocking(False)

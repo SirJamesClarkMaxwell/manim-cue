@@ -648,6 +648,34 @@ Domyślne style zachowują żółtą/czerwoną obwódkę 6 px. D17/D20/D27–D34
 
 ---
 
+## Decyzje F7a (2026-10-23, runda 19)
+
+**D36. Live CE Cairo 2D.** Osobny LiveSceneCE, jawny engine manimgl/ce-cairo
+w LiveLayer i na końcu LiveSpec; zapis v4, v2/v3 oznacza GL. Silnik należy do obu
+tożsamości D33 i miniatury. Spawn izoluje config; po imporcie autora worker narzuca
+Cairo/format none/disable_caching na cały lifecycle. Własny renderer kontroluje play,
+bez patchowania Manima, hashowania i encodera. Monotoniczne terminy + sleep + poll(0),
+select tylko idle/bariera. D10 domyka animacje/czas bez pominiętego dt updaterów.
+Warunek wait jest dynamiczny i kończy czas faktyczny, frozen+warunek jest błędem.
+Construct należy do bazy; finalizer raz, pierwotny wyjątek zachowany, shutdown przerywa
+callable, blokujący kod kończy nadzorca. Progi GL F2 pozostają bez zmian.
+
+**D37. Historia sekwencji.** CE i GL zapisują stan tylko przed next, z pozycją kursora,
+do 50 pozycji bez deduplikacji; nazwane cue nie dodaje wpisu. Back po next i nazwanym
+cue wraca przed next. CE zachowuje oryginalne obiekty, graf submobjects, listy sceny i czas logiczny,
+geometrię/style i referencje updaterów we wspólnym memo; zakres to standardowe panele
+2D. Kopie targetów zachowują odniesienie bound updatera do żywej sceny zamiast kopiować IPC.
+Bez serializacji zamknięć/zasobów i dowolnych klas użytkownika. Interpolacja zgodnych węzłów
+0,6 s, potem dokładne odtworzenie grafu. D33 checkpointy nadal odroczone.
+
+**D38. Zamknięty zakres panelu fazy 8.** D28 CE (pan/zoom/reset), animowana kamera,
+3D i dowolny graf snapshotu odroczone; view w CE jest no-op. D35 obejmuje puste tło
+i pasy, nie dowolną półprzezroczystą treść. Cel CE: 60 różnych odebranych klatek/s
+przy 960×540, 480×270, 538×648 (30 s, ≥60T−2), idle <5% rdzenia i p95 <100 ms,
+trzy pełne przebiegi Qt; brak zaliczenia na podstawie mikrobenchmarku.
+
+---
+
 ## Zakres, którego nie wolno rozszerzyć bez decyzji
 
 **Synchronizacja co do klatki.** Warstwy startują i pauzują razem (D17) — i na tym koniec.

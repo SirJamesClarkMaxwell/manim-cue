@@ -11,8 +11,8 @@ on Windows, or `bash scripts/setup.sh` on Linux/macOS. The scripts install uv if
 run `uv sync` and render Orbit followed by Demo. Initial installation needs internet access.
 They warn if ffmpeg is missing from PATH (needed for manimgl `render --GL`).
 
-Requirements: Python ≥ 3.13 (uv downloads it if needed) and an OpenGL 3.3 driver for live
-panels. On Linux, Manim CE also needs the Cairo/Pango development packages
+Requirements: Python ≥ 3.13 (uv downloads it if needed) and an OpenGL 3.3 driver for manimgl live
+panels; CE Cairo live panels do not need OpenGL. On Linux, Manim CE also needs the Cairo/Pango development packages
 (e.g. `sudo apt install build-essential pkg-config libcairo2-dev libpango1.0-dev`).
 
 Manual setup, with [uv](https://docs.astral.sh/uv/) already installed:
@@ -36,13 +36,47 @@ Rendered decks go into `slides/`. To render with manimgl, add `--GL` immediately
 | S | Show presenter state on the presentation screen |
 | Q | Quit |
 | Click live / Esc | Give keyboard focus to live / return focus to slides |
-| Drag / Shift-drag / wheel / double-click | Orbit / pan / zoom / reset live camera |
+| Drag / Shift-drag / wheel / double-click | Orbit / pan / zoom / reset manimgl live camera |
 
 The Info window shows notes, current composition and the next slide. Move it to your second
 monitor; fullscreen mode assigns separate screens when two are available. On one monitor,
 run `uv run manim-cue present Demo --show-info-window` to show Info explicitly. Before slides 5
 and 8, watch the clip in the next-slide preview. On slide 9, the blue square moves behind the
 transparent live panel and its letterbox bars. Click the panel to see its custom border.
+
+## Live Cairo panels
+
+Select the live engine independently of the deck render engine:
+
+```python
+LiveLayer(scene_file=Path("examples/live_panel_ce.py"), scene_name="Panel",
+          engine="ce-cairo", rect=(0.1, 0.1, 0.4, 0.6),
+          session_id="cairo-panel", enter_cue="rotate", background_opacity=0)
+```
+
+Import `LiveSceneCE` from `manimcue.live_scene_ce` and implement `build_objects()`;
+define `PRESETS`, `SEQUENCE` and `LOOPS` as in `examples/live_panel_ce.py`.
+Cues use ordinary CE `self.play()` and `self.wait()`. Keep `construct()` inherited.
+Demo slides 10–11 contain two Cairo panels and an Orbit clip, with persistent sessions.
+The default live engine is `manimgl`; choosing Cairo does not translate GL objects.
+Deck JSON now uses format v4; v2/v3 live layers load as manimgl.
+
+Cairo live supports CE 0.22 2D with a fixed camera and an isotropic 16:9 image inside
+the panel. Camera gestures are ignored. Right advances the sequence; Left interpolates
+back over 0.6 s. Named entry cues do not add history: Back restores the state before
+the last sequence cue, including changes made by intervening named cues. History retains
+50 sequence positions. Snapshot support covers standard 2D panel objects, shared children,
+add/remove, geometry, styles and updater references; arbitrary Python state and updater
+closure state are not restored. Interrupting a cue finishes its animations and logical time,
+without simulating the skipped time of independent updaters. Live keeps running while
+the base and clips are paused. Empty background and letterbox bars preserve alpha;
+arbitrary translucent content follows upstream Cairo blending.
+
+For a standalone window test:
+
+```bash
+uv run --frozen python examples/live_receiver.py examples/live_panel_ce.py Panel --engine ce-cairo
+```
 
 ## Author a deck
 

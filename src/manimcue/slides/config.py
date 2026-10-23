@@ -185,9 +185,9 @@ class Config(BaseModel):
         return self
 
 
-FORMAT_VERSION = 3
+FORMAT_VERSION = 4
 """Wersja formatu JSON: 1 — upstream 5.7.0 bez pola, 2 — warstwy live (F3, D24),
-3 — warstwy z plików, `kind` i klatki kluczowe (F5, D29)."""
+3 — warstwy z plików, `kind` i klatki kluczowe (F5, D29), 4 — jawny silnik live (D36)."""
 
 Rect = tuple[float, float, float, float]
 """(x, y, szerokość, wysokość) jako ułamki kadru slajdu, (0, 0) w lewym górnym rogu."""
@@ -274,6 +274,7 @@ class LiveLayer(LayerBase):
     background_opacity: float = Field(default=1.0, ge=0, le=1, allow_inf_nan=False)
     active_border: BorderStyle | None = BorderStyle()
     error_border: BorderStyle | None = BorderStyle(color="#dc2828")
+    engine: Literal["manimgl", "ce-cairo"] = "manimgl"
     enter_cue: str | None = None
     thumbnail: FilePath | None = None
 
@@ -544,7 +545,7 @@ class PresentationConfig(BaseModel):
                 if session_id in current:
                     raise ValueError(f"slajd {index}: duplikat session_id={session_id!r}")
                 identity = (layer.scene_file.resolve(), layer.scene_name, layer.fps,
-                            layer.size(self.resolution), layer.background_opacity)
+                            layer.size(self.resolution), layer.background_opacity, layer.engine)
                 if session_id in previous and previous[session_id][1] != identity:
                     raise ValueError(
                         f"slajdy {index - 1}, {index}: niespójna sesja {session_id!r}"
@@ -584,6 +585,8 @@ class PresentationConfig(BaseModel):
                 # ma `kind`, a unia dyskryminowana go wymaga — warstwy v2 to zawsze live.
                 for layer in slide.get("layers", []):
                     layer.setdefault("kind", "live")
+                    if obj.get("version", 2) < 4 and layer["kind"] == "live":
+                        layer["engine"] = "manimgl"
                     for key in ("scene_file", "thumbnail", "file", "end_thumbnail"):
                         if value := layer.get(key):
                             layer[key] = parent / value

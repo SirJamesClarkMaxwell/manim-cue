@@ -9,6 +9,10 @@ from pathlib import Path
 
 def run_worker(spec, shm_name, frame_lock, bootstrap_sender) -> None:
     sys.argv = [sys.argv[0]]
+    if spec.engine == "ce-cairo":
+        from manimcue.live_scene_ce import run_ce_worker
+
+        return run_ce_worker(spec, shm_name, frame_lock, bootstrap_sender)
     shm = None
     scene = None
     try:

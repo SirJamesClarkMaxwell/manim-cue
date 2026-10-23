@@ -23,6 +23,7 @@ from manimcue.slides.config import (
 
 SCENES_DIR = Path(__file__).parent / "scenes"
 UPSTREAM_JSON = Path(__file__).parent / "slides" / "data" / "slides" / "BasicSlide.json"
+CREATED_PLAYERS = []
 LIVE_FILE = SCENES_DIR / "live_gl.py"
 RED = (255, 0, 0)
 
@@ -135,7 +136,11 @@ def test_converters_and_copy_reject_live_layers(tmp_path: Path) -> None:
 def qapp():
     from manimcue.slides.qt_utils import qapp
 
-    return qapp()
+    yield qapp()
+    for player in CREATED_PLAYERS:
+        player.close()
+        player.live.shutdown()
+    CREATED_PLAYERS.clear()
 
 
 def make_player(configs, **kw):
@@ -149,7 +154,9 @@ def make_player(configs, **kw):
         "hide_info_window": False,
         **kw,
     }
-    return Player(Config(), configs, **options)
+    player = Player(Config(), configs, **options)
+    CREATED_PLAYERS.append(player)
+    return player
 
 
 def view_pixel(view, fx: float, fy: float) -> tuple[int, int, int]:

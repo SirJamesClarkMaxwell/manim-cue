@@ -4,6 +4,27 @@ import os
 import sys
 from pathlib import Path
 
+import pytest
+
+ROOT = Path(__file__).resolve().parents[1]
+
+
+def write_manim_config(directory: Path) -> Path:
+    """Izolowane cwd także potrzebuje zapisywalnego cache GL, bez zmian w Manimie."""
+    directory.mkdir(parents=True, exist_ok=True)
+    path = directory / "custom_config.yml"
+    cache = (ROOT / ".cache" / "manimgl").as_posix()
+    path.write_text(
+        f"camera:\n  background_color: '#000000'\ndirectories:\n  cache: {cache}\n",
+        encoding="utf-8",
+    )
+    return path
+
+
+@pytest.fixture(autouse=True)
+def temporary_manim_config(tmp_path):
+    write_manim_config(tmp_path)
+
 # Qt bez ekranu, zanim cokolwiek zaimportuje qtpy. Nie daje kontekstu GL — ten manimgl tworzy
 # sam (standalone ModernGL); testy z prawdziwym GL mają znacznik `gpu`.
 os.environ.setdefault("QT_API", "pyside6")
@@ -20,7 +41,7 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 sys.argv = [
     sys.argv[0],
     "--config_file",
-    str(Path(__file__).parent / "slides" / "data" / "custom_config.yml"),
+    str(write_manim_config(ROOT / ".tmp" / "pytest-config")),
 ]
 
 # Konfiguracja manimgl to singleton liczony przy pierwszym imporcie. Inicjalizujemy go tu,

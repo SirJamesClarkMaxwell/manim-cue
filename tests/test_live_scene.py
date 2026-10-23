@@ -286,7 +286,17 @@ def test_non_looping_cue_runs_once(scene):
     calls = []
     scene.run_cue("rotate", lambda _s: calls.append(1))
     assert len(calls) == 1
-    assert scene.saves == 1
+    assert scene.saves == 0
+
+
+def test_sequence_history_keeps_equal_positions_bounded_and_clears_redo():
+    state = object()
+    scene = SimpleNamespace(undo_stack=[], redo_stack=[object()], get_state=lambda: state)
+    for _ in range(55):
+        LiveScene.save_state(scene)
+    assert len(scene.undo_stack) == 50
+    assert all(saved is state for saved in scene.undo_stack)
+    assert not scene.redo_stack
 
 
 def test_looping_cue_repeats_until_something_arrives(scene):
