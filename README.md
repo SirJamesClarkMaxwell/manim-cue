@@ -36,13 +36,35 @@ Rendered decks go into `slides/`. To render with manimgl, add `--GL` immediately
 | S | Show presenter state on the presentation screen |
 | Q | Quit |
 | Click live / Esc | Give keyboard focus to live / return focus to slides |
-| Drag / Shift-drag / wheel / double-click | Orbit / pan / zoom / reset manimgl live camera |
+| MMB / Shift+MMB drag | Orbit / pan the manimgl live camera |
+| Alt+LMB / Alt+Shift+LMB / Alt+RMB drag | Touchpad orbit / pan / zoom |
+| Wheel / LMB double-click | Zoom / reset to the last cue boundary |
 
 The Info window shows notes, current composition and the next slide. Move it to your second
 monitor; fullscreen mode assigns separate screens when two are available. On one monitor,
 run `uv run manim-cue present Demo --show-info-window` to show Info explicitly. Before slides 5
 and 8, watch the clip in the next-slide preview. On slide 9, the blue square moves behind the
 transparent live panel and its letterbox bars. Click the panel to see its custom border.
+
+Camera gestures require an already focused live panel and a press inside its container.
+The first click grants focus; dragging plain LMB leaves the camera still. A captured drag
+continues outside the panel until release. Losing focus, changing slides or reserving an
+entry cancels it. Wheel zoom requires the pointer over the active panel. Cairo ignores views.
+
+ImGui Info uses two columns: the current composition and presenter timer on the left,
+the independently playing next slide and scrollable Markdown notes on the right.
+Timer pause/restart affects only presenter time; restart preserves its paused state.
+A−/A+ changes notes and math from 16 to 48 logical pixels (default 24), for the session.
+Notes support `$inline$` and `$$display$$` math with local MicroTeX and an Agg fallback.
+Invalid formulas remain visible with an error. The bottom strip lazily loads static
+thumbnails for the current deck; clicking one jumps directly through the normal entry
+barrier. Clicking the current slide does nothing. A jump starts local live history without
+an entry cue; a compatible adjacent session may stay alive. Earlier history is discarded.
+
+With ImGui live focus, a physical Right at the end of the **whole sequence**, or Left at
+its beginning, returns focus and invokes the usual slide action after the boundary image
+is acknowledged. Held-key repeat never advances through this boundary. Pause, loops,
+reverse and end-of-deck rules still apply. Qt keeps live focus at sequence boundaries.
 
 ## Live Cairo panels
 

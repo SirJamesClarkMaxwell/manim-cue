@@ -10,6 +10,132 @@ from multiprocessing.shared_memory import SharedMemory
 SLOT = struct.Struct("<Qqdd")
 PROGRESS = 2 * SLOT.size
 HEADER = 96
+THUMBNAIL_DECODE_BYTES = 8 * 1024 * 1024
+
+
+def render_thumbnail(spec: dict) -> dict:
+    """Statyczna kompozycja t=0; live korzysta wyłącznie z zapisanego obrazu."""
+    from PIL import Image
+
+    from .stage import compose
+
+    width, height = (
+        max(1, min(limit, int(value)))
+        for value, limit in zip(spec["size"], (256, 144), strict=True)
+    )
+    slide = spec["slide"]
+    images, frames = {}, {}
+    for key, media in [
+        ("base", slide),
+        *[(str(i), m) for i, m in enumerate(slide.get("layers", []))],
+    ]:
+        paths = [media.get("thumbnail")]
+        if media["kind"] != "live":
+            paths.append(media.get("file"))
+        for path in dict.fromkeys(p for p in paths if p):
+            try:
+                try:
+                    with Image.open(path) as original:
+                        original.draft("RGB", (width, height))
+                        # Dekoder źródła i bufor skalowania, przed pełnym odczytem pikseli.
+                        if original.width * original.height * 16 > THUMBNAIL_DECODE_BYTES:
+                            raise MemoryError("Obraz przekracza budżet dekodowania miniatury 8 MiB")
+                        original.thumbnail((width, height))
+                        image = original.convert("RGBA")
+                except (OSError, ValueError):
+                    import av
+
+                    with av.open(path) as container:
+                        stream = container.streams.video[0]
+                        stream.codec_context.thread_count = 1
+                        # Konserwatywna rezerwa klatek dekodera; bez pełnego RGBA źródła.
+                        if stream.width * stream.height * 32 > THUMBNAIL_DECODE_BYTES:
+                            raise MemoryError("Wideo przekracza budżet dekodowania miniatury 8 MiB")
+                        frame = next(container.decode(stream))
+                        if frame.width * frame.height * 32 > THUMBNAIL_DECODE_BYTES:
+                            raise MemoryError(
+                                "Klatka przekracza budżet dekodowania miniatury 8 MiB"
+                            )
+                        scale = min(width / frame.width, height / frame.height, 1)
+                        small = frame.reformat(
+                            width=max(1, round(frame.width * scale)),
+                            height=max(1, round(frame.height * scale)),
+                            format="rgba",
+                        )
+                        image = Image.fromarray(small.to_ndarray())
+                image.thumbnail((width, height))
+                images[key] = image
+                frames[key] = {"texture": key, "width": image.width, "height": image.height}
+                break
+            except (OSError, ValueError, StopIteration):
+                continue
+    canvas = Image.new("RGBA", (width, height))
+    commands = compose(
+        {
+            "resolution": spec["resolution"],
+            "slide": slide,
+            "viewport": (0, 0, width, height),
+            "background": spec.get("background", [0, 0, 0, 1]),
+        },
+        frames,
+        0,
+    )
+    for command in commands:
+        x, y, w, h = command["box"]
+        box = (round(x), round(y), round(x + w), round(y + h))
+        if box[2] <= box[0] or box[3] <= box[1]:
+            continue
+        if command["type"] == "image":
+            if (box[2] - box[0]) * (box[3] - box[1]) > width * height:
+                raise MemoryError("Warstwa przekracza budżet kompozycji miniatury")
+            image = images[command["source"]].resize((box[2] - box[0], box[3] - box[1]))
+            cx, cy, cw, ch = command["clip"]
+            clipped = (
+                max(0, round(cx), box[0]),
+                max(0, round(cy), box[1]),
+                min(width, round(cx + cw), box[2]),
+                min(height, round(cy + ch), box[3]),
+            )
+            if clipped[2] > clipped[0] and clipped[3] > clipped[1]:
+                image = image.crop(
+                    (
+                        clipped[0] - box[0],
+                        clipped[1] - box[1],
+                        clipped[2] - box[0],
+                        clipped[3] - box[1],
+                    )
+                )
+                canvas.alpha_composite(image, clipped[:2])
+        else:
+            from PIL import ImageDraw
+
+            color = (
+                tuple(round(c * 255) for c in command["color"])
+                if command["type"] == "fill"
+                else (85, 85, 85, 255)
+            )
+            ImageDraw.Draw(canvas).rectangle((box[0], box[1], box[2] - 1, box[3] - 1), fill=color)
+    return {"rgba": canvas.tobytes(), "width": width, "height": height}
+
+
+def run_thumbnail(spec: dict, connection) -> None:
+    """Jeden proces obsługuje jedną miniaturę, bez sceny i bez okna."""
+    memory = None
+    try:
+        result = render_thumbnail(spec)
+        pixels = result.pop("rgba")
+        memory = SharedMemory(create=True, size=len(pixels))
+        memory.buf[:] = pixels
+        connection.send({**result, "memory": memory.name})
+        if connection.poll(5):
+            connection.recv()
+    except Exception as error:  # noqa: BLE001 — błąd materiału daje placeholder
+        connection.send({"error": str(error)})
+    finally:
+        connection.close()
+        if memory is not None:
+            memory.close()
+            memory.unlink()
 
 
 def run_pooled(control, connection) -> None:

@@ -106,6 +106,8 @@ def reduce(state: dict, event: dict, now: float) -> tuple[dict, list[dict]]:
                 slide += len(decks[deck]["slides"])
             if not 0 <= slide < len(decks[deck]["slides"]):
                 raise ValueError("Niepoprawny indeks slajdu")
+            if [deck, slide] == result["index"]:
+                return result, effects
             effects = _enter(result, [deck, slide], now)
         else:
             index = _neighbor(result, -1)

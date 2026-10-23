@@ -28,6 +28,22 @@ def cue(session, command):
     return pump(session, lambda ev, fr: f"CUE_DONE {command}" in names(ev), 5)
 
 
+def test_sequence_start_end_empty(session):
+    start(session, "LiveCEFirstFrame")
+    for request, direction, result in [(1, "next", "end"), (2, "back", "start")]:
+        session.send(f"step {request} {direction}")
+        events, frames = pump(
+            session,
+            lambda ev, fr, prefix=f"STEP_RESULT {request} {result} ": any(
+                e.startswith(prefix) for e in names(ev)
+            ),
+            5,
+        )
+        status = next(e for e in names(events) if e.startswith(f"STEP_RESULT {request} "))
+        frame_id = int(status.split()[-1])
+        assert any(frame.frame_id == frame_id and frame.boundary for frame in frames)
+
+
 def test_graph_back_named_cue_and_exact_pixels(session):
     _, first = start(session, "GraphPanel", EXTRA)
     session.send("next")

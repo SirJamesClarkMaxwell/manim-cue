@@ -7,6 +7,21 @@ from test_imgui_live import Session, boundary, entry
 from manimcue.player.live import LiveController
 
 
+def test_jump_live_history():
+    controller = LiveController(Session)
+    controller.enter(entry())
+    session = controller.sessions[0]
+    history = controller.histories[session]
+    generation = history.generation
+    controller.enter(entry((0, 1), "start_at", 2))
+    assert controller.sessions[0] is session
+    assert history.generation == generation
+    assert len(history.stack) == 1 and not history.stack[0].has_predecessor
+    assert not controller.cues and controller.active is None
+    controller.enter(entry((0, 3), "start_at", 3))
+    assert controller.sessions[0] is not session and session.stopping
+
+
 def test_history_replay_reverse_and_stale_generation():
     controller = LiveController(Session)
     controller.enter(entry())

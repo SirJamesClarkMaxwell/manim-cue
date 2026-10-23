@@ -8,11 +8,12 @@ import time
 from pathlib import Path
 
 import pytest
+import test_imgui_input as input_fixtures
 from PIL import Image
 
 from manimcue.slides.config import LiveLayer, PresentationConfig, SlideConfig, SlideType
 
-pytestmark = pytest.mark.gpu
+qt_gestures = input_fixtures.qt_gestures
 
 LIVE_FILE = Path(__file__).parent / "scenes" / "live_gl.py"
 RESOLUTION = (640, 360)
@@ -128,8 +129,8 @@ def click(player, fx: float, fy: float) -> None:
     )
 
 
-def mouse(player, kind, fx: float, fy: float) -> None:
-    """Surowe zdarzenie myszy w viewporcie (lewy przycisk), jak z prawdziwej myszy."""
+def mouse(player, kind, fx: float, fy: float, middle: bool = False) -> None:
+    """Surowe zdarzenie myszy w viewporcie, jak z prawdziwej myszy."""
     from qtpy.QtCore import QEvent, QPointF, Qt
     from qtpy.QtGui import QMouseEvent
     from qtpy.QtWidgets import QApplication
@@ -154,6 +155,11 @@ def mouse(player, kind, fx: float, fy: float) -> None:
             Qt.MouseButton.LeftButton,
         ),
     }[kind]
+    if middle:
+        if button == Qt.MouseButton.LeftButton:
+            button = Qt.MouseButton.MiddleButton
+        if buttons == Qt.MouseButton.LeftButton:
+            buttons = Qt.MouseButton.MiddleButton
     viewport = player.view.viewport()
     event = QMouseEvent(
         event_type,
@@ -178,12 +184,14 @@ def recorded_sends(session) -> list[str]:
     return sent
 
 
+@pytest.mark.gpu
 def test_entering_slide_replaces_thumbnail_with_first_frame(qapp, player_for) -> None:
     player = player_for("LiveGLCorners")
     assert near(layer_pixel(player, 0.5, 0.5), MAGENTA)
     pump(qapp, lambda: near(corner(player), (255, 0, 0)), what="pierwsza klatka live")
 
 
+@pytest.mark.gpu
 def test_leaving_slide_reaps_process_and_reentry_is_fresh(qapp, player_for) -> None:
     player = player_for("LiveGLCorners")
     pump(qapp, lambda: ready(player))
@@ -201,6 +209,7 @@ def test_leaving_slide_reaps_process_and_reentry_is_fresh(qapp, player_for) -> N
     pump(qapp, lambda: near(corner(player), (255, 0, 0)), what="pierwsza klatka po powrocie")
 
 
+@pytest.mark.gpu
 def test_quick_leave_and_return_keeps_sessions_apart(qapp, player_for) -> None:
     player = player_for("LiveGLCorners")
     pump(qapp, lambda: ready(player))
@@ -212,6 +221,7 @@ def test_quick_leave_and_return_keeps_sessions_apart(qapp, player_for) -> None:
     pump(qapp, lambda: near(corner(player), (255, 0, 0)) and not player.live.stopping)
 
 
+@pytest.mark.gpu
 def test_click_routes_arrows_to_layer_and_esc_returns_them(qapp, player_for) -> None:
     from qtpy.QtCore import Qt
     from scenes.live_gl import FRAME_WIDTH
@@ -233,6 +243,7 @@ def test_click_routes_arrows_to_layer_and_esc_returns_them(qapp, player_for) -> 
     assert player.current_slide_index == 2
 
 
+@pytest.mark.gpu
 def test_click_outside_layer_releases(qapp, player_for) -> None:
     player = player_for("LiveGLCorners")
     pump(qapp, lambda: ready(player))
@@ -242,6 +253,7 @@ def test_click_outside_layer_releases(qapp, player_for) -> None:
     assert player.live.active is None
 
 
+@pytest.mark.gpu
 def test_keys_before_ready_are_consumed_not_queued(qapp, player_for) -> None:
     from qtpy.QtCore import Qt
 
@@ -255,6 +267,7 @@ def test_keys_before_ready_are_consumed_not_queued(qapp, player_for) -> None:
     assert "next" not in sent
 
 
+@pytest.mark.gpu
 def test_autorepeat_is_not_sent(qapp, player_for) -> None:
     from qtpy.QtCore import Qt
 
@@ -268,6 +281,7 @@ def test_autorepeat_is_not_sent(qapp, player_for) -> None:
     assert player.current_slide_index == 1
 
 
+@pytest.mark.gpu
 def test_cue_error_marks_layer_and_returns_keys(qapp, player_for) -> None:
     from qtpy.QtCore import Qt
 
@@ -287,6 +301,7 @@ def test_cue_error_marks_layer_and_returns_keys(qapp, player_for) -> None:
     assert player.current_slide_index == 2
 
 
+@pytest.mark.gpu
 def test_build_error_before_ready_is_reported(qapp, player_for) -> None:
     player = player_for("LiveGLBuildRaises")
     errors = []
@@ -297,6 +312,7 @@ def test_build_error_before_ready_is_reported(qapp, player_for) -> None:
     assert player.live.active is None
 
 
+@pytest.mark.gpu
 def test_application_deactivation_releases_layer(qapp, player_for) -> None:
     from qtpy.QtCore import Qt
 
@@ -307,18 +323,20 @@ def test_application_deactivation_releases_layer(qapp, player_for) -> None:
     assert player.live.active is None
 
 
+@pytest.mark.gpu
 def test_view_navigation_changes_and_resets_camera(qapp, player_for) -> None:
     player = player_for("LiveGLThreeD", rect=(0.0, 0.0, 1.0, 1.0))
     pump(qapp, lambda: ready(player))
     pump(qapp, lambda: not near(layer_pixel(player, 0.5, 0.5), MAGENTA), what="pierwsza klatka")
     start = player.composition.layer_items[0].pixmap().toImage()
 
-    # Prawdziwa ścieżka: press → move z lewym przyciskiem → release, potem dwuklik.
-    mouse(player, "press", 0.5, 0.5)
+    # Klik nadaje fokus; kolejny press MMB rozpoczyna capture, dwuklik LMB resetuje.
+    click(player, 0.5, 0.5)
+    mouse(player, "press", 0.5, 0.5, middle=True)
     assert player.live.active == 0
-    mouse(player, "move", 0.5, 0.5)
-    mouse(player, "move", 0.62, 0.5)
-    mouse(player, "release", 0.62, 0.5)
+    mouse(player, "move", 0.5, 0.5, middle=True)
+    mouse(player, "move", 0.62, 0.5, middle=True)
+    mouse(player, "release", 0.62, 0.5, middle=True)
     pump(
         qapp,
         lambda: player.composition.layer_items[0].pixmap().toImage() != start,
@@ -332,6 +350,7 @@ def test_view_navigation_changes_and_resets_camera(qapp, player_for) -> None:
     )
 
 
+@pytest.mark.gpu
 def test_gui_path_keeps_up_with_live_frames(qapp, player_for) -> None:
     from qtpy.QtCore import Qt
     from scenes.live_gl import MOVE_RUN_TIME
@@ -356,6 +375,7 @@ def test_gui_path_keeps_up_with_live_frames(qapp, player_for) -> None:
     assert rate >= 0.8 * 60, rate
 
 
+@pytest.mark.gpu
 def test_view_after_sequence_end_does_not_break_barrier(qapp, player_for) -> None:
     from qtpy.QtCore import QPointF, Qt
     from scenes.live_gl import FRAME_WIDTH
@@ -371,6 +391,7 @@ def test_view_after_sequence_end_does_not_break_barrier(qapp, player_for) -> Non
     settle = time.monotonic() + 1.0
     pump(qapp, lambda: time.monotonic() > settle)
     before = player.composition.layer_items[0].pixmap().toImage()
+    player.live.click(0)
     player.live.drag(QPointF(400, 50), False)
     player.live.drag(QPointF(420, 50), False)
     pump(
@@ -385,6 +406,7 @@ def test_view_after_sequence_end_does_not_break_barrier(qapp, player_for) -> Non
     assert ready(player)
 
 
+@pytest.mark.gpu
 def test_slide_change_with_failed_and_active_layers(qapp, player_for) -> None:
     player = player_for(
         "LiveGLCorners",
@@ -397,3 +419,142 @@ def test_slide_change_with_failed_and_active_layers(qapp, player_for) -> None:
     player.load_next_slide()
     assert player.live.active is None
     assert not player.live.border.isVisible()
+
+
+def test_qt_gesture_focus_capture_cancel_reserved_ce_noop(qt_gestures):
+    from types import SimpleNamespace
+
+    from qtpy.QtCore import QPointF, QRectF
+
+    controller, session, commands, _ = qt_gestures
+    controller.drag(QPointF(10, 20), False)
+    controller.drag(QPointF(20, 40), False)
+    assert commands == []
+    controller.click(0)
+    controller.drag(QPointF(10, 20), False)
+    controller.drag(QPointF(200, 400), False)
+    assert commands == ["view orbit 1.90000 1.90000"]
+    controller.end_drag()
+    controller.drag(QPointF(30, 60), False)
+    assert len(commands) == 1
+    controller.click(0)
+    controller.histories[session] = SimpleNamespace(reserved=True)
+    controller.drag(QPointF(10, 20), False)
+    controller.histories[session].reserved = False
+    controller.drag(QPointF(20, 40), False)
+    assert len(commands) == 1
+    controller.identities[0] = ("ce-cairo",)
+    controller.click(0)
+    controller.drag(QPointF(10, 20), False)
+    controller.drag(QPointF(20, 40), False)
+    controller.wheel(1)
+    controller.double_click(0)
+    assert len(commands) == 1
+    controller.identities[0] = ("manimgl",)
+    controller.double_click(0)
+    assert commands[-1] == "view reset"
+    controller.composition.layer_rects[0] = QRectF(0, 0, 0, 0)
+    controller.wheel(1)
+    assert commands[-1] == "view reset"
+    controller.release()
+    assert controller.active is None and controller.drag_from is None
+
+
+def test_qt_wheel_angle_pixel_delta_and_pointer_signal(qt_gestures):
+    from qtpy.QtCore import QEvent, QPoint, QPointF, Qt
+    from qtpy.QtGui import QMouseEvent, QWheelEvent
+
+    from manimcue.composition import SlideView
+
+    controller, _, commands, _ = qt_gestures
+    view = SlideView(controller.composition)
+    view.wheel_turned.connect(controller.wheel)
+    point = QPointF(view.mapFromScene(QPointF(10, 20)))
+    for angle, pixel in ((120, 0), (0, 20), (-60, 10)):
+        view.wheelEvent(
+            QWheelEvent(
+                point,
+                point,
+                QPoint(0, pixel),
+                QPoint(0, angle),
+                Qt.MouseButton.NoButton,
+                Qt.KeyboardModifier.NoModifier,
+                Qt.ScrollPhase.NoScrollPhase,
+                False,
+            )
+        )
+    assert commands == ["view zoom 1", "view zoom 0.5", "view zoom -0.5"]
+    dragged = []
+    view.pointer_dragged.connect(lambda *args: dragged.append(args))
+    view.mousePressEvent(
+        QMouseEvent(
+            QEvent.Type.MouseButtonPress,
+            point,
+            point,
+            Qt.MouseButton.MiddleButton,
+            Qt.MouseButton.MiddleButton,
+            Qt.KeyboardModifier.ShiftModifier | Qt.KeyboardModifier.AltModifier,
+        )
+    )
+    assert len(dragged) == 1 and dragged[0][1:] == (True, "middle", True)
+    view.mouseReleaseEvent(
+        QMouseEvent(
+            QEvent.Type.MouseButtonRelease,
+            point,
+            point,
+            Qt.MouseButton.MiddleButton,
+            Qt.MouseButton.NoButton,
+            Qt.KeyboardModifier.NoModifier,
+        )
+    )
+    assert view.pointer_button is None
+    view.close()
+
+
+@pytest.mark.parametrize("kind", ["FocusOut", "WindowDeactivate", "ApplicationDeactivate"])
+def test_qt_event_loss_cancels_capture(qt_gestures, kind):
+    from qtpy.QtCore import QEvent, QPointF, Qt
+    from qtpy.QtGui import QMouseEvent
+    from qtpy.QtWidgets import QApplication
+
+    from manimcue.composition import SlideView
+
+    controller, _, commands, app = qt_gestures
+    view = SlideView(controller.composition)
+    view.layer_clicked.connect(controller.click)
+    view.pointer_dragged.connect(controller.drag)
+    view.pointer_released.connect(controller.end_drag)
+    point = QPointF(view.mapFromScene(QPointF(10, 20)))
+    target = view.viewport()
+
+    def mouse(kind, offset=0):
+        QApplication.sendEvent(
+            target,
+            QMouseEvent(
+                kind,
+                point + QPointF(offset, offset),
+                point,
+                Qt.MouseButton.MiddleButton
+                if kind == QEvent.Type.MouseButtonPress
+                else Qt.MouseButton.NoButton,
+                Qt.MouseButton.MiddleButton,
+                Qt.KeyboardModifier.NoModifier,
+            ),
+        )
+
+    try:
+        mouse(QEvent.Type.MouseButtonPress)
+        mouse(QEvent.Type.MouseMove, 5)
+        assert commands and controller.drag_from is not None
+        QApplication.sendEvent(
+            app if kind == "ApplicationDeactivate" else view, QEvent(getattr(QEvent.Type, kind))
+        )
+        assert view.pointer_button is None and controller.drag_from is None
+        before = list(commands)
+        mouse(QEvent.Type.MouseMove, 10)
+        assert commands == before
+        mouse(QEvent.Type.MouseButtonPress)
+        mouse(QEvent.Type.MouseMove, 15)
+        assert len(commands) == len(before) + 1
+    finally:
+        view.close()

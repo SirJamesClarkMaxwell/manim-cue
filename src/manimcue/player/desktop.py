@@ -182,10 +182,19 @@ def run_desktop(manifest: dict, options: dict) -> int:
         io.config_viewports_no_decoration = False
 
     def post_init():
+        from .notes_math import NotesRenderer
+
         windows = Windows()
         selected = screen_options(options, len(windows.monitors))
         app = App(manifest, selected)
-        runtime.update(windows=windows, options=selected, app=app, overlay=False, first=True)
+        runtime.update(
+            windows=windows,
+            options=selected,
+            app=app,
+            overlay=False,
+            first=True,
+            notes=NotesRenderer(),
+        )
 
     def action(effect, now):
         app, windows = runtime["app"], runtime["windows"]
@@ -197,11 +206,21 @@ def run_desktop(manifest: dict, options: dict) -> int:
         elif kind == "presenter_state":
             runtime["overlay"] = not runtime["overlay"]
         elif kind == "release_focus":
+            app.live.cancel_steps()
             app.live.active = None
+            runtime["capture"] = None
         elif kind == "focus_live":
+            runtime["capture"] = None
             index = int(effect["index"])
+            if app.live.active != index:
+                app.live.cancel_steps()
             if index in app.live.sessions and index not in app.live.failed:
                 app.live.active = index
+        elif kind == "capture_pointer":
+            if app.live.active is not None and str(app.live.active) == effect["index"]:
+                runtime["capture"] = effect
+        elif kind == "release_pointer":
+            runtime["capture"] = None
         elif kind == "cue":
             app.live.send(effect["direction"])
         elif kind == "view":
@@ -224,6 +243,11 @@ def run_desktop(manifest: dict, options: dict) -> int:
         app, windows = runtime["app"], runtime["windows"]
         now = time.monotonic()
         io = imgui.get_io()
+        if io.app_focus_lost:
+            app.live.cancel_steps()
+            app.live.active = None
+            runtime["capture"] = None
+            runtime["pending_input"] = []
 
         def process_input():
             io = imgui.get_io()
@@ -231,19 +255,26 @@ def run_desktop(manifest: dict, options: dict) -> int:
                 app.dispatch({"type": "quit"}, now)
             input_state = {
                 "bindings": keymap,
-                "active_live": app.live.active,
-                "reserved": any(history.reserved for history in app.live.histories.values()),
+                "active_live": str(app.live.active) if app.live.active is not None else None,
+                "reserved": app.state["preparing"]
+                or any(history.reserved for history in app.live.histories.values()),
                 "editing_text": io.want_text_input,
+                "capture": runtime.get("capture"),
+                "entry_id": app.state["entry_id"],
             }
             if io.app_focus_lost:
                 app.live.active = None
+                runtime["capture"] = None
+                runtime["pending_input"] = []
             queued, runtime["pending_input"] = runtime.get("pending_input", []), []
             for effect in queued:
                 if effect.get("entry_id") == app.state["entry_id"]:
                     action(effect, now)
             for key in dict.fromkeys(key for key, _ in keymap):
-                input_state["active_live"] = app.live.active
-                input_state["reserved"] = any(
+                input_state["active_live"] = (
+                    str(app.live.active) if app.live.active is not None else None
+                )
+                input_state["reserved"] = app.state["preparing"] or any(
                     history.reserved for history in app.live.histories.values()
                 )
                 if imgui.is_key_pressed(getattr(imgui.Key, key), True):
@@ -270,7 +301,17 @@ def run_desktop(manifest: dict, options: dict) -> int:
             if imgui.is_key_pressed(imgui.Key.escape, False):
                 for effect in route({"type": "key", "key": "escape"}, input_state):
                     action(effect, now)
-            input_state["active_live"] = app.live.active
+            input_state["active_live"] = (
+                str(app.live.active) if app.live.active is not None else None
+            )
+            capture = runtime.get("capture")
+            if capture and (
+                capture["entry_id"] != app.state["entry_id"]
+                or capture["index"] != input_state["active_live"]
+                or input_state["reserved"]
+            ):
+                runtime["capture"] = None
+            input_state["capture"] = runtime.get("capture")
             runtime["input_state"] = input_state
 
         state = app.tick(now, process_input)
@@ -307,38 +348,44 @@ def run_desktop(manifest: dict, options: dict) -> int:
             imgui.text_wrapped(state["message"])
         if runtime["overlay"]:
             imgui.text_wrapped(state_text(state))
+        input_state.update(
+            commands=commands, live_indices=[str(index) for index in app.live.sessions]
+        )
+        point = (io.mouse_pos.x, io.mouse_pos.y)
+        buttons = [
+            name
+            for number, name in enumerate(("left", "right", "middle"))
+            if imgui.is_mouse_down(number)
+        ]
+        events = []
         if imgui.is_window_hovered():
-            input_state.update(
-                commands=commands, live_indices=[str(index) for index in app.live.sessions]
-            )
-            if imgui.is_mouse_clicked(0):
-                point = io.mouse_pos
-                for effect in route({"type": "click", "point": (point.x, point.y)}, input_state):
-                    runtime.setdefault("pending_input", []).append(
-                        {**effect, "entry_id": app.state["entry_id"]}
+            for number, button in enumerate(("left", "right", "middle")):
+                if imgui.is_mouse_clicked(number):
+                    events.append(
+                        {
+                            "type": "click",
+                            "button": button,
+                            "buttons": buttons,
+                            "point": point,
+                            "shift": io.key_shift,
+                            "alt": io.key_alt,
+                        }
                     )
-            for event in [{"type": "wheel", "steps": io.mouse_wheel}] if io.mouse_wheel else []:
-                for effect in route(event, input_state):
-                    runtime.setdefault("pending_input", []).append(
-                        {**effect, "entry_id": app.state["entry_id"]}
-                    )
-            if imgui.is_mouse_dragging(0):
-                for effect in route(
-                    {
-                        "type": "drag",
-                        "delta": (io.mouse_delta.x, io.mouse_delta.y),
-                        "shift": io.key_shift,
-                    },
-                    input_state,
-                ):
-                    runtime.setdefault("pending_input", []).append(
-                        {**effect, "entry_id": app.state["entry_id"]}
-                    )
+            if io.mouse_wheel:
+                events.append({"type": "wheel", "steps": io.mouse_wheel, "point": point})
             if imgui.is_mouse_double_clicked(0):
-                for effect in route({"type": "double_click"}, input_state):
-                    runtime.setdefault("pending_input", []).append(
-                        {**effect, "entry_id": app.state["entry_id"]}
-                    )
+                events.append({"type": "double_click", "point": point, "alt": io.key_alt})
+        if runtime.get("capture") and buttons:
+            events.append(
+                {"type": "drag", "delta": (io.mouse_delta.x, io.mouse_delta.y), "buttons": buttons}
+            )
+        if any(imgui.is_mouse_released(number) for number in range(3)):
+            events.append({"type": "pointer_up"})
+        for event in events:
+            for effect in route(event, input_state):
+                runtime.setdefault("pending_input", []).append(
+                    {**effect, "entry_id": app.state["entry_id"]}
+                )
         imgui.end()
         if app.show_info:
             if runtime["first"]:
@@ -379,7 +426,17 @@ def run_desktop(manifest: dict, options: dict) -> int:
                 draw(scaled, imgui.get_window_draw_list())
                 imgui.dummy((box[2], box[3]))
 
-            render_info(state, {"composition": app.preview_composition, "render": render})
+            for effect in render_info(
+                state,
+                {
+                    "composition": app.preview_composition,
+                    "render": render,
+                    "render_notes": lambda text, size: runtime["notes"].render(
+                        text, size, imgui.get_window_viewport().dpi_scale
+                    ),
+                },
+            ):
+                action(effect, now)
             imgui.end()
         if app.closed:
             app.drop_all()
@@ -404,6 +461,7 @@ def run_desktop(manifest: dict, options: dict) -> int:
                 windows.toggle_mouse()
             runtime["configured"] = True
         app.after_render()
+        runtime["notes"].after_render(app.closed)
 
     params.callbacks.setup_imgui_config = setup
     params.callbacks.post_init = post_init
@@ -411,7 +469,11 @@ def run_desktop(manifest: dict, options: dict) -> int:
     params.callbacks.after_swap = after_swap
     # Notatki w Info używają imgui_md; samo hello_imgui.run go nie inicjalizuje.
     markdown = imgui_md.MarkdownOptions()
+    markdown.with_latex = True
     # Roboto Markdownu nie ma strzałek z notatek; Inconsolata z assets imgui_bundle je ma.
     markdown.font_options.merge_fonts = ["fonts/Inconsolata-Medium.ttf"]
-    immapp.run(params, immapp.AddOnsParams(with_markdown=True, with_markdown_options=markdown))
+    immapp.run(
+        params,
+        immapp.AddOnsParams(with_markdown=True, with_latex=True, with_markdown_options=markdown),
+    )
     return 0

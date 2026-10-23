@@ -23,6 +23,8 @@ def initial_state(manifest: dict, now: float = 0.0) -> dict:
         "message_revision": 0,
         "message": None,
         "clock": new_clock(now),
+        "presenter_timer": {"anchor": now, "elapsed": 0.0, "paused": False},
+        "notes_size": 24,
     }
 
 

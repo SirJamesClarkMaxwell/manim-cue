@@ -49,6 +49,16 @@ class EntryHistory:
         return str(self.request)
 
     def prepare(self, key, cue, reason, now):
+        if reason == "start_at":
+            checkpoints = {entry.checkpoint for entry in self.stack if entry.checkpoint}
+            self.stack.clear()
+            self.outgoing.clear()
+            self.drops.clear()
+            self.expected = self.pending_start = self.started_restore = None
+            self.held = None
+            self.boundaries.clear()
+            for checkpoint in checkpoints:
+                self.command("drop_checkpoint", checkpoint)
         cancelled = bool(self.stack and self.stack[-1].cue_state == "prepared" and self.reserved)
         if self.stack and self.stack[-1].cue_state == "prepared":
             self.stack[-1].cue_state = "unsent"
@@ -122,7 +132,8 @@ class EntryHistory:
             if tuple(fields[1:3]) == self.expected:
                 self.completed = int(fields[3])
         elif fields[0] == "RESTORE_START" and len(fields) == 3:
-            self.started_restore = fields[1]
+            if tuple(fields[1:3]) == self.expected:
+                self.started_restore = fields[1]
         elif fields[0] in ("LOOP_WAIT", "CUE_INTERRUPTED") and len(fields) == 3:
             if tuple(fields[1:3]) == self.expected:
                 self.status = (

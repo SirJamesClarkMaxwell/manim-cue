@@ -287,6 +287,26 @@ The player maps its configured keys after clicking a live panel, and Esc release
 Mouse controls in the player send `view orbit dx dy`, `view pan dx dy`, `view zoom steps`,
 and `view reset` to the worker.
 
+Both players map MMB to orbit, Shift+MMB to pan, and wheel to zoom. Touchpad alternatives
+are Alt+LMB, Alt+Shift+LMB and Alt+RMB for orbit, pan and zoom respectively. Plain LMB
+drag has no camera action; LMB double-click resets to the last boundary. Focus must already
+belong to the clicked live container. Capture lasts until release, including outside the
+container, and is cancelled by focus/entry changes or a reservation. Multiple held buttons
+are ignored. Orbit/pan use logical `dx / width`, `dy / height`, with downward-positive y
+and no time multiplier. Alt+RMB sends `-20 * dy / height` zoom steps; Qt wheel uses
+`angleDelta.y / 120`, or `pixelDelta.y / 40` when angleDelta is zero. Positive steps zoom in
+using `0.9 ** steps`. Zero-size containers and Cairo views are no-ops.
+
+ImGui uses the opt-in `step <request_id> next|back` command. The worker checks the whole
+sequence boundary when executing the queued step, and sends correlated
+`STEP_STATUS <request_id> waiting|running|looping` and
+`STEP_RESULT <request_id> done|start|end|error <frame_id>`. At start/end the player accepts
+the published boundary image, sends ACK, releases live focus and invokes the ordinary
+previous/next reducer once. It keeps at most one executing and one queued step. Status
+progress has a five-second watchdog; interruption has a fixed five-second deadline and
+boundary ACK a two-second deadline. Errors/timeouts never navigate. Qt continues to use
+the compatible next/back behavior and retains focus at boundaries.
+
 Client: `uv run python -m manimcue.cue [options] command [command ...]`.
 Control lines are limited to 512 UTF-8 bytes and the worker queue to 128 operations.
 Embedded entry cue names use percent-encoded UTF-8 within that line limit; ordinary
@@ -317,6 +337,34 @@ for the complete default key table and SPEC.md for D17/D20/D27–D41 contracts.
 
 
 ## ImGui player status (phase 10a)
+
+Phase 10d tasks 1–5 add the presenter layout, notes math, lazy thumbnails and the controls
+above. Live pooling and N+1 prefetch are separate tasks and are not part of this delivery.
+
+Info shares the current stage composition and textures. Its presenter timer starts with
+the app and remains independent of media/live pause; restart resets elapsed time while
+preserving timer pause. Notes default to 24 logical px; A−/A+ uses 2 px steps within 16–48
+and persists across slides in the session. Local MicroTeX is preferred; PC fallback is
+mathtext/Agg with baseline metrics and visible source/errors, without a TeX subprocess.
+Formula cache keys include source, style, size, DPI and color; limits are 128 entries,
+16 MiB CPU+GPU, 4096 source characters and 2048×2048 px. Markdown retains Roboto with
+merged Inconsolata arrows. Web math/font packaging still belongs to the Pyodide gate.
+
+The horizontal thumbnail strip covers the current deck. Visible slides and one neighbor
+on each side are loaded lazily: a saved thumbnail or the first normal media frame at t=0,
+with live using only its saved thumbnail. Missing images leave clickable placeholders.
+One extraction process is allowed, including a cancelled process until exit; this limit
+is independent of scene and moving-preview decoders. The four-worker file pool remains
+an idle reserve. Counters distinguish scene, preview, thumbnail, idle, retiring and total
+children. Thumbnail LRU is bounded by 64 images and 16 MiB CPU+GPU, with 256×144 RGBA output.
+
+Thumbnail clicks dispatch explicit `start_at` deck/slide indices through the entry barrier.
+After index normalization, the current target is a complete no-op, including during pause,
+reverse or preparation. Other jumps discard old local checkpoint history and pending
+results without replaying the path or running an entry cue. Compatible adjacent live
+sessions can keep their socket, generation and monotonic counters; non-adjacent jumps
+start cold. Previous/V/R then use only the new local history. Info controls consume their
+clicks; keyboard actions in both windows continue through the shared router.
 
 Qt remains the default: `uv run --frozen manim-cue present Demo`.
 The experimental desktop backend is selectable with

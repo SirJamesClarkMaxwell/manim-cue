@@ -21,6 +21,110 @@ MAX_POLLS = 100
 """Górna granica obrotów pętli w testach — żeby błąd był porażką, nie zawieszeniem."""
 
 
+@pytest.fixture(params=["manimgl", "ce-cairo"])
+def transport_scene(request):
+    """Prawdziwy parser TCP, publikacja obu backendów i bufor; tylko kamera bez GPU."""
+    from collections import deque
+    from threading import Lock
+
+    import numpy as np
+
+    from manimcue.frame_buffer import FrameBuffer, buffer_size
+    from manimcue.live_checkpoint import CheckpointStore
+    from manimcue.live_scene_ce import LiveSceneCE
+    from manimcue.live_transport import LiveTransport
+
+    class TransportScene(LiveTransport):
+        live_publish = (
+            LiveScene.live_publish if request.param == "manimgl" else LiveSceneCE.live_publish
+        )
+
+        def save_state(self):
+            self.undo_stack.append(self.checkpoints.capture())
+
+        def rewind(self):
+            self.undo_stack.pop().restore(self)
+
+    scene = TransportScene()
+    scene.SEQUENCE, scene.PRESETS, scene.LOOPS = [], {}, set()
+    scene.buffer = LineBuffer()
+    scene.listener = socket.socket()
+    scene.listener.bind(("127.0.0.1", 0))
+    scene.listener.listen(1)
+    peer = socket.create_connection(scene.listener.getsockname())
+    scene.client, _ = scene.listener.accept()
+    scene.client.setblocking(False)
+    scene.live_commands = deque()
+    scene.live_step = None
+    scene.live_step_request = scene.live_step_progress = 0
+    scene.live_reserved = scene.live_generation = None
+    scene.live_request = scene.live_reservation_request = scene.live_entry_counter = 0
+    scene.live_frame_id = scene.live_boundary_id = scene.live_seen = 0
+    scene.live_boundary_request = "0"
+    scene.live_loop = scene.abort_cue = False
+    scene.live_outgoing = bytearray()
+    scene.cursor = 0
+    scene.undo_stack = []
+    scene.mobjects = []
+    scene.time = 0
+    scene.assemble_render_groups = lambda: None
+    scene.live_bootstrap = SimpleNamespace(send=lambda value: None)
+    scene.camera = SimpleNamespace(
+        get_raw_fbo_data=lambda **kw: bytes(4),
+        get_pixel_shape=lambda: (1, 1),
+        pixel_array=np.zeros((1, 1, 4), dtype=np.uint8),
+        fps=60,
+    )
+    scene.frame = SimpleNamespace(copy=lambda: None)
+    scene.update_frame = lambda *args, **kw: None
+    scene.renderer = SimpleNamespace(update_frame=lambda scene: None)
+    scene.live_metrics = {name: [0.0, 0] for name in ("render", "readback", "publish")}
+    memory = SimpleNamespace(size=buffer_size(1, 1), buf=bytearray(buffer_size(1, 1)))
+    scene.live_buffer = FrameBuffer(memory, Lock(), 1, 1)
+    scene.checkpoints = CheckpointStore(scene)
+    try:
+        yield scene, peer
+    finally:
+        peer.close()
+        scene.close_sockets()
+
+
+@pytest.mark.parametrize("direction,result", [("next", "end"), ("back", "start")])
+def test_sequence_start_end_empty(transport_scene, direction, result):
+    scene, peer = transport_scene
+    peer.sendall(f"step 3 {direction}\n".encode())
+    scene.live_poll(0.1)
+    scene.live_execute_step(*scene.live_commands.popleft()[1:])
+    frame = scene.live_buffer.try_read()
+    assert frame.boundary and frame.frame_id == scene.live_boundary_id == 1
+    statuses = peer.recv(4096).decode()
+    assert "BOUNDARY 3 1\n" in statuses
+    assert f"STEP_RESULT 3 {result} 1\n" in statuses
+    peer.sendall(b"frame_seen 1\n")
+    scene.live_barrier()
+    assert scene.live_seen == 1 and scene.cursor == 0
+
+
+@pytest.mark.parametrize("barrier", [False, True])
+def test_step_fifo_one_recv_and_ack_barrier(transport_scene, barrier):
+    scene, peer = transport_scene
+    if barrier:
+        scene.live_publish(boundary=True)
+    peer.sendall(b"step 1 next\nstep 2 back\n" + (b"frame_seen 1\n" if barrier else b""))
+    if barrier:
+        scene.live_barrier()
+    else:
+        scene.live_poll(0.1)
+    assert list(scene.live_commands) == [("step", "1", "next"), ("step", "2", "back")]
+    scene.live_execute_step(*scene.live_commands.popleft()[1:])
+    # Wykonywany krok przyjmuje tylko jednego następcę.
+    scene.live_step = "1"
+    peer.sendall(b"step 3 next\n")
+    scene.live_poll(0.1)
+    assert list(scene.live_commands) == [("step", "2", "back")]
+    assert "STEP_RESULT 3 error 0" in peer.recv(4096).decode()
+
+
 # --- bufor bajtów ----------------------------------------------------------
 
 

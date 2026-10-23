@@ -152,6 +152,9 @@ class LiveTransport:
         self.listener.setblocking(False)
         self.live_bootstrap.send(self.listener.getsockname())
         self.live_commands = deque()
+        self.live_step = None
+        self.live_step_request = 0
+        self.live_step_progress = 0
         self.checkpoints = CheckpointStore(self)
         self.live_reserved = None
         self.live_generation = None
@@ -180,6 +183,9 @@ class LiveTransport:
                         # D28: zmiana widoku w bezczynności to zwykła klatka, bez bariery.
                         self.live_publish()
                 command = self.live_commands.popleft()
+                if isinstance(command, tuple) and command[0] == "step":
+                    self.live_execute_step(*command[1:])
+                    continue
                 entry = None
                 if isinstance(command, tuple):
                     operation, request, checkpoint, *args = command
@@ -247,6 +253,58 @@ class LiveTransport:
         self.live_outgoing.extend((message + "\n").encode("utf-8"))
         self.live_flush()
 
+    def live_execute_step(self, request, direction):
+        """Granica sekwencji jest sprawdzana dopiero po zdjęciu kroku z FIFO."""
+        self.live_step = request
+        self.abort_cue = False
+        self.live_boundary_request = request
+        self.live_status(f"STEP_STATUS {request} running")
+        result = "done"
+        try:
+            if direction == "back":
+                if self.cursor == 0 or not getattr(self, "undo_stack", [True]):
+                    result = "start"
+                else:
+                    self.live_cue = "back"
+                    self.step_back()
+            elif self.cursor >= len(self.SEQUENCE):
+                result = "end"
+            else:
+                command = self.advance()
+                self.live_cue = command
+                self.save_state()
+                self.abort_cue = False
+                self.live_loop = command in self.LOOPS
+                while True:
+                    self.PRESETS[command](self)
+                    self.abort_cue = False
+                    self.live_poll(0)
+                    if not self.live_loop or self.live_commands:
+                        break
+                self.live_loop = False
+                self.live_status(f"STEP_STATUS {request} running")
+            self.live_publish(boundary=True)
+            self.live_status(f"STEP_RESULT {request} {result} {self.live_frame_id}")
+        except Exception:
+            self.live_status(f"STEP_RESULT {request} error 0")
+            raise
+        finally:
+            self.live_step = None
+            self.live_boundary_request = "0"
+
+    def live_step_heartbeat(self):
+        """Wywoływane przy postępie animacji, nigdy przez sam transport."""
+        request = getattr(self, "live_step", None)
+        now = time.monotonic()
+        if request is None or now - self.live_step_progress < 1:
+            return
+        self.live_step_progress = now
+        status = "looping" if self.live_loop else "running"
+        self.live_status(f"STEP_STATUS {request} {status}")
+        for command in self.live_commands:
+            if isinstance(command, tuple) and command[0] == "step":
+                self.live_status(f"STEP_STATUS {command[1]} waiting")
+
     def live_flush(self) -> None:
         if self.client is not None and self.live_outgoing:
             try:
@@ -270,6 +328,23 @@ class LiveTransport:
                         self.live_seen = frame_id
                 except (ValueError, IndexError):
                     log.warning(f"Niepoprawne potwierdzenie: {command!r}")
+            elif command.startswith("step "):
+                fields = command.split()
+                valid = (
+                    len(fields) == 3
+                    and re.fullmatch(r"[1-9][0-9]{0,19}", fields[1])
+                    and fields[2] in ("next", "back")
+                    and int(fields[1]) > self.live_step_request
+                    and self.live_reserved is None
+                    and sum(isinstance(c, tuple) and c[0] == "step" for c in self.live_commands)
+                    < (1 if self.live_step is not None else 2)
+                )
+                if valid:
+                    self.live_step_request = int(fields[1])
+                    self.live_commands.append(tuple(fields))
+                    self.live_status(f"STEP_STATUS {fields[1]} waiting")
+                elif len(fields) > 1:
+                    self.live_status(f"STEP_RESULT {fields[1]} error 0")
             elif command.split(" ")[0] in (
                 "checkpoint",
                 "restore",
@@ -419,6 +494,7 @@ class LiveTransport:
                 return
             elapsed = min(duration, now - began)
             yield elapsed, elapsed - last
+            LiveTransport.live_step_heartbeat(self)
             last = elapsed
             if elapsed >= duration:
                 return

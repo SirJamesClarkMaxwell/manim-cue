@@ -5,9 +5,9 @@ import time
 from .clock import media_time, new_clock, set_playing
 from .controller import reduce
 from .geometry import rect_at
-from .info import preview_target
+from .info import preview_target, timer_elapsed, update_timer
 from .live import LiveController
-from .sources_av import Source
+from .sources_av import Source, Thumbnails, process_counts
 from .stage import compose
 from .state import initial_state, snapshot
 from .textures import upload
@@ -46,6 +46,9 @@ class App:
         self.sources, self.preview_sources = {}, {}
         self.frames, self.preview_frames = {}, {}
         self.retired_sources, self.retired_leases = [], []
+        self.thumbnails = Thumbnails(self.uploader, lambda lease: self.retired_leases.append(lease))
+        self.thumbnail_indices = []
+        self.thumbnail_requests = []
         self.show_info = options.get("show_info", True)
         self.preview = None
         self.preview_started = set()
@@ -62,6 +65,22 @@ class App:
     def _slide(self):
         deck, slide = self.state["index"]
         return self.manifest["presentations"][deck]["slides"][slide]
+
+    def request_thumbnail(self, index: tuple, size: tuple) -> None:
+        """Zamów wyłącznie statyczny normalny slajd bieżącego decku."""
+        deck, slide = index
+        presentation = self.manifest["presentations"][deck]
+        self.thumbnail_requests.append(
+            (
+                index,
+                {
+                    "slide": presentation["slides"][slide],
+                    "resolution": presentation.get("resolution", self.manifest["resolution"]),
+                    "size": size,
+                    "background": presentation.get("background", [0, 0, 0, 1]),
+                },
+            )
+        )
 
     def _close_sources(self, sources):
         for source in sources.values():
@@ -82,6 +101,7 @@ class App:
             self.held = None
         self._drop_frames(self.frames)
         self._drop_frames(self.preview_frames)
+        self.thumbnails.clear()
 
     def _held_ids(self):
         frames = self.held["frames"].values() if self.held else ()
@@ -101,6 +121,7 @@ class App:
                 return
             media = {"kind": "image", "file": media["thumbnail"]}
         source = self.source_factory()
+        source.role = "preview" if preview else "scene"
         source.prepare(self.state["entry_id"], media)
         sources[key] = source
 
@@ -164,6 +185,8 @@ class App:
         else:
             self._retire_unused(old_frames)
         self._prepare_preview()
+        self.thumbnail_indices = []
+        self.thumbnails.configure((id(self.manifest), self.state["index"][0]), [])
         self.prepare_deadline = now + 5
 
     def _prepare_preview(self):
@@ -189,9 +212,22 @@ class App:
         if visible != self.show_info:
             self.show_info = visible
             self._prepare_preview()
+            if not visible:
+                self.thumbnails.configure(self.thumbnails.revision, [])
 
     def dispatch(self, event, now):
         """Przyjmij akcję routera i wykonaj jawne efekty reducera."""
+        if event["type"] in ("timer_pause", "timer_restart"):
+            self.state["presenter_timer"] = update_timer(
+                self.state["presenter_timer"], event["type"], now
+            )
+            return []
+        if event["type"] == "notes_scale":
+            self.state["notes_size"] = min(48, max(16, self.state["notes_size"] + event["delta"]))
+            return []
+        if event["type"] == "thumbnail_range":
+            self.thumbnail_indices = event["indices"]
+            return []
         self.state, effects = reduce(self.state, event, now)
         if (
             event["type"] == "next"
@@ -226,6 +262,7 @@ class App:
                 self.live.begin_shutdown()
                 self._close_sources(self.sources)
                 self._close_sources(self.preview_sources)
+                self.thumbnails.clear()
         return effects
 
     def _accept_update(self, key, update, frames):
@@ -265,6 +302,9 @@ class App:
                 {"type": "message_expired", "revision": self.state["message_revision"]}, now
             )
         for event in self.live.poll(now):
+            if event["type"] == "navigate" and event["entry_id"] == self.state["entry_id"]:
+                self.dispatch({"type": event["direction"]}, now)
+                continue
             if event["type"] == "restore_frame":
                 key = str(event["index"])
                 old = self.frames.get(key, {}).get("lease")
@@ -399,6 +439,18 @@ class App:
         self.retired_sources = [
             source for source in self.retired_sources if not source.poll_closed(now)
         ]
+        deck = self.state["index"][0]
+        presentation = self.manifest["presentations"][deck]
+        self.thumbnail_requests = []
+        if self.show_info and not self.state.get("closing"):
+            for index in self.thumbnail_indices:
+                if 0 <= index < len(presentation["slides"]):
+                    self.request_thumbnail((deck, index), (256, 144))
+        requests = self.thumbnail_requests
+        self.thumbnails.configure((id(self.manifest), deck), requests)
+        self.thumbnails.poll_thumbnails(
+            now, allow_start=bool(requests) and time.perf_counter() < deadline
+        )
         return self.presenter_snapshot(now)
 
     def presenter_snapshot(self, now):
@@ -406,11 +458,22 @@ class App:
         result = snapshot(self.state)
         result.update(
             notes=self._slide().get("notes", ""),
-            elapsed=now - self.started_at,
+            elapsed=timer_elapsed(self.state["presenter_timer"], now),
             composition=self.composition,
             errors=list(self.errors),
             active_live=self.live.active,
             loop=self._slide().get("loop", False),
+            thumbnails={
+                key[1]: {
+                    name: value[name]
+                    for name in ("texture", "width", "height", "error")
+                    if name in value
+                }
+                for key, value in self.thumbnails.cache.items()
+            },
+            process_counts=process_counts(self.thumbnails),
+            thumbnail_bytes=self.thumbnails.bytes
+            + (self.thumbnails.working_bytes if self.thumbnails.worker else 0),
             clips=[
                 {
                     "index": key,
@@ -449,4 +512,9 @@ class App:
     @property
     def closed(self):
         """Dekodery i live muszą zakończyć się przed zniszczeniem kontekstu."""
-        return self.state.get("closing") and self.live.closed and not self.retired_sources
+        return (
+            self.state.get("closing")
+            and self.live.closed
+            and not self.retired_sources
+            and self.thumbnails.worker is None
+        )

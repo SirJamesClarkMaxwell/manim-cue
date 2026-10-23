@@ -7,10 +7,10 @@ pokazuje ten sam obraz z konstrukcji. Podgląd następnego slajdu ma własną ko
 import math
 from pathlib import Path
 
-from qtpy.QtCore import QPointF, QRectF, QSizeF, Qt, Signal
+from qtpy.QtCore import QEvent, QPointF, QRectF, QSizeF, Qt, Signal
 from qtpy.QtGui import QColor, QImage, QPainter, QPixmap, QTransform
 from qtpy.QtMultimediaWidgets import QGraphicsVideoItem
-from qtpy.QtWidgets import QFrame, QGraphicsPixmapItem, QGraphicsScene, QGraphicsView
+from qtpy.QtWidgets import QApplication, QFrame, QGraphicsPixmapItem, QGraphicsScene, QGraphicsView
 
 from manimcue.slides.config import ClipLayer, Layer, LiveLayer, Rect
 
@@ -221,10 +221,10 @@ class SlideView(QGraphicsView):
     layer_clicked = Signal(int)
     """Klik w widoku: indeks warstwy live pod kursorem albo -1 poza warstwami (F4)."""
     layer_double_clicked = Signal(int)
-    pointer_dragged = Signal(QPointF, bool)
-    """Przeciąganie lewym przyciskiem: punkt we współrzędnych sceny i czy wciśnięty Shift (D28)."""
+    pointer_dragged = Signal(QPointF, bool, str, bool)
+    """Punkt sceny, Shift, przycisk i Alt; capture kończy się na release (D47)."""
     pointer_released = Signal()
-    wheel_turned = Signal(float)
+    wheel_turned = Signal(float, int)
     """Obrót kółka w ząbkach (120 jednostek Qt = 1), dodatni od użytkownika."""
 
     def __init__(
@@ -234,6 +234,8 @@ class SlideView(QGraphicsView):
     ) -> None:
         super().__init__(composition)
         self.aspect_ratio_mode = aspect_ratio_mode
+        self.pointer_button = None
+        QApplication.instance().installEventFilter(self)
         self.setFrameShape(QFrame.Shape.NoFrame)
         self.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         self.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
@@ -242,6 +244,18 @@ class SlideView(QGraphicsView):
         # Bez fokusu: QAbstractScrollArea zjadłby strzałki na przewijanie, a klawisze
         # mają trafiać do okna (Player.keyPressEvent, Info.keyPressEvent).
         self.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+
+    def eventFilter(self, watched, event):
+        if self.pointer_button is not None and (
+            event.type() == QEvent.Type.ApplicationDeactivate
+            or (
+                event.type() in (QEvent.Type.WindowDeactivate, QEvent.Type.FocusOut)
+                and watched in (self, self.viewport(), self.window())
+            )
+        ):
+            self.pointer_button = None
+            self.pointer_released.emit()
+        return super().eventFilter(watched, event)
 
     def layer_at(self, point) -> int:
         """Najwyższy kontener pod punktem; margines klipu blokuje klik do live poniżej."""
@@ -252,26 +266,66 @@ class SlideView(QGraphicsView):
         return -1
 
     def mousePressEvent(self, event) -> None:
-        self.layer_clicked.emit(self.layer_at(event.position().toPoint()))
+        buttons = {
+            Qt.MouseButton.LeftButton: "left",
+            Qt.MouseButton.MiddleButton: "middle",
+            Qt.MouseButton.RightButton: "right",
+        }
+        self.pointer_button = (
+            buttons.get(event.button()) if event.buttons() == event.button() else None
+        )
+        if self.pointer_button:
+            self.layer_clicked.emit(self.layer_at(event.position().toPoint()))
+            self.pointer_dragged.emit(
+                self.mapToScene(event.position().toPoint()),
+                bool(event.modifiers() & Qt.KeyboardModifier.ShiftModifier),
+                self.pointer_button,
+                bool(event.modifiers() & Qt.KeyboardModifier.AltModifier),
+            )
+        else:
+            self.pointer_released.emit()
         super().mousePressEvent(event)
 
     def mouseDoubleClickEvent(self, event) -> None:
-        self.layer_double_clicked.emit(self.layer_at(event.position().toPoint()))
+        if (
+            event.button() == Qt.MouseButton.LeftButton
+            and not event.modifiers() & Qt.KeyboardModifier.AltModifier
+        ):
+            self.layer_double_clicked.emit(self.layer_at(event.position().toPoint()))
         super().mouseDoubleClickEvent(event)
 
     def mouseMoveEvent(self, event) -> None:
-        if event.buttons() & Qt.MouseButton.LeftButton:
+        buttons = {
+            "left": Qt.MouseButton.LeftButton,
+            "middle": Qt.MouseButton.MiddleButton,
+            "right": Qt.MouseButton.RightButton,
+        }
+        if self.pointer_button and event.buttons() == buttons[self.pointer_button]:
             shift = bool(event.modifiers() & Qt.KeyboardModifier.ShiftModifier)
-            self.pointer_dragged.emit(self.mapToScene(event.position().toPoint()), shift)
+            alt = bool(event.modifiers() & Qt.KeyboardModifier.AltModifier)
+            self.pointer_dragged.emit(
+                self.mapToScene(event.position().toPoint()), shift, self.pointer_button, alt
+            )
+        elif self.pointer_button:
+            self.pointer_button = None
+            self.pointer_released.emit()
         super().mouseMoveEvent(event)
 
     def mouseReleaseEvent(self, event) -> None:
+        self.pointer_button = None
         self.pointer_released.emit()
         super().mouseReleaseEvent(event)
 
     def wheelEvent(self, event) -> None:
         # Bez przewijania widoku: kadr zawsze mieści się w oknie (fitInView).
-        self.wheel_turned.emit(event.angleDelta().y() / 120)
+        point = event.position().toPoint()
+        if self.layer_at(point) >= 0:
+            self.wheel_turned.emit(
+                event.angleDelta().y() / 120
+                if event.angleDelta().y()
+                else event.pixelDelta().y() / 40,
+                self.layer_at(point),
+            )
         event.accept()
 
     def resizeEvent(self, event) -> None:

@@ -29,6 +29,20 @@ def running(**options):
     return state
 
 
+@pytest.mark.parametrize("preparing", [True, False])
+def test_current_thumbnail_noop_entry_pause_reverse_preparing_no_effects(preparing):
+    state = make_state(index=[1, 0], preparing=preparing, paused=True, reverse=True)
+    result, effects = act(state, "start_at", index=[-1, -1])
+    assert result == state and effects == []
+
+
+def test_thumbnail_start_at_barrier():
+    state = running()
+    result, effects = act(state, "start_at", index=[1, 0])
+    assert result["preparing"] and result["entry_id"] == state["entry_id"] + 1
+    assert [effect["type"] for effect in effects] == ["cancel", "prepare"]
+
+
 def test_preparing_next_pause_replay_and_stale():
     state = make_state()
     assert act(state, "replay")[0] == state

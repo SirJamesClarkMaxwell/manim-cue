@@ -16,6 +16,7 @@ from qtpy.QtWidgets import QGraphicsRectItem
 from manimcue.composition import SlideComposition
 from manimcue.live_entry import EntryHistory
 from manimcue.live_session import LiveSession, LiveSpec
+from manimcue.player.input import gesture_mode
 from manimcue.slides.config import Keys, LiveLayer, SlideConfig
 from manimcue.slides.logger import logger
 
@@ -59,6 +60,8 @@ class LiveLayerController(QObject):
         self.failed: set[int] = set()
         self.closing = False
         self.drag_from: QPointF | None = None
+        self.gesture_allowed = False
+        self.drag_mode = None
         self.framed: int | None = None
         composition.layer_moved.connect(self.follow_layer)
         self.border = QGraphicsRectItem()
@@ -101,6 +104,7 @@ class LiveLayerController(QObject):
         old_identities = self.identities
         self.active = None
         self.drag_from = None
+        self.gesture_allowed = False
         self.failed = set()
         self.border.hide()
         self.sessions, self.started, self.identities = {}, {}, {}
@@ -377,6 +381,8 @@ class LiveLayerController(QObject):
     def click(self, index: int) -> None:
         """Klik w widoku głównym: warstwa (indeks) dostaje klawisze, -1 je zwalnia."""
         self.drag_from = None
+        self.drag_mode = None
+        self.gesture_allowed = self.active == index
         if index not in self.sessions or index in self.failed:
             self.release()
             return
@@ -384,22 +390,48 @@ class LiveLayerController(QObject):
         self.frame_layer(index, "active")
         self.changed.emit()
 
-    def drag(self, point: QPointF, shift: bool) -> None:
-        """Przeciąganie po aktywnej warstwie (D28): obrót kamery, z Shiftem przesunięcie."""
-        if self.active is None:
+    def drag(self, point: QPointF, shift: bool, button: str = "middle", alt: bool = False) -> None:
+        """Capture od press nad aktywnym kontenerem, bez delty na pierwszym kliknięciu."""
+        if self.active is None or not self.gesture_allowed:
             return
+        session = self.sessions[self.active]
+        history = self.histories.get(session)
+        rect = self.composition.layer_rects[self.active]
+        mode = gesture_mode(button, shift, alt)
+        if (
+            (history and history.reserved)
+            or mode is None
+            or rect.width() <= 0
+            or rect.height() <= 0
+        ):
+            self.end_drag()
+            return
+        if self.drag_from is None:
+            if not rect.contains(point):
+                self.end_drag()
+                return
+            self.drag_mode = mode
         if self.drag_from is not None:
-            rect = self.composition.layer_rects[self.active]
             dx = (point.x() - self.drag_from.x()) / rect.width()
             dy = (point.y() - self.drag_from.y()) / rect.height()
-            self.send(f"view {'pan' if shift else 'orbit'} {dx:.5f} {dy:.5f}")
+            if dx == 0 and dy == 0:
+                return
+            if self.drag_mode == "zoom":
+                self.send(f"view zoom {-20 * dy:g}")
+            else:
+                self.send(f"view {self.drag_mode} {dx:.5f} {dy:.5f}")
         self.drag_from = point
 
     def end_drag(self) -> None:
         self.drag_from = None
+        self.drag_mode = None
+        self.gesture_allowed = False
 
-    def wheel(self, steps: float) -> None:
-        if self.active is not None and steps:
+    def wheel(self, steps: float, index: int | None = None) -> None:
+        if self.active is not None and steps and (index is None or index == self.active):
+            rect = self.composition.layer_rects[self.active]
+            if rect.width() <= 0 or rect.height() <= 0:
+                return
             self.send(f"view zoom {steps:g}")
 
     def double_click(self, index: int) -> None:
@@ -407,6 +439,7 @@ class LiveLayerController(QObject):
             self.send("view reset")
 
     def release(self) -> None:
+        self.end_drag()
         if self.active is None:
             return
         self.active = None
@@ -464,7 +497,10 @@ class LiveLayerController(QObject):
         session = self.sessions[self.active]
         history = self.histories.get(session)
         if history and history.reserved:
+            self.end_drag()
             self.observed.emit("live: przygotowanie zarezerwowane, komenda ręczna pominięta")
+            return
+        if command.startswith("view ") and self.identities[self.active][-1] == "ce-cairo":
             return
         if session.state == "ready" and not repeat:
             session.send(command)

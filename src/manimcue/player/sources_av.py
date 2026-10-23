@@ -2,14 +2,18 @@
 
 import struct
 import time
+import weakref
+from collections import OrderedDict
 from multiprocessing import get_context
 from multiprocessing.shared_memory import SharedMemory
 
-from .decoder_worker import HEADER, PROGRESS, SLOT, run_pooled
+from .decoder_worker import HEADER, PROGRESS, SLOT, run_pooled, run_thumbnail
 
 POOL_SIZE = 4
 """Ciepłe procesy na bazę i do trzech klipów slajdu; podgląd może wystartować na zimno."""
 _pool = []
+_sources = weakref.WeakSet()
+_retiring_pool = []
 
 
 def _spawn():
@@ -39,13 +43,38 @@ def _take():
 def close_pool() -> None:
     """Zamknięty potok kończy czekający proces puli bez join w UI."""
     while _pool:
-        _pool.pop()[1].close()
+        process, connection, _ = _pool.pop()
+        connection.close()
+        _retiring_pool.append(process)
+
+
+def process_counts(thumbnails=None) -> dict:
+    """Kończący proces zajmuje miejsce aż do exit, nie tylko do żądania stop."""
+    counts = {"scene": 0, "preview": 0, "thumbnail": 0, "idle": 0, "retiring": 0}
+    for source in list(_sources):
+        if source.process is not None and source.process.exitcode is None:
+            counts[source.role] += 1
+        counts["retiring"] += sum(p.exitcode is None for p in source.retired)
+    counts["idle"] = sum(p.exitcode is None for p, _, _ in _pool)
+    for process in list(_retiring_pool):
+        if process.exitcode is None:
+            counts["retiring"] += 1
+        else:
+            process.join(0)
+            process.close()
+            _retiring_pool.remove(process)
+    if thumbnails and thumbnails.worker:
+        counts["retiring" if thumbnails.cancelled else "thumbnail"] += 1
+    counts["total"] = sum(counts.values())
+    return counts
 
 
 class Source:
     """Nieblokujący nadzorca źródła z dwoma slotami RGBA i generacją."""
 
     def __init__(self):
+        _sources.add(self)
+        self.role = "scene"
         self.generation = 0
         self.entry_id = 0
         self.process = None
@@ -206,3 +235,129 @@ class Source:
                 process.close()
         self.retired = pending
         return self.process is None and not pending
+
+
+class Thumbnails:
+    """Jedna ekstrakcja z nieblokującym reap i LRU obejmującym CPU oraz GPU."""
+
+    max_images = 64
+    max_bytes = 16 * 1024 * 1024
+    working_bytes = 8 * 256 * 144 * 4
+
+    def __init__(self, uploader, retire):
+        self.uploader, self.retire = uploader, retire
+        self.cache = OrderedDict()
+        self.requests = []
+        self.revision = None
+        self.worker = None
+        self.cancelled = False
+        self.result = None
+        self.bytes = 0
+
+    def configure(self, revision, requests):
+        """Nowy deck unieważnia cache; ukrycie anuluje ekstrakcję, bez nowego spawnu."""
+        if revision != self.revision:
+            self.clear()
+            self.revision = revision
+        self.requests = list(requests)
+        for key, _ in requests:
+            self.get(key)
+        if self.worker and self.worker[2] not in {key for key, _ in requests}:
+            self.cancel()
+
+    def cancel(self):
+        if self.worker and not self.cancelled:
+            self.cancelled = True
+            self.result = None
+            self.worker[0].terminate()
+
+    def clear(self):
+        self.cancel()
+        for value in self.cache.values():
+            if value.get("lease"):
+                self.retire(value["lease"])
+        self.cache.clear()
+        self.bytes = 0
+        self.requests = []
+
+    def _evict(self, extra=0):
+        while self.cache and (
+            len(self.cache) >= self.max_images or self.bytes + extra > self.max_bytes
+        ):
+            _, value = self.cache.popitem(last=False)
+            self.bytes -= value.get("bytes", 0)
+            if value.get("lease"):
+                self.retire(value["lease"])
+
+    def get(self, key):
+        value = self.cache.get(key)
+        if value is not None:
+            self.cache.move_to_end(key)
+        return value
+
+    def poll_thumbnails(self, now: float, *, allow_start=True) -> list[dict]:
+        """Odbiór wyniku i exit poprzedza nowy start, także po anulowaniu."""
+        events = []
+        if self.worker:
+            process, connection, key, revision, began = self.worker
+            if not self.cancelled:
+                try:
+                    if connection.poll():
+                        self.result = connection.recv()
+                        if "memory" in self.result:
+                            memory = SharedMemory(name=self.result.pop("memory"))
+                            try:
+                                self.result["rgba"] = bytes(memory.buf)
+                            finally:
+                                memory.close()
+                            connection.send("received")
+                except (EOFError, OSError):
+                    pass
+                if now - began > 5:
+                    self.cache[key] = {"error": "Timeout ekstrakcji miniatury 5 s"}
+                    self.cancel()
+            if process.exitcode is None:
+                return events
+            process.join(0)
+            process.close()
+            connection.close()
+            self.worker = None
+            if not self.cancelled and revision == self.revision:
+                value = self.result or {"error": "Ekstrakcja zakończona bez obrazu"}
+                if "rgba" in value:
+                    size = len(value["rgba"]) * 2
+                    self._evict(size + self.working_bytes)
+                    try:
+                        lease = self.uploader(value)
+                        value = {**value, "lease": lease, "texture": lease.texture, "bytes": size}
+                    except Exception as error:  # noqa: BLE001 — placeholder zamiast awarii UI
+                        value = {"error": str(error)}
+                self.cache[key] = value
+                self.bytes += value.get("bytes", 0)
+                events.append({"index": key, **value})
+            self.result = None
+            self.cancelled = False
+        if allow_start:
+            request = next(
+                ((key, spec) for key, spec in self.requests if key not in self.cache), None
+            )
+            if request:
+                key, spec = request
+                # Dekodowanie źródła oraz małe rastry, canvas, resize/crop, SHM i upload.
+                from .decoder_worker import THUMBNAIL_DECODE_BYTES
+
+                self.working_bytes = (
+                    THUMBNAIL_DECODE_BYTES
+                    + (len(spec["slide"].get("layers", [])) + 8) * 256 * 144 * 4
+                )
+                self._evict(self.working_bytes)
+                if self.working_bytes > self.max_bytes:
+                    self.cache[key] = {"error": "Kompozycja przekracza budżet miniatur"}
+                    return events
+                context = get_context("spawn")
+                connection, child = context.Pipe()
+                process = context.Process(target=run_thumbnail, args=(spec, child), daemon=True)
+                process.start()
+                child.close()
+                self.worker = process, connection, key, self.revision, now
+        return events

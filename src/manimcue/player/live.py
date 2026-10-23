@@ -31,6 +31,8 @@ class LiveController:
         self.files_ready = False
         self.started_group = False
         self.events = []
+        self.steps = {}
+        self.step_counters = {}
 
     def enter(self, entry: dict) -> None:
         """Przejmiij zgodne sąsiednie sesje; nowe wejście rezerwuje checkpoint."""
@@ -45,11 +47,14 @@ class LiveController:
         self.frame_deadlines.clear()
         self.start_deadlines.clear()
         self.active = None
+        self.steps.clear()
         old = dict(self.sessions)
         identities = dict(self.identities)
         for session, frame in self.pending.items():
             if frame.boundary:
                 session.send(f"frame_seen {frame.frame_id}")
+                if session in self.histories:
+                    self.histories[session].boundaries.pop(frame.frame_id, None)
         self.events = []
         self.sessions, self.identities, self.cues, self.pending, self.failed = {}, {}, {}, {}, {}
         same = old_entry and old_entry["index"] == entry["index"]
@@ -100,6 +105,8 @@ class LiveController:
                 )
             else:
                 session = old.pop(reused)
+                if entry.get("reason") == "start_at":
+                    self.restore_resources.pop(session, None)
             self.sessions[index], self.identities[index] = session, identity
             self.started[index] = now
             if entry.get("preserve_live") and reused is not None:
@@ -161,8 +168,11 @@ class LiveController:
     def poll(self, now: float) -> list[dict]:
         """Najpierw przyjmij statusy, później kopiuj klatki bez automatycznego ACK."""
         for index, session in self.sessions.items():
+            if self.active != index:
+                self.steps.pop(session, None)
             history = self.histories.get(session)
             for event in session.poll():
+                self._step_status(session, event, now)
                 if history:
                     correlated = (history.expected, history.pending_start)
                     history.accept(event)
@@ -183,6 +193,13 @@ class LiveController:
                 if event.startswith("ERROR"):
                     self._fail(index, event)
             if index in self.failed:
+                continue
+            if any(
+                now >= step.get("interrupt_deadline", float("inf")) or now >= step["deadline"]
+                for step in self.steps.get(session, [])
+            ):
+                self._fail(index, "Timeout kroku 5 s; wynik live nieznany")
+                self.steps.pop(session, None)
                 continue
             if session in self.frame_deadlines and now >= self.frame_deadlines[session]:
                 self._fail(index, "Timeout upload/ACK 2 s; wynik live nieznany")
@@ -215,6 +232,21 @@ class LiveController:
             if frame is None:
                 continue
             request = history.boundaries.get(frame.frame_id) if history and frame.boundary else None
+            step = next(
+                (s for s in self.steps.get(session, []) if s.get("frame_id") == frame.frame_id),
+                None,
+            )
+            if step:
+                request = step["request"]
+            if (
+                frame.boundary
+                and step is None
+                and (
+                    (not history and self.steps.get(session))
+                    or any(s["request"] == request for s in self.steps.get(session, []))
+                )
+            ):
+                continue
             if history and frame.boundary and request is None:
                 continue
             current_requests = {"0"}
@@ -222,9 +254,11 @@ class LiveController:
                 current_requests.add(history.expected[0])
             if history and history.pending_start:
                 current_requests.add(history.pending_start[0])
+            current_requests.update(s["request"] for s in self.steps.get(session, []))
             stale = bool(history and frame.boundary and request not in current_requests)
             if stale:
                 session.send(f"frame_seen {frame.frame_id}")
+                history.boundaries.pop(frame.frame_id, None)
                 self.pending.pop(session, None)
                 continue
             if frame.boundary:
@@ -247,6 +281,7 @@ class LiveController:
                 session.send(f"frame_seen {frame.frame_id}")
             if not session.running:
                 self.stopping.remove(session)
+                self.step_counters.pop(session, None)
         events, self.events = self.events, []
         return events
 
@@ -269,8 +304,23 @@ class LiveController:
         self.events.append({"type": "assigned", "index": index, "entry_id": self.entry["entry_id"]})
         if owned.boundary:
             session.send(f"frame_seen {owned.frame_id}")
+            steps = self.steps.get(session, [])
+            step = next((s for s in steps if s.get("frame_id") == owned.frame_id), None)
+            if step:
+                steps.remove(step)
+                if step["result"] in ("start", "end") and self.active == index:
+                    self.active = None
+                    self.steps.pop(session, None)
+                    self.events.append(
+                        {
+                            "type": "navigate",
+                            "direction": "previous" if step["result"] == "start" else "next",
+                            "entry_id": self.entry["entry_id"],
+                        }
+                    )
             if history and history.expected and frame["request_id"] == history.expected[0]:
                 history.received.add(owned.frame_id)
+            if history:
                 history.boundaries.pop(owned.frame_id, None)
         if history:
             history.finish()
@@ -332,6 +382,11 @@ class LiveController:
             self.stopping.append(session)
         self.sessions = {}
 
+    def cancel_steps(self) -> None:
+        """Zmiana fokusu odrzuca także nawigację czekającą już po ACK."""
+        self.steps.clear()
+        self.events = [event for event in self.events if event["type"] != "navigate"]
+
     @property
     def closed(self):
         """Zasoby GL można zwolnić dopiero po odebraniu wszystkich procesów."""
@@ -345,14 +400,66 @@ class LiveController:
         history = self.histories.get(session)
         if history and history.reserved:
             return
+        if command in ("next", "back"):
+            self.step(command, self.entry["entry_id"])
+            return
         if command.startswith("view ") and self.identities[self.active][-1] == "ce-cairo":
             return
         session.send(command)
 
+    def step(self, direction: str, entry_id: int) -> None:
+        """Jeden krok wykonywany i jeden FIFO; liczniki należą do socketu."""
+        session = self.sessions.get(self.active)
+        if (
+            session is None
+            or self.entry["entry_id"] != entry_id
+            or not self.started_group
+            or session.state != "ready"
+            or session.stopping
+            or (self.histories.get(session) and self.histories[session].reserved)
+        ):
+            return
+        steps = self.steps.setdefault(session, [])
+        if len(steps) >= 2:
+            return
+        now = time.monotonic()
+        if steps:
+            steps[0].setdefault("interrupt_deadline", now + 5)
+        history = self.histories.get(session)
+        request = max(self.step_counters.get(session, 0), history.request if history else 0) + 1
+        if history:
+            history.request = request
+        self.step_counters[session] = request
+        steps.append({"request": str(request), "entry_id": entry_id, "deadline": now + 5})
+        session.send(f"step {request} {direction}")
+
+    def _step_status(self, session, event, now):
+        """Tylko skorelowany postęp odnawia watchdog; wynik czeka na obraz i ACK."""
+        fields = event.split()
+        if len(fields) < 3 or fields[0] not in ("STEP_STATUS", "STEP_RESULT"):
+            return
+        step = next((s for s in self.steps.get(session, []) if s["request"] == fields[1]), None)
+        if step is None or step["entry_id"] != self.entry["entry_id"]:
+            return
+        if now >= min(step["deadline"], step.get("interrupt_deadline", float("inf"))):
+            return
+        if fields[0] == "STEP_STATUS" and fields[2] in ("waiting", "running", "looping"):
+            step["deadline"] = now + 5
+        elif len(fields) == 4 and fields[2] in ("done", "start", "end", "error"):
+            if fields[2] == "error":
+                index = next(i for i, value in self.sessions.items() if value is session)
+                self._fail(index, "Błąd kroku; wynik live nieznany")
+                self.steps.pop(session, None)
+            else:
+                try:
+                    step.update(result=fields[2], frame_id=int(fields[3]), deadline=now + 2)
+                except ValueError:
+                    return
+
 
 def view(event: dict, container: tuple) -> dict:
-    """Gesty D28 normalizują przesunięcie przez kontener, także na jego marginesie."""
-    if event.get("engine") == "ce-cairo":
+    """Gesty D47 normalizują przesunięcie przez kontener, także na jego marginesie."""
+    if event.get("engine") == "ce-cairo" or container[2] <= 0 or container[3] <= 0:
         return {}
     gesture = event.get("gesture", event.get("type"))
     if gesture == "double_click":
@@ -361,6 +468,16 @@ def view(event: dict, container: tuple) -> dict:
         return {"command": f"view zoom {event['steps']:g}"}
     if gesture == "drag" and container[2] > 0 and container[3] > 0:
         dx, dy = event["delta"]
-        mode = "pan" if event.get("shift") else "orbit"
+        if dx == 0 and dy == 0:
+            return {}
+        from .input import gesture_mode
+
+        mode = event.get("mode") or gesture_mode(
+            event.get("button", "middle"), event.get("shift", False), event.get("alt", False)
+        )
+        if mode is None:
+            return {}
+        if mode == "zoom":
+            return {"command": f"view zoom {-20 * dy / container[3]:g}"}
         return {"command": f"view {mode} {dx / container[2]:.5f} {dy / container[3]:.5f}"}
     return {}
