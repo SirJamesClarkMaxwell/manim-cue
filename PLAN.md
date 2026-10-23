@@ -1292,116 +1292,245 @@ Do tego czasu nic w seminarium od tego projektu nie zależy (R8 tamtego planu).
 
 Wchodzi, gdy manimgx dostanie udokumentowany tryb interaktywny (warunek z D12).
 
-## Faza 10 — player ImGui: jeden kod na PC i w przeglądarce (kontrakt, szkic przed rundą 21)
+## Faza 10 — player ImGui: jeden kod na PC i w przeglądarce (kontrakt)
 
-**Powód.** Kryterium 8 fazy 5 ([raport](reports/REPORT-f5-crit8.md)): `QGraphicsVideoItem` w Qt 6
-maluje wideo na CPU (`QVideoFrame::map/toImage`, transfer D3D11 → CPU w wątku GUI); baza + 2–3 klipy
-1080p60 z widocznym Info zawieszają player, także reproduktor w samym Qt bez manim-cue. Prelegent
-(2026-10-23) chce jednego kodu UI na PC i w przeglądarce, w Pythonie, i wybrał ImGui.
-**PoC** ([experiments/f5i_imgui](experiments/f5i_imgui/README.md)): imgui-bundle 1.93 — jedyne
-wiązanie z Pyodide i mostem `imgui_bundle.webgl.register_texture` (pyimgui: ImGui 1.82, bez kół 3.13
-i webu; slimgui: bez Pyodide). Ten sam `stage.py` na PC (PyAV + `glTexSubImage2D`, prawdziwy
-`LiveSession`) i w przeglądarce (`<video>` → `texImage2D`). Wynik przy N=3 z Info (8 dekoderów
-1080p60): PC ~58 kl./s każdy strumień, live 58; web headless (ANGLE D3D11 RTX 4060) 48–56. Ekran był
-zablokowany — bez vsync i bez pomiaru Edge z oknem.
+**Stan 2026-10-23:** kontrakt po rundzie 21; implementacja 10a zablokowana na bramce 1,
+nie jest ukończonym playerem. Dowody i ograniczenia: `reports/REPORT-10a.md`.
 
-**Cel.** Nowy player w `src/manimcue/player/` (bez Qt) z parytetem funkcji obecnego playera Qt,
-najpierw na PC (10a), potem ten sam kod w przeglądarce bez live (10b); live w przeglądarce (10c)
-zarys. Render, model decku (JSON v4), workery live, transport, checkpointy 5g, `SceneView` — bez
-zmian. Player Qt zostaje domyślny do próby człowieka 10a; usunięcie to osobna decyzja.
+**Powód i cel.** Qt QGraphicsVideoItem zawiesza UI przy bazie i 2–3 klipach 1080p60
+z Info (`reports/REPORT-f5-crit8.md`). ImGui ma dać parytet PC z uzgodnionym wyjątkiem
+audio (D44), wspólny kod UI/logiki z webem i brak zawieszeń. PoC `experiments/f5i_imgui/`
+jest punktem wyjścia, nie dowodem parytetu ani zaliczeniem kryteriów w oknie.
+Qt pozostaje domyślny, nie usuwamy go. JSON v4, render, SceneView, EntryHistory,
+LiveSession, protokół transportu i workery Manima pozostają źródłem istniejącej semantyki.
+Nie forkujemy ani nie łatamy Manima; jeden wątek aplikacji na proces.
 
-**Proponowane decyzje (do SPEC po rundzie):**
-- **D42 — player ImGui.** imgui-bundle (pin wersji), PyOpenGL na PC; ImGui w jednym wątku kodu
-  aplikacji, poll workerów live raz na klatkę (bez `select`, bez wątków aplikacji). Kod współdzielony
-  nie importuje platformy; platforma dostarcza źródła tekstur i pętlę (hello_imgui na PC,
-  `requestAnimationFrame` w Pyodide). Wybór: `manim-cue present --player imgui|qt` (domyślnie `qt`).
-- **D43 — zegar.** Na PC dekodowanie bazy i klipów prowadzi wspólny zegar grupy (klatka =
-  floor(t · fps · rate), CFR jak w F5); bariera gotowości D31 i pauza bez zmian semantyki D17.
-  Zgodność co do klatki na PC jest skutkiem ubocznym, nie API (brak seek dla autora). W przeglądarce
-  `<video>` ma własne zegary: wspólny start i pauza, dryf zaakceptowany (D17 bez zmian).
-- **D44 — dźwięk.** Qt odtwarza dźwięk bazy (`QAudioOutput`). Prelegent (2026-10-23): w 10a na PC
-  bez dźwięku, z ostrzeżeniem, gdy baza ma strumień audio; decyzja (np. `sounddevice` prowadzone
-  wspólnym zegarem) przed usunięciem playera Qt. W przeglądarce dźwięk bazy z `<video>` bez wyciszenia.
+**Decyzje:** D42–D44 w SPEC. Wykonawca całej F10: **codex**, zadaniami po kolei,
+także kontroler live i odbiór techniczny przypisane w recenzji Claude'owi.
+Claude przegląda po każdym etapie, wykonuje próby człowieka i pomiar przy odblokowanym ekranie.
+Bez commita/stash/reset/checkout i bez zmian .venv w tej sesji.
+Rozstrzygnięcia wszystkich 23 punktów rundy 21 zapisano w REVIEW-LOG.
 
-**Projekt 10a (PC):**
-- `player/stage.py` — kompozycja z PoC: z-order warstw, `Rect`, ruch `rect_at(t)`, izotropowe
-  dopasowanie i pasy D34 w kolorze `camera.background_rgba`, obwódki `BorderStyle` (aktywna/błąd,
-  `None`), placeholder i ochrona przed czarną klatką (zostaje ostatnia dobra klatka), alfa live
-  (`background_opacity`) przez mieszanie ImGui z prostą alfą.
-- `player/clock.py` — grupa slajdu: bariera (pierwsze klatki bazy i klipów, READY/wejście live D31,
-  5g), start, pauza w przygotowaniu, `playback_rate`, replay od zera, reverse (`*_reversed.mp4`,
-  klipy na ostatniej klatce w prostokącie końcowym), pętle slajdu z zamówionym wyjściem po iteracji,
-  `auto_next`, `skip_all`, `exit_after_last_slide`, baza statyczna (obraz) i GIF.
-- `player/sources_av.py` — PyAV: wideo (wątki FFmpeg, pętla przez seek, konwersja RGBA w rozmiarze
-  tekstury — opcjonalnie rozmiar prostokąta), obraz/GIF (PIL); pomiar opcjonalnego `hwaccel`
-  (d3d11va/cuda) bez gwarancji.
-- `player/live.py` — kontroler live bez Qt: przeniesienie logiki `live_layers.py` 1:1 (sesje D33 i
-  ich przejmowanie, `enter_cue`, `EntryHistory` 5g z `live_entry.py`, ACK granicy po narysowaniu
-  klatki, rezerwacja cue/view, fokus D20 klik/Esc, przekazywanie klawiszy, gesty kamery D28 z myszy
-  ImGui, błędy i komunikaty, miniatury live w podglądzie).
-- `player/app.py` — nawigacja i klawisze z `Config.keys` (identyfikatory Qt → `ImGuiKey`, jawna tabela
-  z testem; nieznany klawisz → czytelny błąd), stan prelegenta 5c (Info i nakładka `S`), Info:
-  scena, slajd, zegar, czas od startu, notatki Markdown (`imgui_md`), bieżący widok, podgląd
-  następnego **z ruchem warstw** (`rect_at(t)` — zamyka odroczony ruch podglądu 5d), ukryte Info nie
-  dekoduje podglądu.
-- `player/desktop.py` — hello_imgui: okno główne i Info jako osobne okno systemowe (multi-viewport)
-  na ekranie `--info-window-screen`; `--screen`, pełny ekran `F`, `--hide-mouse`/`H`, vsync,
-  `--start-paused`, `--start-at*`, `--aspect-ratio`, `--playback-rate`, `--next-terminates-loop`,
-  `--hide-info-window`/`--show-info-window`, wiele prezentacji w jednym wywołaniu.
-- Testy bez okna: logika (`clock`, `app`, `live`) w czystym Pythonie; kompozycja na kontekście ImGui
-  bez renderera (komendy `ImDrawList`: tekstury, współrzędne ±0,5 px); kilka testów dymnych
-  w prawdziwym oknie (znacznik `gpu`); integracja z prawdziwymi workerami GL i CE.
+### Architektura i protokół źródła
 
-**Projekt 10b (przeglądarka, bez live):** `manim-cue present --player web` uruchamia lokalny serwer
-(jeden wątek, `Range`, tylko pliki decku i strony) i otwiera Edge/Chrome w trybie `--app`. Strona
-ładuje Pyodide i imgui-bundle, te same moduły `player/` (bez `desktop.py`, `sources_av.py`,
-`live.py`) oraz `player/web.py` (`<video>`/`<img>` → tekstury WebGL). Info: drugie okno przeglądarki
-z tym samym kodem, synchronizacja `BroadcastChannel` (indeks slajdu, zegar, pauza); pełny ekran przez
-Fullscreen API. Warstwa live: miniatura (`thumbnail`) z oznaczeniem „live tylko na PC”. Tryb offline:
-Pyodide i koło imgui-bundle z lokalnej kopii w cache (`--offline`), bo sala może nie mieć sieci.
+Wspólne moduły `player/manifest.py`, `clock.py`, `controller.py`, `geometry.py`,
+`state.py`, `stage.py`, `input.py`, `info.py`, `keys.py` nie importują Qt, PyAV,
+multiprocessing, modelu Pydantic/rtoml ani platformowych adapterów, także tranzytywnie.
+Import imgui_bundle jest dozwolony dla UI; czysta logika nie wymaga kontekstu.
+Adapter PC waliduje model v4 i przekazuje manifest JSON: version=1, resolution,
+presentations/slides (file/rev_file, kind, duration, rate/reverse_rate, loop/auto_next,
+notes, layers, rect/motion, alpha/border, thumbnail, live descriptor).
+Ścieżki PC mapowane na dozwolone URL przy eksporcie web; żadnych klas modelu w danych.
+Walidacja manifestu odrzuca nieznaną wersję, niepoprawne rozmiary i nieskończone czasy/rate.
+API wspólne przyjmuje zwykłe dict/list/liczby/teksty; nie importuje CLI.
 
-**10c (zarys, kontrakt po 10b):** klatki live przez WebSocket (RGBA lokalnie, kompresja przy
-zdalnym), komendy cue/view/fokus i checkpointy 5g przez ten sam kanał; nagrany przebieg cue jako
-tryb domyślny dla serwera z taska finalnego.
+`Source.prepare(entry_id: int, media: dict) -> None` rozpoczyna nieblokujące przygotowanie;
+`poll(now: float, target: float | None, budget_ms: float) -> SourceUpdate` zwraca
+status preparing/ready/eof/error, generation/entry_id, frame_id, PTS, duration,
+owned RGBA8 top-left/stride=4*width lub uchwyt trwałej tekstury, boundary/request_id i błąd.
+`play(anchor: float) -> None`, `pause() -> None`, `reset(entry_id: int) -> None`,
+`request_close() -> None`, `poll_closed(now: float) -> bool` są nieblokujące dla UI.
+SourceUpdate nie zawiera obiektów av/Qt. Gotowość wymaga dostępnej pierwszej klatki,
+nie tylko otwartego pliku. EOF pozostawia ostatni dobry obraz; błąd pokazuje placeholder
+lub zachowaną klatkę z błędem i usuwa źródło z bariery. Reset unieważnia stare wyniki.
+Podgląd ma własne źródła; bieżący obraz w Info współdzieli zasoby kompozycji głównej.
 
-**Kryteria akceptacji 10a:**
-1. Nawigacja i zegar: next/previous/replay/reverse/pauza, pętle z zamówionym wyjściem, auto_next,
-   skip_all, start_at, exit_after_last_slide, playback_rate — testy logiki bez okna odpowiadające
-   semantyce testów Qt (`test_clip_layers`, `test_layers`, `test_presenter_state`).
-2. Bariera D31: żadne źródło nie rusza przed gotowością wszystkich; pauza w przygotowaniu zachowana;
-   błędny plik nie blokuje reszty; pierwsze klatki po starcie w tej samej klatce renderu.
-3. Kompozycja: z-order, prostokąty, ruch, D34, obwódki, placeholder, czarna klatka — test komend
-   `ImDrawList` bez okna; zrzut prawdziwego okna zgodny z Qt na demo (slajdy 1–11) w tolerancji.
-4. Live: scenariusze `test_live_layers`, `test_persistent_live`, `test_live_ce_player`,
-   `test_live_checkpoint` (poziom playera) na kontrolerze bez Qt, z prawdziwymi workerami GL i CE.
-5. Info: notatki Markdown, czas, podgląd z ruchem; programowo okno Info na zadanym monitorze.
-6. Wydajność w prawdziwym oknie przy odblokowanym ekranie i vsync: scenariusz `measure_clips`
-   N=1..3 z Info i live — mediana każdego strumienia wideo ≥ 55 kl./s, p95 ≤ 34 ms, brak zawieszeń;
-   CPU raportowane z `hwaccel` i bez.
-7. Klawisze `.manim-slides.toml` przez mapowanie Qt → ImGui; nieznany → błąd z nazwą.
-8. Pełny pytest zielony; player Qt bez regresji jako domyślny.
-9. **Próba człowieka:** demo w prawdziwym oknie, dwa monitory, klik/Esc, gesty, ←/V/R z live.
+**Zegary i przeciążenie.** PC używa wewnętrznego monotonicznego czasu mediów grupy
+z kotwicą startu, pauzą i iloczynem rate CLI/slajdu; CFR cel=floor(t*fps*rate).
+Jest to jawny wyjątek D43 od zakazu zegara D17, bez publicznego seek/frame-lock i bez
+synchronizacji czasu live. Ruch D30 ma osobny aktywny czas, zatrzymany po końcu bazy
+i w pauzie; Info ma czas rzeczywisty i elapsed od startu aplikacji, niezależny od pauzy.
+Reverse czyta rev_file do przodu, klipy pozostają na końcowym obrazie/rect_at(duration).
+Renderowane CFR są gwarantowane; inne wideo według znormalizowanego PTS (pierwszy PTS=0),
+brak wiarygodnego PTS/czasu albo niemonotoniczne PTS daje czytelny błąd przed startem.
+GIF: czasy poszczególnych klatek, disposal przez Pillow, minimum 10 ms dla zerowego czasu,
+limit 256 MiB rozkodowanych RGBA na źródło; przekroczenie to błąd, nie nieograniczony preload.
 
-**Kryteria akceptacji 10b:**
-1. Te same testy logiki co 10a przechodzą w Pyodide (uruchomione w headless Edge przez Playwright).
-2. Demo bez live w przeglądarce: nawigacja klawiszami, pauza, Info w drugim oknie zsynchronizowane.
-3. Wydajność Edge z oknem, scenariusz N=1..3 z Info: mediana ≥ 50 kl./s, odrzucone klatki ≤ 10 %.
-4. `--offline` działa bez sieci (Pyodide i koło z cache).
+UI najpierw poll live, przyjęcie granic i ACK, potem wejście/deadline, następnie media round-robin.
+Budżet mediów UI łącznie 4 ms/tick, max 1 ms/źródło; preview ma niższy priorytet.
+Nie wykonujemy blokujących decode/seek w UI: PC izoluje PyAV w nadzorowanych procesach
+(jeden wątek aplikacji w każdym, wewnętrzne wątki FFmpeg dozwolone), z ograniczonym mailboxem
+2 klatek/źródło i bez narastającej kolejki. Adapter czyta najnowszą gotową klatkę, odrzuca starsze.
+Proces dekoduje max 4 klatki/tick; przy zaległości >250 ms przeskakuje do klatki kluczowej
+i publikuje najbliższą dostępną PTS, bez nadrabiania w UI. Do tego czasu zostaje ostatni obraz.
+Brak postępu przez 2 s oznacza error i asynchroniczne zakończenie procesu, bez blokującego join;
+przygotowanie ma wspólny deadline 5 s. Pomiar oddziela decode, konwersję, upload i seek pętli.
+Zegar nie czeka na spóźnione wideo, a licznik odrzuconych klatek ujawnia degradację.
+Twardego czasu reakcji nie dowodzi sam budżet Pythona; odbiór wymaga testu zawieszonego procesu.
 
-**Poza zakresem fazy 10:** live w przeglądarce (10c), serwer z logowaniem i hosting (task finalny),
-eksport decków z warstwami, usunięcie playera Qt, kreator kluczy (`wizard`, zostaje w Qt).
+### Bariera 5g, ACK i zamykanie
 
-**Budżet:** 10a ~30 h (kontroler live 8 h, zegar i nawigacja 6 h, kompozycja i Info 6 h, okna
-i monitory 4 h, testy i pomiar 6 h), stop i raport przy 60 h; 10b ~12 h, stop przy 24 h.
-Wykonawca (prelegent, 2026-10-23): **Haiku** (podagent Claude) etapami według rozpisanych zadań;
-Claude rozpisuje zadania, przegląda, mierzy i commituje.
+Każde initial/next/previous/V/R/auto_next/skip_all dostaje nowe ID wejścia; reverse_to_normal
+zachowuje wejście live. Zachowujemy D39–D41, rezerwację, historię i izolację generacji/socketu.
+Kolejność: pierwsze obrazy plików → checkpoint/restore → status operacji i wskazana skorelowana
+klatka graniczna (generacja, wejście, request_id, frame_id) → trwały zasób kompozycji → ACK →
+gotowa grupa → rzeczywisty wspólny start mediów i enter/release. Sam READY nie zwalnia bariery.
+Pauza pozwala przygotować checkpoint i obraz, ale nie wystartować mediów/cue.
+Deadline całej bariery 5 s, ACK 2 s; nowa nawigacja anuluje stare wejście, nie przedłuża jego terminu.
+Timeout odcina niepewny worker, pokazuje trwałą degradację, baza/klipy mogą kontynuować.
+
+**Dokładny ACK:** `try_read_frame(acknowledge=False)` kopiuje obraz; aktualna granica jest
+potwierdzana `frame_seen <frame_id>` dopiero po udanym uploadzie do trwałej tekstury i przypisaniu
+jej do snapshotu kompozycji bieżącego wejścia. Zasób jest przypięty do końca wykonania draw data
+obu viewportów tej iteracji i nie może być nadpisany przez następny update przed tym użyciem.
+Nie trzeba czekać na swap ani fizyczne wyświetlenie. Granice anulowane odbieramy i ACK bez
+uploadu/kompozycji. Błąd uploadu aktualnej granicy nie daje gotowości; odcinamy źródło i raportujemy.
+Test sprawdza kolejność copy/upload/assign/ACK/start/enter oraz brak ACK przed trwałym zasobem.
+Shutdown: najpierw request_stop/begin_shutdown i poll procesu, potem zwolnienie tekstur w bieżącym
+kontekście GL, na końcu zniszczenie viewportów i kontekstu; brak blokujących join w callbacku.
+
+### Tabela przejść nawigacji (test każdej pozycji)
+
+Stan zawiera preparing, requested_playing, paused, running/ended, reverse, loop_exit_requested,
+termination_achieved, entry_id i indeks prezentacji/slajdu. Każdy efekt nosi entry_id.
+
+| Stan × akcja | Wynik i efekty |
+|---|---|
+| preparing, next, start niezamówiony | requested_playing=True, nadal czekaj na całą barierę |
+| preparing, next, start zamówiony | anuluj wejście i przygotuj następny cel |
+| preparing, replay | ignoruj, zachowaj przygotowanie |
+| preparing, pause | przełącz requested_playing, checkpoint może się przygotować |
+| paused bez termination_achieved, next | wznów grupę, bez zmiany indeksu |
+| static running, next | następny slajd; static paused, next: wznów grupę |
+| running loop + next_terminates_loop, next | zamów koniec bieżącej iteracji, bez skoku teraz |
+| zamówiona pętla, granica iteracji | zatrzymaj na ostatniej klatce, zatrzymaj klipy/ruch; auto_next przechodzi dalej |
+| running/ended bez powyższych, next | kolejny slajd; reverse: normalny plik tego samego indeksu, bez nowego wejścia live |
+| dowolny, previous | normalny kierunek, poprzedni slajd/deck i bariera D39; na początku komunikat i brak zmiany |
+| dowolny, reverse | poprzedni slajd/deck w reverse i bariera D39; na początku brak zmiany |
+| gotowy, replay | reset czasu/flag pętli, bariera restore początku + cue celu zgodnie D39, zachowaj kierunek |
+| running/paused, pause | wspólna pauza/wznowienie plików i ruchu; live działa dalej; ended nie wznawia zakończonej bazy |
+| EOF bazy | zatrzymaj klipy/ruch, zachowaj obrazy, live nie zatrzymuj; auto_next ładuje następny cel |
+| skip_all, dowolna pętla | jedno odtworzenie, EOF → next; wymuś exit_after_last_slide |
+| next na końcu | zamknij oba okna gdy exit_after_last_slide, inaczej komunikat bez zmiany |
+| start_at / zmiana decku | normalizuj ujemne indeksy, zero różne od None; nowa rozdzielczość, wyczyść stary preview |
+| quit / zamknięcie okna | wspólny dwufazowy shutdown obu okien i wszystkich źródeł |
+
+### Obraz, wejście, Info i macierz CLI
+
+Geometria rozróżnia kadr decku, kontener warstwy w ułamkach kadru, obraz w kontenerze
+i logiczne współrzędne viewportu (DPI dopiero przy renderze). Warstwy przycinamy do kadru;
+hit-test wybiera najwyższy kontener, także przezroczyste marginesy blokujące klik.
+Bufor live zawiera już pasy D34: bez ponownego dopasowania proporcji sceny.
+Zewnętrzne tło playera jest osobne od background_rgba kamery. Alfa prosta, opacity mnoży alfę
+koloru, również dla zachowanej klatki i miniatur. BorderStyle.width skaluje się z kadrem,
+jest ograniczone wymiarem kontenera i rysowane do wewnątrz; None ukrywa tylko styl, nie fokus.
+Rola aktywna wygrywa z błędem, po release pierwszy błąd. Brak dobrej klatki: placeholder.
+
+Router: zamknięcie/utrata aktywności aplikacji → edycja tekstu/Markdown → rezerwacja live →
+aktywne cue next/back (repeat konsumowany bez wysłania) → pozostałe akcje Config.keys → gesty.
+Nie przejmujemy strzałek do domyślnej nawigacji widgetów. Esc/klik poza live zwalnia fokus;
+przejście do Info nie zwalnia go (agregacja aktywności wszystkich okien). Klik marginesu
+najwyższej warstwy blokuje niższe; Shift-drag/wheel/double-click to D28, ruch normalizowany
+przez kontener, nie okno ani wewnętrzną scenę. Rezerwacja blokuje cue/view; CE view pozostaje no-op.
+TOML nadal zapisuje kody Qt; keys.py jest jedyną tabelą mapowania, rozszerzoną o Plus/Asterisk
+z modyfikatorami i numpadem. Błąd: akcja, kod dziesiętny, hex i nazwa tylko jeśli znana.
+
+Info i S czytają jeden snapshot: scena/slajd, kierunek, pętla/wyjście, przygotowanie/zamówiony
+start/koniec, fokus, klipy, operacja historii, początek/pozostawiony stan, niewysłane/przerwane/
+nieznany wynik i trwała degradacja ponad READY. Komunikat 2 s ma rewizję, stary timer nie kasuje nowego.
+Info: Markdown, czas lokalny/elapsed, identyczna bieżąca kompozycja; podgląd normalny, wyciszony,
+niezależne pętle/rate, miniatury live, bez bariery i pauzy głównej, bez dekoderów gdy ukryte.
+Ruch podglądu pozostaje w 10a: osobny aktywny czas każdego plikowego źródła preview, reset przy
+jego pętli/zmianie celu, rect_at(czas źródła); miniatura live rect_at(0). **Do potwierdzenia**,
+zachowawczo izolowany od zegara/barier głównego slajdu; D35 zmienione tylko w zakresie ruchu preview.
+
+| Opcje/akcje objęte parytetem | Test odbioru (planowany, nie dowód wykonania) |
+|---|---|
+| scenes, brak scen/wybór, powtórzona scena, folder/config/verbosity, -h/--help | test_imgui_cli.py::test_selection_and_common_options |
+| --player imgui/qt, domyślnie qt | test_imgui_cli.py::test_backend_default |
+| --start-paused, -s/--skip-all, --exit-after-last-slide | test_imgui_cli.py::test_playback_flags |
+| -F/--full-screen/--fullscreen, -H/--hide-mouse | test_imgui_cli.py::test_aliases |
+| --aspect-ratio keep/ignore, --playback-rate | test_imgui_cli.py::test_geometry_and_rate |
+| --sa/--start-at, --sacn/--start-at-scene-number, --sasn/--start-at-slide-number | test_imgui_cli.py::test_start_indices (zero/ujemne/priorytet/błędy) |
+| -S/--screen, --info-window-screen, --hide-info-window/--show-info-window | test_imgui_cli.py::test_screens (1/2 monitory, błędny indeks, ostrzeżenia) |
+| --next-terminates-loop | test_imgui_navigation.py::test_loop_exit |
+| QUIT, PLAY_PAUSE, NEXT, PREVIOUS, REVERSE, REPLAY, FULL_SCREEN, HIDE_MOUSE, PRESENTER_STATE | test_player_keys.py oraz test_imgui_input.py::test_actions parametrized po 9 akcjach |
+
+Windows: jawne GLFW + OpenGL3; Info osobny natywny viewport od startu, uchwyt identyfikowany
+przez ImGui platform IO/viewport (platform_handle), nigdy zgadywany po kolejności okien.
+GLFW per-window ustawia pozycję, rozmiar i dekoracje; fullscreen bez ramek na geometrii monitora,
+nie wyłączny (**do potwierdzenia**). F przełącza oba okna i odtwarza osobne geometrie;
+H jak Qt tylko okno główne. Upload po post_init w aktywnym współdzielonym kontekście, usuwanie
+przed jego zniszczeniem. Vsync włączony, realne swapy mierzone osobno, utrata fokusu nie minimalizuje Info.
+
+### Etapy 10a — zamknięte pliki, porty i odbiór
+
+Wszystkie poniższe nazwy nowych testów są wymaganiami, nie istniejącymi zielonymi wynikami.
+`p/` oznacza `src/manimcue/player/`, `t/` oznacza `tests/`, `e/` oznacza `experiments/f10a_gate/`.
+Plik raz utworzony można zmieniać tylko w zadaniu wymieniającym go; zmiana semantyki wymaga
+powrotu do kontraktu i przeglądu Claude. Zadanie 1 musi być zielone przed 2, oba przed portem.
+Po każdym zadaniu uruchomić jego testy, zapisać wyniki i przekazać do przeglądu Claude.
+
+| Zadanie / budżet (stop 2×) | Zamknięta lista plików | Sygnatury wejścia → wyjścia | Testy odbioru |
+|---|---|---|---|
+| 0. Kontrakt / 3 h | PLAN.md, SPEC.md, REVIEW-LOG.md, reports/REPORT-10a.md, REPORT-10a.md, CLAUDE.md (tylko punkt 2), README.md, docs/api.md | recenzja + player Qt → kontrakt i 23 decyzje | komplet punktów recenzji, D42–44, macierze i bramki |
+| 1. Bramka Windows / 4 h | e/windows.py, t/test_imgui_windows_gate.py, pyproject.toml, uv.lock, reports/REPORT-10a.md | run_gate(main_monitor:int, info_monitor:int, output:Path)->int; JSON monitors/windows/backend/swaps | test_two_native_windows, test_fullscreen_roundtrip, test_cursor_and_backend (gpu), programowa lista monitorów/pozycje/rozmiary/tryb; Claude: DPI/fokus/wygląd |
+| 2. Bramka wspólnego kodu / 3 h | p/__init__.py, p/manifest.py, p/clock.py, p/controller.py, p/geometry.py, p/state.py, e/imports.py, e/pyodide.html, t/test_imgui_shared_imports.py, t/test_imgui_shared_logic.py, reports/REPORT-10a.md | validate_manifest(data:dict)->dict; run_shared_cases()->dict; run_import_gate(channel='msedge')->dict | subprocess PC i Pyodide headless Edge przez uv run --with playwright, bez Qt/PyAV/multiprocessing; te same named cases |
+| 3. Klawisze/config / 3 h | p/keys.py, p/input.py, src/manimcue/slides/config.py, t/test_player_keys.py, t/test_imgui_input.py | bindings(config:dict)->dict; route(event:dict,state:dict)->list[dict] | domyślne/własne/nieznane, Plus/Asterisk, modyfikatory/repeat, Config() bez Qt; regresja liczbowego TOML |
+| 4. Nawigacja / 6 h | p/controller.py, p/clock.py, p/state.py, t/test_imgui_navigation.py, t/test_imgui_shared_logic.py | reduce(state:dict,event:dict,now:float)->tuple[dict,list[dict]]; snapshot(state:dict)->dict | każda pozycja tabeli, sztuczny zegar, stare entry_id, 5c i rewizje komunikatów |
+| 5. Źródła PC / 7 h | p/sources_av.py, p/decoder_worker.py, t/test_imgui_sources.py | protokół Source powyżej; run_decoder(spec:dict,connection)->None | identyfikowalne CFR/GIF/obraz/PTS, reset/pętla/EOF/błędy, zawieszony dekoder, bounded mailbox i UI poll |
+| 6. Kompozycja / 5 h | p/stage.py, p/geometry.py, p/textures.py, t/test_imgui_composition.py | compose(manifest:dict,frames:dict,now:float)->list[dict]; draw(commands:list,draw_list)->None; upload(frame)->TextureLease | draw list: kontekst/display/delta/ini off, renderer_has_textures + set_tex_id/set_status; UV/indices/vertices/clip rect, nie liczba scalanych komend; render pikselowy gpu |
+| 7. Live / 9 h | p/live.py, t/test_imgui_live.py, t/test_imgui_live_checkpoint.py | LiveController.poll(now:float)->list[dict]; enter(entry:dict)->None; accept_frame(frame,lease)->None; begin_shutdown()->None | port scenariuszy test_live_layers/persistent_live/live_ce_player/live_checkpoint, D39–41, stale granice, timeout, pauza/rezerwacja, ACK i dwufazowy shutdown |
+| 8. Wejście live / 3 h | p/input.py, p/live.py, t/test_imgui_input.py | route(event,state)->list[dict]; view(event:dict,container:tuple)->dict | D20/D28, oba okna, klik marginesu, Shift-drag/wheel/double-click, repeat i rezerwacja, CE no-op |
+| 9. Info / 5 h | p/info.py, p/state.py, p/stage.py, p/app.py, t/test_imgui_info.py | render_info(snapshot:dict,preview:dict)->None; preview_target(manifest:dict,index:tuple)->Optional[dict] | port test_presenter_state, test_preview_alpha_border i 5d; brak preview decoder gdy ukryte, zmiana rozdzielczości decku, niezależny ruch |
+| 10. CLI / 4 h | p/desktop.py, p/app.py, p/manifest.py, src/manimcue/slides/present/__init__.py, t/test_imgui_cli.py, README.md, docs/api.md | run_desktop(manifest:dict,options:dict)->int; model_to_manifest(configs:list)->dict | cała macierz CLI, Qt domyślny bez regresji, ostrzeżenie audio raz/materiał |
+| 11. Odbiór / 8 h | e/measure.py, t/test_imgui_acceptance.py, reports/REPORT-10a.md, REPORT-10a.md, PLAN.md, CLAUDE.md (tylko punkt 2), README.md, docs/api.md | measure(options:dict)->dict; watchdog(command:list,timeout:float)->dict | pełny pytest, okna gpu, dwa monitory, GL/CE, pomiar/stabilność i próba Claude |
+
+Budżet bazowy 10a **60 h** (suma tabeli), stop przy **120 h** całości lub 2× zadania;
+estymacja ryzyka implementacji/przeglądów/prób 50–80 h, reestymacja po bramkach, bez automatycznego
+podnoszenia limitu. Raport oddziela czas pracy codex, przeglądu Claude i czekania na człowieka.
+Niepowodzenie/brak dowodu bramki oznacza STOP, nie skip zaliczający i nie obejście.
+
+### Kryteria odbioru 10a
+
+1. Obie bramki zaliczone dowodem z PC i Pyodide, testy zadania przed kolejnym zadaniem zielone.
+2. Pełna tabela nawigacji i macierz CLI/9 akcji, bez regresji Qt; D31/D39–41 z gotowym obrazem,
+   ACK i timeoutami również dla ciepłego live, replay/reverse i anulowania.
+3. Kompozycja D30/D34/D35: geometria/UV/clip rect ±0,5 logicznego px; kontrolowane zrzuty demo
+   1–11 względem Qt, maska krawędzi 1 fizycznego px, poza nią ≥99% pikseli z błędem kanału ≤3/255;
+   obwódki/geometria ±1 px fizyczny. Zrzuty po ustalonym PTS, osobno alfa i pasy.
+4. Pełne scenariusze live GL/CE i 5g, brak zagłodzenia poll/ACK podczas zastoju dekodera;
+   degradacja trwała i widoczna, brak czarnej klatki, shutdown zwalnia procesy/tekstury.
+5. Info/Markdown/czas/bieżący obraz/podgląd z niezależnym ruchem i poprawnym ukryciem oraz fokus D20/D28.
+6. Pomiar przy odblokowanym ekranie, dwa monitory, vsync, sprzęt i Hz zapisane; N=1..3,
+   Info widoczne, live GL i CE osobno, 5 s rozgrzewki + 60 s próby, 3 powtórzenia.
+   Dla każdego strumienia osobno mediana liczby nowych obrazów w 1 s ≥55 fps (materiały 60 fps),
+   p95 odstępu ≤34 ms, max ciszy ≤250 ms, p95 wejście→zmiana ≤100 ms (min. 30 akcji).
+   Liczniki drop/decode/upload z tych samych okien; CPU raportowane, hwaccel poza zakresem.
+   Zewnętrzny watchdog: brak heartbeat UI >2 s przerywa próbę i oznacza porażkę;
+   dodatkowo 30 min stabilności i ≥100 przejść slajd/pętla, przełączanie aplikacji, live GL/CE.
+7. Pełne `uv run --frozen pytest -q -p no:cacheprovider` zielone; testy prawdziwych okien oznaczone gpu.
+8. Próba człowieka: DPI, wygląd, fokus/Info, dwa monitory, F/H, klik/Esc, gesty i ←/V/R z live.
+   Automatyczna geometria okien nie zastępuje tej próby; PoC nie zalicza wydajności finalnego playera.
+
+### 10b i 10c — granice wspólnego kodu
+
+10b: `--player web`, wspólne moduły i manifest z 10a; źródła HTML video/img i WebGL,
+bez lokalnych workerów/live, miniatury z oznaczeniem. Nazwany wspólny zestaw
+`test_imgui_shared_logic`: clock_pause, navigation_table, geometry_clip, stale_entry,
+manifest_validation z atrapami źródeł uruchamiany identycznie na PC/Pyodide.
+Integracje live i Qt są wyłącznie desktopowe. Drugie okno jest repliką: authority w głównym,
+snapshot/handshake, deck_id/entry_generation/revision, id komendy i lokalna kotwica czasu;
+odrzuć stare rewizje i podwójne komendy. Po throttlingu wznów ze snapshotu, zamknięcie authority
+zatrzymuje replikę. Domyślna tolerancja dryfu 100 ms, większy dryf wymusza resync (**do potwierdzenia**).
+Tylko baza główna emituje audio, preview/klipy/Info muted; gest odblokowuje play,
+odrzucone Promise blokuje start grupy i daje komunikat. Obsłużyć odmowę popup/fullscreen i Esc.
+Serwer async w jednym wątku: porcjowanie plików, GET/HEAD, 206/416, zakres ograniczany do EOF,
+allowlista manifestu. Offline: przypięty runtime/WASM/stdlib/lock/zależności/fonty i koła Emscripten,
+manifest SHA256 i lokalne URL bez PyPI fallback; test świeżego profilu, pustego cache i sieci tylko loopback.
+Odbiór 10b: named suite w Edge msedge headless, demo i dwa prawdziwe okna; próg web ≥50 fps
+każdy strumień, drop ≤10% każdy, ta sama metodologia okien co PC. Budżet wstępny 20 h,
+stop 40 h, do ponownej estymacji po 10a; brak implementacji 10b w tej sesji.
+10c: live WebSocket i serwer prezentacji wymagają osobnego kontraktu po 10b, poza 10a/10b.
+Poza zakresem: usunięcie Qt, wizard bez Qt, publiczny seek/frame-lock/live sync,
+hwaccel, adaptacyjne skalowanie, audio PC inne niż D44, eksport warstw i hosting/logowanie.
 
 ---
 
 ## Poza zakresem całego projektu
 
 - Fork albo łatanie Manima (CE, GL, GX). Forkujemy manim-slides, nie Manima.
-- Zegar główny i seek warstw, synchronizacja co do klatki (D17).
+- Publiczny zegar główny, seek warstw i synchronizacja live co do klatki (D17); wewnętrzny zegar mediów PC dopuszcza D43.
 - Przechwytywanie ekranu / OBS jako architektura.
 - Uwierzytelnianie i transport między hostami. Zakres to lokalne `127.0.0.1`.
 - Back-pressure i kolejka aplikacyjna.

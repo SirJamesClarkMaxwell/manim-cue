@@ -2070,3 +2070,256 @@ opierają się na dostarczonej pełnej rundzie 18 i walidacji kodu/testów.
 **Werdykt:** nie przekazywałbym jeszcze 5g do implementacji jako zamkniętego kontraktu. Podstawowa semantyka A→B→A, reverse→normalny plik i pętli jest sensowna oraz uwzględnia rundę 16. Blokują przede wszystkim zbyt mocna obietnica snapshotów GL oraz brak pełnej reguły rezerwacji sceny, obsługi anulowanych granic i historii po fallbacku.
 
 Przegląd był statyczny i read-only; niczego nie zmieniałem. Nie uruchamiałem testów ani pomiarów — wykonalność czasowa i pamięciowa pozostaje do wykazania.
+
+## Runda 21 — codex, 2026-10-23: kontrakt F10 (player ImGui)
+
+**Pytania:** Czy kontrakt zapewnia parytet PC z D44, wspólny kod z webem, poprawne przejścia/5g/ACK, dwa okna i brak zawieszeń? Czy zadania, bramki i budżet są wykonalne bez rozstrzygania architektury podczas portu?
+
+**Co weszło:**
+
+1. Przyjęto jawny wyjątek D43 od ograniczenia D17 dla wewnętrznego zegara mediów PC, ponieważ dotychczasowe zapisy były sprzeczne.
+2. Przyjęto ograniczone ticki, priorytet live/ACK i izolację blokującego dekodera w procesie, ponieważ sam jeden wątek nie chroni UI przed wywołaniem natywnym.
+3. Przyjęto CFR renderów, walidację PTS pozostałych wideo i czasy/disposal GIF z limitem pamięci, ponieważ average_rate nie opisuje wszystkich mediów.
+4. Przyjęto barierę z gotowym obrazem skorelowanego restore, ponieważ READY nie dowodzi przywrócenia stanu.
+5. Przyjęto ACK po przyjęciu granicy do trwałego zasobu kompozycji; odrzucono oczekiwanie na fizyczne wyświetlenie, ponieważ D41 go nie wymaga i swap go nie dowodzi.
+6. Przyjęto bramkę dwóch okien Windows i odtwarzanie geometrii, ponieważ samo enable_viewports nie zapewnia parytetu F.
+7. Przyjęto jawne GLFW/OpenGL3, lifecycle tekstur i pomiar swapów, ponieważ flaga vsync nie jest wynikiem pomiaru.
+8. Przyjęto użycie istniejącego keys.py, domyślne stałe bez Qt i mapowania modyfikowane, ponieważ liczbowy TOML musi pozostać zgodny.
+9. Przyjęto tabelę przejść zamiast listy akcji, ponieważ przygotowanie, reverse i zamówione wyjście z pętli mają różną semantykę.
+10. Przyjęto pełną macierz CLI/Info oraz rozróżnienie zera od None w start_at, ponieważ aliasy i indeks zero są częścią interfejsu.
+11. Przyjęto wspólny snapshot Info/S z rewizją komunikatu i trwałą degradacją, ponieważ READY nie może ukrywać nieudanego restore.
+12. Przyjęto niezależny podgląd bez bariery głównej; odrzucono wycięcie ruchu podglądu z 10a, ponieważ prelegent już włączył go do F10 (dokładny zegar do potwierdzenia).
+13. Przyjęto jawne przestrzenie współrzędnych, clipping, alfa i testy pikselowe, ponieważ geometria draw list nie dowodzi poprawnego blendowania i hit-testu.
+14. Przyjęto osobny kontroler live z zachowaniem EntryHistory/transportu i dwufazowym shutdown; odrzucono port 1:1 oraz przypisanie Claude'owi implementacji, ponieważ UI wymaga wydzielenia, a wykonawcą całości jest codex.
+15. Przyjęto router wejścia, agregację fokusu obu okien i gesty w jednostkach kontenera, ponieważ D20/D28 muszą działać również z Info i przy DPI.
+16. Przyjęto fixture protokołu tekstur 1.92+ i osobny odbiór GPU, ponieważ stare fonts.build nie jest dostępnym API.
+17. Przyjęto nazwany czysty zestaw testów i manifest JSON dla Pyodide, ponieważ workerów PC i importów Qt/PyAV nie da się przenieść do WASM.
+18. Przyjęto autorytatywne okno web i protokół repliki z generacją/rewizją, ponieważ BroadcastChannel sam nie rozstrzyga właściciela stanu.
+19. Przyjęto D44 bez zmiany decyzji prelegenta oraz gest/obsługę odmowy audio web, ponieważ PoC z muted nie potwierdza odtwarzania dźwięku.
+20. Przyjęto lokalne domknięcie zależności offline z sumami i testem zimnego profilu, ponieważ dwa artefakty nie wystarczają do bootstrapu.
+21. Przyjęto asynchroniczny jednowątkowy serwer z porcjowaniem, allowlistą i GET/HEAD/206/416, ponieważ HTTPServer PoC może blokować inne filmy.
+22. Przyjęto mierzalny protokół wydajności, watchdog i tolerancje obrazów, ponieważ średnia uploadów PoC nie zalicza odbioru okien.
+23. Przyjęto reestymację po bramkach i zakres 50–80 h jako ocenę ryzyka; odrzucono delegowanie Haiku oraz budżet 30 h jako wiarygodny, ponieważ codex wykonuje wszystkie zadania etapami, a okna i dekoder nie są jeszcze zweryfikowane.
+
+Przyjęto kolejność zadań 0–11 z końcowej tabeli recenzji; Claude przegląda każdy etap, ale niczego za codex nie implementuje. Przyjęto wyłączenie hwaccel, adaptacyjnego skalowania i implementacji audio PC poza ostrzeżeniem, ponieważ nie są potrzebne do uzgodnionego celu; testy bariery, shutdown, przeciążenia i dwóch okien pozostają obowiązkowe.
+
+**Odpowiedź codex (bez zmian):**
+
+**Werdykt: poprawić kontrakt przed przekazaniem 10a Haiku.** Kierunek ImGui ma potwierdzenie w PoC, ale PoC nie potwierdza jeszcze parytetu, protokołu 5g ani obsługi dwóch pełnoekranowych okien. Największe ryzyko to ponowne zablokowanie UI przez synchroniczne dekodowanie.
+
+Przegląd read-only, bez implementacji. Sprawdziłem lokalne API imgui-bundle 1.93.0 i wykonałem małe próby kontekstu ImGui bez okna. Nie wykonywałem próby dwóch monitorów ani nowego pomiaru w prawdziwym oknie.
+
+1. **[KRYTYCZNE] D43 faktycznie zmienia D17, mimo deklaracji „bez zmian”.**
+
+   **Dowód:** `PLAN.md:1318` wprowadza wspólny zegar wyznaczający klatkę każdego dekodera. `SPEC.md:372` opisuje niezależne zegary wideo i zaakceptowany dryf. `CLAUDE.md:16` i `PLAN.md:1404` wyłączają zegar główny z zakresu.
+
+   **Konsekwencja:** wykonawca dostaje sprzeczne wymagania. Nazwanie synchronizacji „skutkiem ubocznym” nie usuwa kosztu jej implementacji ani konieczności rozstrzygnięcia zachowania przy spóźnieniu.
+
+   **Poprawka planu:** jawnie dopuścić wewnętrzny zegar prezentacji na PC jako zastąpienie ograniczenia D17, bez publicznego seeku i gwarancji synchronizacji live. Rozdzielić czas mediów, aktywny czas ruchu D30 i czas rzeczywisty Info.
+
+2. **[KRYTYCZNE] Brakuje polityki spóźnienia dekodera; PoC może zagłodzić UI i ACK live.**
+
+   **Dowód:** `experiments/f5i_imgui/sources_desktop.py:105` synchronicznie dekoduje kolejne klatki aż do celu w nieograniczonej pętli. `stage.py:197` aktualizuje źródła kolejno. `PLAN.md:1315` zakłada poll live raz na klatkę.
+
+   **Konsekwencja:** po zastoju, przy wysokim `playback_rate` lub trudniejszym materiale każdy strumień nadrabia zaległości w wątku UI. Obsługa klawiszy i live czeka; deadline 2 s ACK nie jest zabezpieczeniem przed blokującym wywołaniem natywnym.
+
+   **Poprawka planu:** określić budżet pracy źródła na tick, pomijanie spóźnionych klatek, priorytet poll/ACK oraz zachowanie po dużym opóźnieniu. Dodać test sztucznego zastoju i przeciążenia. Wyraźnie zapisać: jeden wątek aplikacji nie zapewnia responsywności blokującego dekodera. Jeśli wymagane są twarde granice reakcji, dopuścić osobny proces dekodowania.
+
+3. **[WAŻNE] Formuła CFR nie wystarcza do obsługi wszystkich deklarowanych mediów.**
+
+   **Dowód:** `sources_desktop.py:65` używa `average_rate`, `:66` zakłada dostępne `duration`, `:119` przelicza `frame.time` na indeks. `PLAN.md:1335` rozszerza źródła na obraz/GIF. `media.py:52` jawnie wyróżnia GIF i bazę statyczną.
+
+   **Konsekwencja:** nie określono obsługi zmiennych opóźnień GIF, disposal, brakujących metadanych, przesuniętego początku PTS ani materiału VFR. Skalowanie przy konwersji RGBA nie oznacza tańszego dekodowania zakodowanego strumienia.
+
+   **Poprawka planu:** ustalić zakres wejścia: CFR gwarantowane przez render, a pozostałe pliki walidowane albo odtwarzane według PTS. GIF odtwarzać według czasów poszczególnych klatek, z limitem pamięci. Osobno mierzyć decode, konwersję, upload i seek na granicy pętli. Reverse bazy czyta `rev_file` do przodu — nie wymaga dekodowania wstecz.
+
+4. **[KRYTYCZNE] Bariera 5g wymaga gotowego obrazu przywróconego stanu, nie samego READY.**
+
+   **Dowód:** `SPEC.md:698` wymaga korelacji żądań i klatek; status bez wskazanej klatki nie zwalnia bariery. `live_entry.py:169` czeka jednocześnie na zakończenie operacji i odebranie właściwej granicy. `live_layers.py:201` wysyła enter/release dopiero przy faktycznym starcie grupy.
+
+   **Konsekwencja:** uproszczone `all(source.ready)` może uruchomić bazę przed zakończeniem restore. Dotyczy to także ciepłej sesji, replay, reverse i wejścia bez cue. Pauza musi zatrzymać start mediów i cue, ale pozwolić przygotować checkpoint.
+
+   **Poprawka planu:** wpisać kolejność: przygotowanie pierwszych klatek → checkpoint/restore → skorelowana klatka graniczna → przyjęcie do kompozycji → ACK → gotowość grupy → faktyczny start i enter/release. Zachować wspólny deadline 5 s, unieważnianie poprzedniego wejścia i odcięcie niepewnego workera po timeout.
+
+5. **[KRYTYCZNE] „ACK po narysowaniu” jest nieprecyzyjne i mocniejsze od obecnej implementacji.**
+
+   **Dowód:** `live_layers.py:332` ustawia obraz kompozycji, a `:335` wysyła ACK przed późniejszym malowaniem Qt. PoC jest jeszcze wcześniejsze: `sources_desktop.py:171` wywołuje domyślne `try_read_frame()`, które potwierdza granicę w `live_session.py:181`, przed uploadem w `sources_desktop.py:180`.
+
+   **Konsekwencja:** `add_image()` zapisuje komendę; nie oznacza wykonania renderera ani fizycznego wyświetlenia. Z kolei oczekiwanie na fizyczne wyświetlenie nie jest obecnym kontraktem D41.
+
+   **Poprawka planu:** zdefiniować konkretny punkt ACK. Najmniejsza zgodna wersja: właściwa klatka została przyjęta do trwałego zasobu kompozycji, którego następny update nie zniszczy przed użyciem. Jeśli wymagany jest zakończony render, użyć udokumentowanego callbacku i przetestować jego kolejność także dla viewportów. Anulowane granice nadal potwierdzać bez kompozycji. API udostępnia `before_swap` i `after_swap` (`hello_imgui.pyi:1887`, `:1901`), ale swap nie jest dowodem fizycznego wyświetlenia.
+
+6. **[KRYTYCZNE] Multi-viewport nie dowodzi obsługi dwóch pełnoekranowych okien na wskazanych monitorach.**
+
+   **Dowód:** PoC tylko włącza `enable_viewports` (`stage.py:40`) i tworzy zwykłe `begin("Info")` (`:220`). `hello_imgui.pyi:1137` i `:1149` opisują monitor i fullscreen okna aplikacji; `:2433` udostępnia wskaźnik głównego okna GLFW. Obecne `Player.full_screen()` przełącza **oba** okna (`player.py:756`).
+
+   **Konsekwencja:** możliwość ręcznego wyciągnięcia Info nie zapewnia programowego utworzenia osobnego viewportu, wskazania monitora, przełączania obu okien i odtworzenia ich geometrii. Parametry głównego okna nie są automatycznie parametrami Info.
+
+   **Poprawka planu:** przed portem zrobić małą bramkę Windows: dwa monitory, osobne Info od startu, F w obie strony, różne DPI, zachowanie po zmianie fokusu. Nazwać używane API dla viewportu Info i zdecydować fullscreen bez ramek czy wyłączny. GLFW ma operacje per okno, lecz trzeba uzyskać właściwe uchwyty i uwzględnić automatyczne minimalizowanie fullscreen po utracie fokusu. [Dokumentacja GLFW](https://www.glfw.org/docs/latest/window).
+
+7. **[WAŻNE] PyOpenGL, kursor i vsync są wykonalne, ale kontrakt pomija warunki ich poprawności.**
+
+   **Dowód:** tekstury PoC powstają w `post_init` (`desktop.py:100`), a ustawienia wybierają jedynie vsync (`stage.py:45`), bez jawnego wyboru backendu renderującego. `hello_imgui.pyi:2679` udostępnia wybór backendów; `imgui/__init__.pyi:3003` udostępnia `set_mouse_cursor`.
+
+   **Konsekwencja:** PyOpenGL wymaga bieżącego kontekstu OpenGL. Przy kilku viewportach trzeba kontrolować kontekst, współdzielenie tekstur i ich usuwanie. Ukrycie kursora jest stanem ustawianym przez backend, a vsync nie jest twardą gwarancją częstotliwości.
+
+   **Poprawka planu:** przypiąć GLFW + OpenGL3, określić callbacki uploadu i zwalniania zasobów, testować oba viewporty. Doprecyzować zakres H — obecny Qt ukrywa kursor głównego okna (`player.py:765`). Mierzyć realny odstęp swapów; ustawienie flagi nie wystarcza. [Kontekst GLFW](https://www.glfw.org/docs/latest/context_guide.html).
+
+8. **[WAŻNE] Mapowanie klawiszy już istnieje, lecz nie usuwa zależności konfiguracji od Qt.**
+
+   **Dowód:** istnieją `src/manimcue/player/keys.py:46` i `tests/test_player_keys.py:13`. Natomiast domyślne `Keys()` wywołuje `key_id()` importujące Qt (`slides/config.py:53`, `:92`). Wizard zapisuje wynik `event.key()` (`wizard.py:41`, `:123`), a TOML przechowuje liczbowe `ids` (`config.py:86`, `:176`).
+
+   **Konsekwencja:** sam adapter wejścia ImGui nie pozwala tworzyć domyślnej konfiguracji bez Qt. Nieznany identyfikator nie musi mieć dostępnej nazwy. Ponadto Qt `Key_Plus` nie oznacza wyłącznie klawisza numerycznego, a obecna tabela mapuje go na `keypad_add` (`player/keys.py:83`); analogicznie `Asterisk`.
+
+   **Poprawka planu:** wykorzystać istniejący moduł, przenieść tworzenie domyślnych kodów na stałe bez importu Qt i zachować zgodność liczbowego TOML. Zdefiniować mapowania wielokrotne dla klawiszy zależnych od modyfikatorów/układu. Błąd musi zawierać akcję, kod dziesiętny i hex; nazwę tylko gdy znana. Testować również routing i autorepeat, nie tylko istnienie enumów.
+
+9. **[WAŻNE] Lista funkcji nie zastępuje tabeli przejść nawigacji.**
+
+   **Dowód:** `player.py:678` rozróżnia next w przygotowaniu, pauzie i nad bazą statyczną. `:568` rozróżnia reverse → normalny plik tego samego slajdu. `:720` ignoruje replay podczas przygotowania. `:365` kończy zamówioną pętlę na końcu iteracji, opcjonalnie przechodząc dalej.
+
+   **Konsekwencja:** implementacja „next/previous/replay/reverse/pauza” może formalnie spełnić listę i zmienić zachowanie prezentacji.
+
+   **Poprawka planu:** dodać tabelę stan × akcja × wynik, obejmującą:
+
+   - next w pauzie: wznowienie przed przejściem dalej;
+   - next podczas przygotowania: zamówienie startu albo kolejne wejście;
+   - zamówienie wyjścia z pętli, końcową klatkę i `auto_next`;
+   - koniec bazy: zatrzymanie klipów i ruchu, ale nie live;
+   - reverse → normalny ten sam slajd bez nowego wejścia live;
+   - granice prezentacji, brak poprzedniego/następnego, replay i flagi zakończenia;
+   - `skip_all` wymuszające pojedyncze odtworzenie oraz wyjście.
+
+10. **[WAŻNE] Parytet CLI i Info nie ma kompletnego inwentarza odbiorowego.**
+
+    **Dowód:** pełne CLI znajduje się w `slides/present/__init__.py:130`; domyślne ukrywanie Info na jednym monitorze w `:324`, wybór scen bez argumentów w `:43`, powtarzanie tej samej prezentacji w `:269`. Info ma czas lokalny i czas od uruchomienia (`player.py:69`), wspólny bieżący obraz (`:59`) i przekazywanie klawiatury (`:175`).
+
+    **Konsekwencja:** łatwo zachować nazwy opcji, ale zgubić aliasy, wartości ujemne startu, domyślne rozmieszczenie okien, zmianę rozdzielczości między prezentacjami albo sterowanie z Info.
+
+    **Poprawka planu:** załączyć macierz wszystkich opcji i dziewięciu akcji `Config.keys`, z odnośnikiem do testu. Uwzględnić `--full-screen` i aliasy, folder/config/verbosity, wybór scen, ujemne indeksy, powtórzone sceny, niepoprawny monitor, zamykanie obu okien i niezależność zegara Info od pauzy. Błędu upstreamu z traktowaniem zera w `start_at` (`present/__init__.py:297`) nie utrwalać bez świadomej decyzji.
+
+11. **[WAŻNE] 5c i 5g wymagają pełnego modelu komunikatów, nie ogólnego „stan prelegenta”.**
+
+    **Dowód:** `player.py:837` opisuje przygotowanie, zamówiony start, koniec, kierunek, pętlę, fokus, problemy klipów i operacje historii. `:904` wygasza komunikat po 2 s z ochroną rewizji. `SPEC.md:704` wymaga trwałej degradacji ponad READY.
+
+    **Konsekwencja:** samo „ready/error” ukryje różnicę między gotowym stanem a niewysłanym cue, oczekiwaniem na koniec pętli i nieudanym restore. Stary timer może skasować nowszy komunikat.
+
+    **Poprawka planu:** zrobić jeden model snapshotu dla Info i nakładki S. Przepisać przypadki z `tests/test_presenter_state.py:237` i `tests/test_live_checkpoint.py:515`, wraz z komunikatami granic nawigacji, blokady komend i degradacji.
+
+12. **[WAŻNE] Podgląd w PoC ma inną semantykę niż 5d; ruch jest dodatkową funkcją.**
+
+    **Dowód:** `stage.py:131` dołącza podgląd do źródeł wspólnej bariery i pauzy. `SPEC.md:640` wymaga niezależnych, wyciszonych pętli bez bariery głównej, z `rect_at(0)`. `PLAN.md:1345` dodaje ruch.
+
+    **Konsekwencja:** wolny podgląd może opóźnić slajd, a pauza główna zatrzymać podgląd. Dla nowego ruchu nie wiadomo, czy czas resetuje pętla bazy, każdy klip osobno, czy zmiana podglądu.
+
+    **Poprawka planu:** oddzielić grupę główną od podglądu. Zachować normalny kierunek, niezależne pętle i szybkości, miniatury live, brak dekoderów przy ukrytym Info oraz poprawne czyszczenie ostatniego podglądu. Ruch wyciąć z 10a — to rozszerzenie, nie parytet. Zachować test przejścia między prezentacjami o różnych rozdzielczościach (`test_preview_alpha_border.py:293`).
+
+13. **[WAŻNE] D34, alfa i obwódki potrzebują kontraktu współrzędnych oraz wejścia.**
+
+    **Dowód:** PoC ma stałe 16:9 (`stage.py:22`), czarne wypełnienie (`:161`) i obwódkę 3 px (`:173`). Qt ogranicza szerokość obwódki rozmiarem kontenera i rysuje ją wewnątrz (`live_layers.py:435`). `composition.py:246` trafia w najwyższy **kontener**, także jego przezroczysty margines. `SPEC.md:646` określa mnożenie alfy i priorytet ról.
+
+    **Konsekwencja:** można uzyskać poprawne prostokąty i błędne kliknięcia, grubość zależną od DPI albo podwójne dopasowanie live. Pasy live są już w buforze workera; nie wolno dopasowywać go ponownie według proporcji wewnętrznej sceny.
+
+    **Poprawka planu:** rozdzielić kadr decku, kontener warstwy, obraz wewnątrz kontenera i współrzędne viewportu. Zdefiniować clipping warstw wychodzących poza kadr, skalowanie `BorderStyle.width`, `None` bez utraty fokusu, priorytet aktywna/błąd i zachowanie alfy zachowanej klatki. Kolor pasów workera odróżnić od zewnętrznego tła playera. Testy pikselowe są tu konieczne.
+
+14. **[KRYTYCZNE] „Przeniesienie `live_layers.py` 1:1” nie jest zadaniem o jasnych granicach.**
+
+    **Dowód:** `live_layers.py:12` importuje QObject, sygnały, QTimer, QImage i QGraphics; `:322` zarządza życiem bajtów obrazu; `:387` korzysta z QPointF i geometrii kompozycji; `:443` przyjmuje QKeyEvent.
+
+    **Konsekwencja:** mechaniczne przepisywanie jednocześnie zmieni protokół, przechowywanie obrazu, harmonogram i wejście. To szczególnie ryzykowne zadanie dla Haiku.
+
+    **Poprawka planu:** Claude powinien sam ustalić i zrecenzować kontroler live: wejścia zdarzeń, przejścia historii, efekty transportowe, korelację granic i shutdown. Haiku może osobno dostarczyć adapter tekstur i adapter wejścia. Zachować `EntryHistory` i transport; nie przepisywać ich razem z UI. Zamykanie pozostać dwufazowe (`live_layers.py:472`, `:483`), ze zwolnieniem tekstur przed zniszczeniem kontekstu.
+
+15. **[WAŻNE] Fokus D20 i gesty D28 nie wynikają automatycznie z wejścia ImGui.**
+
+    **Dowód:** `live_layers.py:443` konsumuje autorepeat next/back bez wysyłania, pozwalając innym akcjom przejść do playera. `:462` blokuje cue/view podczas rezerwacji. `SPEC.md:541` traktuje oba okna jako jeden obszar aktywności. Gesty normalizują ruch przez rozmiar kontenera (`live_layers.py:393`).
+
+    **Konsekwencja:** standardowa nawigacja ImGui może przejąć strzałki, a focus pojedynczego okna zwolnić live przy przejściu do Info. Złe współrzędne dadzą inną czułość kamery w podglądzie, przy DPI i letterboxie.
+
+    **Poprawka planu:** określić kolejność routera, repeat, obsługę tekstu/Markdown, klik poza live, marginesy blokujące klik, drag z Shiftem, wheel i double-click. Fokus aplikacji agregować po wszystkich jej oknach. D28 dla CE pozostaje no-op zgodnie z `SPEC.md:673`.
+
+16. **[WAŻNE] Test `ImDrawList` bez renderera jest wykonalny, ale opis pomija protokół tekstur 1.92.**
+
+    **Dowód:** w lokalnym 1.93.0 `fonts.build()` i `get_tex_data_as_rgba32()` są nieobecne. Zwykłe `new_frame()` zgłasza asercję niezbudowanego atlasu. API udostępnia `renderer_has_textures` (`imgui/__init__.pyi:4490`) oraz `ImTextureData.set_tex_id/set_status` (`:11140`).
+
+    **Konsekwencja:** fixture oparta na starszych poradnikach ImGui nie ruszy. Sam draw list nie dowodzi poprawności blendowania ani wykonania OpenGL.
+
+    **Poprawka planu:** wpisać sprawdzoną fixture: kontekst, rozmiar, delta, wyłączony ini, minimalna atrapa protokołu tworzenia/aktualizacji tekstur i kontrolowana geometria okna. Próba lokalna uzyskała komendy z testową teksturą `123`. Sprawdzać bufory wierzchołków/indeksów, UV i clip rect; komendy bywają scalane. Alfę, DPI i backend weryfikować osobno w prawdziwym oknie.
+
+17. **[WAŻNE] „Te same testy logiki w Pyodide” nie ma obecnie wykonalnej definicji.**
+
+    **Dowód:** `PLAN.md:1386` obejmuje te same testy co 10a, a `:1351` zalicza do logiki także live. Obecne scenariusze playera używają qapp, workerów i subprocessów, np. `tests/test_live_checkpoint.py:84`. Model importuje natywne `rtoml` i Pydantic (`config.py:14`); media importują PyAV (`media.py:10`).
+
+    **Konsekwencja:** pominięcie trzech plików platformowych nie zapewnia przenośności całego drzewa importów. W Pyodide nie uruchomią się lokalne workery multiprocessing ani obecne testy Qt. [Ograniczenia Pyodide](https://pyodide.org/en/latest/usage/wasm-constraints.html).
+
+    **Poprawka planu:** zdefiniować wspólny, nazwany zestaw testów czystego kontrolera, zegara i geometrii z atrapami źródeł. Integracje live pozostają desktopowe. Dodać bramkę importów w Pyodide już na początku 10a i określić format danych dostarczanych przeglądarce. Przeglądarka może otrzymywać zwalidowany manifest; nie musi importować całego modelu i CLI.
+
+18. **[WAŻNE] Drugie okno webowe wymaga protokołu repliki, nie tylko BroadcastChannel.**
+
+    **Dowód:** `PLAN.md:1359` wymienia indeks, zegar i pauzę. Obecne bieżące Info współdzieli kompozycję (`composition.py:3`), natomiast druga strona ma osobny interpreter, dekodery i zegar. PoC mierzy jedno płótno.
+
+    **Konsekwencja:** brakuje synchronizacji reverse, replay tego samego indeksu, granic pętli, przygotowania, zmiany decku i ponownego otwarcia Info. Dwa sterujące egzemplarze mogą wykonać akcję dwukrotnie. Bieżący obraz w Info będzie osobnym odtworzeniem, więc nie ma dotychczasowej gwarancji identycznego obrazu.
+
+    **Poprawka planu:** jedno okno autorytatywne, drugie jako replika/prezenter. Snapshot początkowy, numer rewizji i generacji wejścia, jawne komendy, handshake po ponownym otwarciu, lokalne kotwice czasu i tolerancja dryfu. Zdefiniować zachowanie po throttlingu/minimalizacji i zamknięciu głównego okna. Pomiar wykonać z rzeczywiście otwartą drugą stroną.
+
+19. **[WAŻNE] D44 jest świadomym wyjątkiem od parytetu; webowe audio nie jest jeszcze zweryfikowane.**
+
+    **Dowód:** `PLAN.md:1322` jawnie dopuszcza brak audio na PC. PoC web wycisza każde wideo (`sources_web.py:29`), ignoruje Promise `play()` (`:65`), a launcher dodaje obejście autoplay (`serve.py:123`).
+
+    **Konsekwencja:** wynik PoC nie potwierdza startu bazy z dźwiękiem w zwykłych warunkach. Odmowa autoplay może rozjechać stan „gra” z faktycznym odtwarzaniem. Drugie okno może zdublować audio.
+
+    **Poprawka planu:** nazwać 10a „parytet z uzgodnionym wyjątkiem audio”. Ostrzegać raz na materiał z audio, pozostawić Qt jako ścieżkę dźwiękową. W webie odblokowanie przez gest, obsługa odrzuconego Promise i wspólnego startu dopiero po sukcesie. Tylko główna baza emituje audio; Info i klipy są wyciszone. Uwzględnić odrzucenie fullscreen/popup i Esc przeglądarki. [Aktywacja użytkownika](https://developer.mozilla.org/en-US/docs/Web/Security/Defenses/User_activation).
+
+20. **[WAŻNE] `--offline` jest realny, ale cache dwóch artefaktów nie wystarczy.**
+
+    **Dowód:** `web/index.html:7` pobiera loader z CDN, `:38` ładuje micropip/numpy, `:39` instaluje pakiet po nazwie z PyPI. `PLAN.md:1361` wymienia jedynie Pyodide i koło imgui-bundle.
+
+    **Konsekwencja:** częściowo rozgrzany cache może zamaskować brak runtime WASM, biblioteki standardowej, lockfile, zależności lub zasobów fontów. Koło Windows z uv nie zastępuje koła Emscripten.
+
+    **Poprawka planu:** przygotowywać przypięty lokalny zestaw runtime i całego domknięcia zależności, z manifestem i sumami. Instalować przez lokalne URL, bez niejawnego wyszukiwania w PyPI; `deps=False` wyłącznie po przygotowaniu zależności. Testować świeży profil, pusty cache HTTP i zablokowany ruch poza loopback. [Ładowanie pakietów Pyodide](https://pyodide.org/en/latest/usage/loading-packages.html).
+
+21. **[WAŻNE] Jednowątkowy serwer PoC blokuje inne żądania i nie realizuje pełnego Range.**
+
+    **Dowód:** `serve.py:64` czyta cały plik przed odpowiedzią, `:82` wykonuje blokujące `wfile.write`, a `:106` używa `HTTPServer`. Parser Range w `:66` nie obsługuje poprawnie granic i odpowiedzi 416.
+
+    **Konsekwencja:** obsługa dużego filmu może zatrzymać dostarczanie innych strumieni i bootstrap drugiego okna. Pamięć rośnie z rozmiarem pliku, mimo że klient żąda małego fragmentu.
+
+    **Poprawka planu:** zachować jeden wątek przez serwer asynchroniczny, z porcjowaniem plików i przerwami na inne połączenia. Zapisać obsługiwany zakres HTTP: GET/HEAD, poprawne 206/416, ograniczanie końca zakresu i allowlista plików manifestu. Nie przenosić handlera PoC jako gotowej implementacji.
+
+22. **[WAŻNE] Kryteria pomiaru nie definiują jednoznacznie sukcesu.**
+
+    **Dowód:** `PLAN.md:1379` mówi o „medianie każdego strumienia ≥55 kl./s”, bez okien agregacji i czasu próby. PoC liczy średnie uploady na całe okno (`stage.py:78`). `desktop-vsync-n3.json:5` ma render 208 fps mimo nazwy „vsync”; README wyjaśnia zablokowany ekran (`README.md:39`). Webowy `clip_2` ma 48,09 fps i 244/1379 odrzuconych klatek (`web-headless-n3.json:32`).
+
+    **Konsekwencja:** PoC nie zalicza proponowanych kryteriów okienkowych. Łączne ~9% strat ukrywa znacznie gorszy pojedynczy strumień. „Zrzut zgodny w tolerancji” również nie ma ustalonej tolerancji.
+
+    **Poprawka planu:** podać sprzęt, odświeżanie, rozgrzewkę, długość i liczbę powtórzeń; minimalny wynik każdego strumienia, delty liczników w tym samym oknie, p95/max ciszy i opóźnienie wejścia. Dodać zewnętrzny watchdog, serię zmian slajdów i pętli oraz dłuższą próbę stabilności. Testy Windows muszą obejmować dwa monitory, vsync, live GL/CE i przełączanie aplikacji. Zrzuty porównywać na kontrolowanych chwilach przez maski/geometrię, z liczbowymi tolerancjami.
+
+23. **[WAŻNE] Budżet nie uwzględnia bramek technicznych i iteracji mniejszego modelu.**
+
+    **Dowód:** `PLAN.md:1394` przeznacza 30 h na całość 10a, w tym 8 h na kontroler live i 4 h na okna. Tymczasem brak jeszcze potwierdzenia najtrudniejszych właściwości okien, określenia polityki dekodowania i wydzielonego zestawu testów.
+
+    **Konsekwencja:** Haiku będzie rozstrzygać architekturę podczas implementacji. Limit 60 h stanie się momentem zatrzymania częściowego portu, a nie kontrolą przewidywalnego zakresu.
+
+    **Poprawka planu:** estymować po bramkach technicznych. Nie podawałbym 30 h jako wiarygodnego budżetu parytetu; orientacyjnie rezerwowałbym **50–80 h łącznej pracy implementacji, przeglądu i prób**, z ponowną estymacją po pierwszych zadaniach. To ocena ryzyka, nie wynik pomiaru. Osobno rozliczać pracę Haiku i Claude oraz oczekiwanie na próbę człowieka.
+
+Proponowany podział 10a dla Haiku, wykonywany kolejno:
+
+| Zadanie | Wejście → wynik | Warunek odbioru |
+|---|---|---|
+| 0. Kontrakt — **Claude** | Obecny player i testy → macierz parytetu, przejść, wyjątków i portów platformowych | Rozstrzygnięte punkty 1–5, 9–12 |
+| 1. Bramka Windows | Mała aplikacja hello_imgui → dwa okna, monitory, F/H, jawny OpenGL3 | Próba dwóch monitorów, DPI i przechodzenia do Info; bez reszty playera |
+| 2. Bramka wspólnego kodu | Minimalny manifest → import kontrolera na PC i w Pyodide | Bez Qt/PyAV/multiprocessing w wspólnym drzewie importów |
+| 3. Klawisze i konfiguracja | Istniejące `keys.py`, TOML → adapter bez Qt | Domyślne, własne, nieznane, repeat i klawisze modyfikowane |
+| 4. Kontroler nawigacji | Tabela przejść, sztuczny zegar → czysty model stanu i efektów | Test każdej pozycji tabeli; żadnych okien i dekoderów |
+| 5. Źródła PC | Ustalony protokół źródła → obraz, GIF, CFR, reset, pętla, EOF | Małe materiały z identyfikowalnymi klatkami; błędy i opóźnienia |
+| 6. Kompozycja | Manifest i gotowe tekstury → geometria, clipping, alfa, obwódki | Fixture tekstur 1.92 + obrazy z prawdziwego renderera |
+| 7. Live — **Claude** | `EntryHistory`, LiveSession, kontrakt bariery → kontroler bez Qt | Port scenariuszy 5g, stale granice, timeout, rezerwacja, shutdown |
+| 8. Adapter wejścia live | Zdarzenia ImGui → klik/fokus/gesty/komendy kontrolera | D20/D28, Info, marginesy, repeat, rezerwacja |
+| 9. Info i podgląd | Snapshot stanu, osobne źródła preview → wspólny bieżący obraz i niezależny podgląd | 5c/5d, ukryte Info bez dekoderów, przejście między deckami |
+| 10. Integracja CLI | Gotowe moduły → `--player imgui`, Qt nadal domyślny | Macierz CLI i brak regresji Qt |
+| 11. Odbiór — **Claude + człowiek** | Gotowy player → raport obrazu, wydajności i stabilności | Pełne testy, prawdziwe okna, dwa monitory, próba człowieka |
+
+Każde zadanie powinno mieć zamkniętą listę plików, sygnatury wejść/wyjść, konkretne testy i zakaz zmiany semantyki bez powrotu do Claude. Kontrolera live nie oddawałbym Haiku jako „portu 1:1”.
+
+Z 10a można wyciąć bez utraty celu: **ruch podglądu**, eksperymenty `hwaccel`, adaptacyjne skalowanie dekodowanych tekstur i implementację audio inną niż uzgodnione ostrzeżenie. 10c pozostawić poza zakresem. Nie wycinać testów bariery, shutdown, dwóch okien ani polityki przeciążenia — one bezpośrednio chronią cel „brak zawieszeń”.
+
+**Werdykt końcowy: kierunek zaakceptować, kontrakt odesłać do poprawy. Najpierw bramki Windows/Pyodide oraz precyzyjny kontrakt zegara i live, potem małe zadania Haiku.**

@@ -202,3 +202,19 @@ imports use `manimcue.slides`, the CLI is `manim-cue`, IPython magic and the Sph
 are removed, and PyPI version checks are disabled. `.manim-slides.toml` and the upstream logger
 name remain compatible. Architectural decisions are in [SPEC.md](SPEC.md), implementation
 contracts in [PLAN.md](PLAN.md), and reviews in [REVIEW-LOG.md](REVIEW-LOG.md) (all in Polish).
+
+
+## ImGui player status (phase 10a)
+
+The phase 10 contract is documented in PLAN.md; implementation is blocked at the
+Windows gate. `--player imgui` is **not available yet**. The planned invocation is
+`uv run --frozen manim-cue present Demo --player imgui`; do not use it as a working command.
+The current Qt player remains the default (`uv run --frozen manim-cue present Demo`).
+
+The planned desktop ImGui player shares its controller and UI with the future web
+player. Desktop audio is excluded: it will warn once per base material containing
+audio; use Qt for sound. Desktop live panels remain supported in the contract;
+browser live panels require a later phase. The existing ImGui experiment is a PoC,
+not the production player. Two-window/DPI/focus and unlocked-screen performance
+acceptance are still pending. See reports/REPORT-10a.md for the gate failure and
+the commands needed to resume; no ImGui performance or parity claim is made here.

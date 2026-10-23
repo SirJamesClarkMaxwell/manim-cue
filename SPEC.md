@@ -706,10 +706,45 @@ pokazują tę samą operację, początek/pozostawiony stan oraz trwałą degrada
 
 ---
 
+## Decyzje F10 (2026-10-23, runda 21)
+
+**D42. Player ImGui PC/web.** imgui-bundle 1.93.0, PyOpenGL 3.1.10 na PC,
+jawne GLFW/OpenGL3 i hello_imgui; wspólny kod kontrolera/geometrii/UI bez Qt,
+PyAV i multiprocessing, manifest JSON zamiast importu modelu w Pyodide.
+`present --player imgui|qt`, Qt domyślny. Jeden wątek aplikacji na proces;
+poll live/ACK przed mediami, blokujące dekodery w nadzorowanych procesach PC.
+Bramki dwóch okien Windows i importów PC/Pyodide przed portem.
+Wykonawca codex zadaniami 0–11, Claude przegląda po każdym etapie;
+podział i zamknięty zakres w PLAN. Implementacja pozostaje zablokowana na bramce 1.
+
+**D43. Wewnętrzny zegar mediów PC.** Jawny wyjątek od ograniczenia D17:
+baza i klipy plikowe PC mają wspólny czas prezentacji z barierą i pauzą;
+CFR wybierane według czasu, inne materiały według zwalidowanych PTS/czasów GIF.
+Spóźnione obrazy pomijane, bez nadrabiania w UI i bez gwarancji frame-lock.
+Czas mediów, aktywny czas ruchu D30 i czas rzeczywisty Info są oddzielne.
+Bez publicznego seek i synchronizacji czasu live; web zachowuje własne zegary
+video, wspólny start/pauzę i zaakceptowany dryf. D31/D39–41 nadal obowiązują:
+bariera czeka na gotowy obraz restore, ACK po trwałym przyjęciu do kompozycji,
+przed startem/enter, nie po fizycznym wyświetleniu. Ruch preview w F10 ma własny
+czas niezależny od pauzy/barier głównych (wyjątek od rect_at(0) w D35 dla plików).
+
+**D44. Audio — decyzja prelegenta zachowana.** 10a PC bez dźwięku, ostrzeżenie
+raz na materiał bazy ze strumieniem audio; Qt pozostaje ścieżką dźwiękową.
+Implementacja audio wymaga osobnej decyzji przed usunięciem Qt. W 10b audio
+tylko z bazy głównego okna, po udanym play odblokowanym gestem użytkownika;
+odmowa blokuje wspólny start i pokazuje komunikat, Info/preview/klipy wyciszone.
+PoC web z muted nie dowodzi działania audio.
+
+Domyślne warianty **do potwierdzenia** przez prelegenta: fullscreen bez ramek,
+ruch preview według czasu każdego źródła/reset przy jego pętli, dryf repliki web 100 ms.
+Nie zmieniają decyzji D44 ani wykonania etapami; szczegóły i budżety w PLAN.
+
+---
+
 ## Zakres, którego nie wolno rozszerzyć bez decyzji
 
-**Synchronizacja co do klatki.** Warstwy startują i pauzują razem (D17) — i na tym koniec.
-Zegar główny, seek i frame-lock to dni pracy i realne ryzyko (dryf, różne długości klipów, seek).
+**Synchronizacja co do klatki.** Warstwy startują i pauzują razem (D17); D43 dopuszcza wewnętrzny zegar plików PC, bez gwarancji frame-lock/live sync.
+Publiczny zegar główny, seek i frame-lock to dni pracy i realne ryzyko (dryf, różne długości klipów, seek).
 Do czterowidokowej sceny seminarium wystarczy jedna scena Manima z czterema panelami albo warstwy
 o równej długości.
 
