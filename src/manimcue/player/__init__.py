@@ -1,1 +1,1 @@
-"""Player ImGui (faza 10): kod bez Qt, wspólny dla PC i przeglądarki."""
+"""Wspólna logika playera; adaptery platformowe importowane wyłącznie jawnie."""

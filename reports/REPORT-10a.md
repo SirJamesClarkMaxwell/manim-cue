@@ -1,4 +1,21 @@
-# REPORT-10a — kontrakt i zatrzymanie na bramce 1
+# REPORT-10a — bramka Windows zaliczona programowo, STOP na bramce Pyodide
+
+**Końcowy pełny pytest bieżącej sesji:** **581 passed, 2 failed, 2 skipped,
+57 warnings, 943,64 s, kod 1**. Dwa błędy: brak Playwright offline w bramce 2
+oraz timeout 240 s istniejącego web PoC. Pełny zestaw nie jest zielony.
+
+**Aktualizacja bieżącej sesji, 2026-10-23:** zadanie 1 zaimplementowane,
+3 testy GPU zielone, dwa monitory wykryte, geometria/uchwyty/backend/kursor
+sprawdzone. Zadanie 2 przygotowane, część PC: 6 testów zielonych; część
+Pyodide: 1 test czerwony z powodu braku Playwright w cache offline.
+**Bramka 2 NIEZALICZONA, zadania 3–10 niewykonane.** Kontrakt wymaga obu
+bramek przed portem; wyjątek środowiskowy z polecenia użytkownika dotyczył
+przejścia z bramki 1 do 2, nie pominięcia bramki 2. Szczegóły wznowienia
+i końcowy pełny pytest na końcu pliku. Poniższy pierwotny raport pozostaje
+zapisem historycznym: blokada imgui-bundle/uv.lock została usunięta przez
+Claude przed tą sesją, obecnie import imgui_bundle działa.
+
+## Historyczny raport poprzedniej sesji
 
 Data: 2026-10-23. Repozytorium główne `D:/Programming/Python/manim/manim-cue`,
 gałąź `develop`, bez worktree. Wykonawca codex. **10a nie jest zaimplementowane.**
@@ -182,3 +199,149 @@ kodzie angielskie, komentarze/docstringi polskie (wyjątek upstream slides zacho
 
 D44 (PC bez dźwięku i ostrzeżenie) oraz wykonanie etapami pozostają rozstrzygnięte,
 nie są pytaniami do ponownego zatwierdzenia.
+
+## Wznowienie 2026-10-23 — zadanie 1
+
+Bramka Windows zaimplementowana w `experiments/f10a_gate/windows.py`; odbiór w
+`tests/test_imgui_windows_gate.py`. Bez zmian pyproject/lock/.venv. Brak pakietu
+Python glfw rozwiązano dostępem ctypes do tej samej glfw3.dll dostarczonej przez
+imgui-bundle. Uchwyty pobierane z platform_handle viewportu, HWND z GLFW.
+
+Dowód: `test_two_native_windows`, `test_fullscreen_roundtrip`,
+`test_cursor_and_backend`: **3 passed**, także F10_INFO_MONITOR=1 (drugi monitor),
+0,56 s. Ruff check i format zielone. Programowy JSON: dwa monitory
+3440x1440@60 przy (0,0) oraz 2560x1440@59 przy (3440,-588); osobne natywne
+okna; jawny Glfw - OpenGL3; borderless fullscreen i odtworzenie osobnych geometrii.
+Pomiary wywołań glfwSwapBuffers osobno dla obu okien, interval_requested=1;
+krótkie czasy nie dowodzą vsync przy zablokowanym ekranie.
+Czas zadania około 8 min z odczytem kontraktu; limit 8 h nieprzekroczony.
+Odstępstwa: brak próby człowieka DPI/fokus/wygląd; do Claude, jak uzgodniono.
+Bramka 1: część programowa zaliczona, próba człowieka pozostaje.
+Komenda: `uv run --frozen python experiments/f10a_gate/windows.py --info-monitor 1 --output .tmp/MEASUREMENT-10a-windows.json`.
+
+## Wznowienie — zadanie 2 (nieukończone, STOP)
+
+Pliki przygotowane zgodnie z zamkniętą listą:
+- `src/manimcue/player/__init__.py`: granica pakietu bez adapterów;
+- `manifest.py`: validate_manifest, kopia JSON, wersja/rozdzielczości/czasy/rate/rect;
+- `clock.py`: wewnętrzny czas, kotwica, rate, pauza i wznowienie;
+- `geometry.py`: fit, kontener i clipping w logicznych współrzędnych;
+- `state.py`: stan początkowy i niezależny snapshot;
+- `controller.py`: podstawowe przejścia potrzebne do named cases bramki;
+- `experiments/f10a_gate/imports.py`: identyczne run_shared_cases na PC/Pyodide,
+  blokada zabronionych importów, osobny interpreter PC, headless Edge Playwright;
+- `experiments/f10a_gate/pyodide.html`: bootstrap przypiętego Pyodide v314.0.7,
+  wgranie dokładnie tych samych źródeł i odebranie wyniku JSON;
+- `tests/test_imgui_shared_imports.py`, `tests/test_imgui_shared_logic.py`.
+
+Dowód PC: `test_pc_shared_imports` i parametrized `test_shared_case`:
+`clock_pause`, `navigation_table`, `geometry_clip`, `stale_entry`,
+`manifest_validation`. **6 passed**; pusty zbiór zabronionych importów
+w osobnym interpreterze PC, 7 odrzuconych niepoprawnych manifestów.
+`navigation_table` w tej bramce sprawdza tylko przygotowanie/start/pauzę/next;
+pełna tabela (loop/reverse/history/CLI/live) należy do niewykonanego zadania 4.
+To nie jest gotowy kontroler produkcyjny ani implementacja playera.
+
+`test_pyodide_shared_imports`: **1 failed**, nie skip. Dokładny błąd resolvera:
+
+```text
+× No solution found when resolving `--with` dependencies:
+╰─▶ Because playwright was not found in the cache and you require
+    playwright, we can conclude that your requirements are unsatisfiable.
+    hint: Packages were unavailable because the network was disabled. When
+    the network is disabled, registry packages may only be read from the cache.
+```
+
+Polecenie `uv run --frozen --with playwright python -c "import playwright"`
+z UV_OFFLINE=1 potwierdziło ten sam błąd. Nie zmieniano cache na cudzy,
+nie wyłączano offline, nie instalowano zależności i nie zmieniano .venv.
+Nie uruchomiono Edge/Pyodide: to blokada środowiska, brak dowodu API przeglądarki.
+Strona wymaga też dostępu do przypiętego CDN Pyodide (domknięcie offline to 10b).
+Ruff check i format dla wszystkich 11 zmienionych plików Python: zielone.
+Czas przygotowania zadania 2 około 5 min, limit 6 h nieprzekroczony.
+
+### Dalsze zadania i komendy dla Claude
+
+Zadania 3, 4, 5, 6, 7, 8, 9, 10: **niewykonane**, wymagana bramka 2
+nie przeszła. Qt i jego CLI niezmienione. Zadanie 11 pozostaje dla Claude;
+measure.py nie przygotowano, ponieważ finalny player jeszcze nie istnieje.
+Nie ma komendy pomiaru finalnego playera i nie ma wdrożonego --player imgui.
+
+W sesji Claude z dostępem do sieci (bez synchronizacji .venv):
+
+```powershell
+$env:UV_CACHE_DIR='D:/Programming/Python/manim/manim-cue/.cache/uv'
+$env:TMP='D:/Programming/Python/manim/manim-cue/.tmp'
+$env:TEMP=$env:TMP
+$env:UV_NO_SYNC='1'
+$env:QT_QPA_PLATFORM='offscreen'
+$env:UV_OFFLINE='0'
+uv run --frozen --with playwright python experiments/f10a_gate/imports.py --channel msedge --output .tmp/MEASUREMENT-10a-imports.json
+uv run --frozen pytest -q -p no:cacheprovider tests/test_imgui_shared_imports.py tests/test_imgui_shared_logic.py
+$env:UV_OFFLINE='1'
+$env:F10_INFO_MONITOR='1'
+uv run --frozen pytest -q -p no:cacheprovider tests/test_imgui_windows_gate.py
+uv run --frozen python experiments/f10a_gate/windows.py --main-monitor 0 --info-monitor 1 --output .tmp/MEASUREMENT-10a-windows.json
+```
+
+Obowiązkowy wynik bramki 2: status ok i identyczne pc/pyodide z pięcioma
+named cases oraz pustym forbidden_imports. Sam test PC nie wystarcza.
+Jeśli API bramki nie przejdzie, zatrzymać port. Po zaliczeniu wznowić od zadania 3.
+
+**Do potwierdzenia przez Claude/człowieka:** DPI i ostrość; fokus po przejściu
+main/Info/inne aplikacje i brak minimalizacji; wygląd; dwa monitory w praktyce;
+rzeczywisty vsync przy odblokowanym ekranie. Borderless fullscreen, niezależny
+czas ruchu preview i tolerancja web 100 ms pozostają decyzjami do potwierdzenia
+z kontraktu. Próby człowieka i przegląd Claude w tej sesji: 0 min.
+
+Nie wykonano commita, stash, reset, checkout, worktree, zmian .venv ani łatania
+Manima. UV_NO_SYNC=1 dodatkowo zabezpieczało .venv przy wszystkich uv run.
+Odstępstwo od celu zadań 1–10 wynika z obowiązkowej bramki 2, nie z budżetu.
+
+## Końcowy pełny pytest i podsumowanie bieżącej sesji
+
+Wymagane polecenie, bez wyłączania gpu/PoC i bez zmiany .venv:
+
+```powershell
+$env:UV_CACHE_DIR='D:/Programming/Python/manim/manim-cue/.cache/uv'
+$env:UV_OFFLINE='1'
+$env:UV_NO_SYNC='1'
+$env:TMP='D:/Programming/Python/manim/manim-cue/.tmp'
+$env:TEMP=$env:TMP
+$env:QT_QPA_PLATFORM='offscreen'
+uv run --frozen pytest -q -p no:cacheprovider
+```
+
+**581 passed, 2 failed, 2 skipped, 57 warnings in 943.64s (0:15:43), kod 1.**
+Log: `.tmp/f10a-pytest-full.log`. Wszystkie nowe testy PC, w tym trzy gpu
+bramki Windows, przeszły także w pełnym przebiegu. Testy istniejącego playera
+Qt w tym przebiegu przeszły; nie zmieniano jego kodu ani domyślnego CLI.
+
+Niepowodzenia:
+1. `tests/test_imgui_shared_imports.py::test_pyodide_shared_imports`:
+   resolver uv nie znajduje Playwright w cache offline; przeglądarka i Pyodide
+   nie zostały uruchomione. Obowiązkowa bramka 2 nadal niezaliczona.
+2. `experiments/f5i_imgui/test_poc.py::test_web_smoke_same_stage_in_browser`:
+   wynik istniejącego PoC `{'error': 'brak metryk po 240.0 s'}`. Nie zmieniano
+   PoC; samego powodu braku metryk w tej sesji nie ustalono. Nie zamieniono
+   błędu w skip i nie pominięto testu w wymaganym pełnym przebiegu.
+
+Końcowe kontrole: Ruff check i format dla wszystkich 11 zmienionych plików
+Python zielone; git diff --check zielony. Gałąź nadal develop, główne drzewo.
+Wynik okien z obu monitorów: `.tmp/MEASUREMENT-10a-windows.json`.
+Raport wyjściowy `REPORT-10a.md` jest kopią niniejszego pliku.
+
+| Zadanie | Status tej sesji | Dowód / brak |
+|---|---|---|
+| 1 | Zaimplementowane, programowo zaliczone | test_two_native_windows, test_fullscreen_roundtrip, test_cursor_and_backend; 3 passed także dla Info na monitorze 1 |
+| 2 | Przygotowane, nieukończone; STOP | 5 named cases + test_pc_shared_imports zielone; test_pyodide_shared_imports czerwony, brak Playwright offline |
+| 3–10 | Niewykonane | Kontrakt wymaga zaliczenia bramki 2 przed portem |
+| 11 | Pozostawione Claude | Brak finalnego playera/pomiarów/measure.py; próby człowieka wypisane wyżej |
+
+Czas bieżącej sesji około 30 min: implementacja/odczyt/raport około 14 min,
+pełny pytest dokładnie 15 min 43,64 s. Jest to przybliżenie całej sesji,
+ponieważ pierwszy jawny odczyt zegara wykonano już podczas pracy (11:35:13
+CEST); zakończenie około 11:56 CEST. Czas przeglądu Claude i próby człowieka: 0.
+Nie przekroczono 2x budżetu żadnego zadania ani całości. Oczekiwanie na
+Playwright/sieć wymaga nowej sesji z odpowiednim środowiskiem; bramki nie
+zaliczono zastępczym testem PC ani innym narzędziem przeglądarkowym.

@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="pl">
+<meta charset="utf-8">
+<title>Bramka wspólnego kodu F10</title>
+<!-- Przypięty runtime jak w PoC; domknięcie offline należy do etapu 10b. -->
+<script src="https://cdn.jsdelivr.net/pyodide/v314.0.7/full/pyodide.js"></script>
+<body>Bramka wspólnego kodu F10
+<script>
+async function run() {
+    const pyodide = await loadPyodide();
+    const sources = await (await fetch("/sources.json")).json();
+    for (const [path, source] of Object.entries(sources)) {
+        const parent = path.includes("/") ? path.slice(0, path.lastIndexOf("/")) : "";
+        if (parent) pyodide.FS.mkdirTree(parent);
+        pyodide.FS.writeFile(path, source);
+    }
+    const result = pyodide.runPython(`
+import sys, json
+sys.path.insert(0, '.')
+from shared_cases import check_shared_imports
+json.dumps(check_shared_imports())
+`);
+    window.gateResult = JSON.parse(result);
+}
+run().catch(error => { window.gateResult = {error: String(error)}; });
+</script>
+</html>
