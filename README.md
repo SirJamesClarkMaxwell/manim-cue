@@ -206,15 +206,19 @@ contracts in [PLAN.md](PLAN.md), and reviews in [REVIEW-LOG.md](REVIEW-LOG.md) (
 
 ## ImGui player status (phase 10a)
 
-The phase 10 contract is documented in PLAN.md; implementation is blocked at the
-Windows gate. `--player imgui` is **not available yet**. The planned invocation is
-`uv run --frozen manim-cue present Demo --player imgui`; do not use it as a working command.
-The current Qt player remains the default (`uv run --frozen manim-cue present Demo`).
+Qt remains the default: `uv run --frozen manim-cue present Demo`.
+The experimental desktop backend is selectable with
+`uv run --frozen manim-cue present Demo --player imgui --show-info-window`.
+The Windows and shared PC/Pyodide gates passed (commit ed012bb); desktop
+integration is under acceptance, not a performance or full parity claim.
 
-The planned desktop ImGui player shares its controller and UI with the future web
-player. Desktop audio is excluded: it will warn once per base material containing
-audio; use Qt for sound. Desktop live panels remain supported in the contract;
-browser live panels require a later phase. The existing ImGui experiment is a PoC,
-not the production player. Two-window/DPI/focus and unlocked-screen performance
-acceptance are still pending. See reports/REPORT-10a.md for the gate failure and
-the commands needed to resume; no ImGui performance or parity claim is made here.
+The backend uses GLFW/OpenGL3 and separate main/Info viewports. Media decoding
+runs in supervised processes, while application code stays on one thread per
+process. Live panels reuse the existing transport and checkpoint history.
+Desktop audio is excluded: one warning is emitted per material with an audio
+track. Use Qt when audio is needed. The web backend is a later phase.
+
+See `reports/REPORT-10a.md` for test evidence, remaining acceptance checks
+and network-dependent tests. Native window appearance,
+DPI, focus, two-monitor use, vsync and performance still require acceptance
+with an unlocked screen. The existing ImGui experiment remains a separate PoC.

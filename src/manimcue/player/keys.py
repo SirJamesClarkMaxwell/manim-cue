@@ -106,3 +106,41 @@ def imgui_key(qt_code: int):
 def imgui_keys(qt_codes) -> list:
     """Mapuje kolejne kody Qt; podnosi UnknownKeyError na pierwszym nieznanym."""
     return [imgui_key(code) for code in qt_codes]
+
+
+DEFAULT_KEYS = {
+    "QUIT": "Q",
+    "PLAY_PAUSE": "Space",
+    "NEXT": "Right",
+    "PREVIOUS": "Left",
+    "REVERSE": "V",
+    "REPLAY": "R",
+    "FULL_SCREEN": "F",
+    "HIDE_MOUSE": "H",
+    "PRESENTER_STATE": "S",
+}
+
+
+def bindings(config: dict) -> dict:
+    """Zamień liczbowe kody TOML na klawisz fizyczny i zestaw modyfikatorów."""
+    result = {}
+    configured = config.get("keys", config)
+    for action, default in DEFAULT_KEYS.items():
+        codes = configured.get(action, {"ids": [QT_KEYS[default]]})["ids"]
+        for code in codes:
+            name = QT_TO_IMGUI.get(code)
+            if name is None:
+                label = next((name for name, value in QT_KEYS.items() if value == code), None)
+                raise UnknownKeyError(
+                    f"{action}: Qt key code {code} (0x{code:X})" + (f", {label}" if label else "")
+                )
+            candidates = [(name, frozenset())]
+            if code == QT_KEYS["Plus"]:
+                candidates.append(("equal", frozenset({"shift"})))
+            elif code == QT_KEYS["Asterisk"]:
+                candidates.append(("_8", frozenset({"shift"})))
+            for candidate in candidates:
+                if candidate in result:
+                    raise ValueError(f"Duplicate binding: {action}, {code}")
+                result[candidate] = "pause" if action == "PLAY_PAUSE" else action.lower()
+    return result

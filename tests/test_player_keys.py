@@ -16,6 +16,9 @@ def test_qt_keys_match_qt():
 
     for name, code in QT_KEYS.items():
         assert code == getattr(Qt, "Key_" + name), name
+    from manimcue.slides.config import key_id
+
+    assert key_id("MediaPlay") == Qt.Key_MediaPlay
 
 
 def test_default_bindings_map():
@@ -70,3 +73,26 @@ def test_import_does_not_load_qt():
         ],
         check=True,
     )
+
+
+def test_config_without_qt_and_numeric_toml(tmp_path):
+    script = """
+import sys
+from pathlib import Path
+from manimcue.slides.config import Config
+config = Config()
+assert not any(n.startswith(('qtpy', 'PySide6', 'PyQt6')) for n in sys.modules)
+path = Path(sys.argv[1])
+config.to_file(path)
+assert Config.from_file(path) == config
+assert '16777236' in path.read_text()
+"""
+    subprocess.run([sys.executable, "-c", script, str(tmp_path / "keys.toml")], check=True)
+
+
+def test_bindings_custom_unknown():
+    from manimcue.player.keys import bindings
+
+    assert bindings({"NEXT": {"ids": [ord("T")]}})[("t", frozenset())] == "next"
+    with pytest.raises(UnknownKeyError, match=r"NEXT.*33554431.*0x1FFFFFF"):
+        bindings({"NEXT": {"ids": [0x1FFFFFF]}})

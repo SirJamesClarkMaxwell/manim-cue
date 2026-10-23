@@ -1,5 +1,7 @@
 """Geometria logiczna: kadr, kontener i przycięcie, bez zależności od DPI."""
 
+from itertools import pairwise
+
 
 def fit(aspect: float, container: tuple) -> tuple:
     """Wyśrodkuj obraz o zadanych proporcjach wewnątrz kontenera."""
@@ -34,3 +36,29 @@ def clip(box: tuple, frame: tuple) -> tuple:
         max(0.0, min(x + width, fx + fw) - left),
         max(0.0, min(y + height, fy + fh) - top),
     )
+
+
+def rect_at(media: dict, now: float) -> tuple:
+    """Liniowa interpolacja D30; poza keyframes zachowaj skrajny prostokąt."""
+    frames = media.get("keyframes", [])
+    if not frames:
+        return tuple(media.get("rect", (0, 0, 1, 1)))
+    if now <= frames[0]["t"]:
+        return tuple(frames[0]["rect"])
+    for left, right in pairwise(frames):
+        if now <= right["t"]:
+            ratio = (now - left["t"]) / (right["t"] - left["t"])
+            return tuple(a + ratio * (b - a) for a, b in zip(left["rect"], right["rect"]))
+    return tuple(frames[-1]["rect"])
+
+
+def hit_test(commands: list, point: tuple):
+    """Najwyższy kontener blokuje niższe także na przezroczystych marginesach."""
+    px, py = point
+    for command in reversed(commands):
+        if "container" not in command:
+            continue
+        x, y, w, h = clip(command["container"], command["clip"])
+        if x <= px < x + w and y <= py < y + h:
+            return command["source"]
+    return None

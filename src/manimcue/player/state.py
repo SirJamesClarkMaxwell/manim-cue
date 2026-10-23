@@ -16,6 +16,12 @@ def initial_state(manifest: dict, now: float = 0.0) -> dict:
         "paused": True,
         "ended": False,
         "reverse": False,
+        "loop_exit_requested": False,
+        "termination_achieved": False,
+        "resolution": manifest["presentations"][0].get("resolution", manifest["resolution"])[:],
+        "preview": None,
+        "message_revision": 0,
+        "message": None,
         "clock": new_clock(now),
     }
 

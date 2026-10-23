@@ -51,7 +51,11 @@ class Signal(BaseModel):
 
 
 def key_id(name: str) -> PositiveInt:
-    """Avoid importing Qt too early."""
+    """Avoid importing Qt too early; default keys resolve without Qt."""
+    from manimcue.player.keys import QT_KEYS
+
+    if name in QT_KEYS:
+        return QT_KEYS[name]
     from qtpy.QtCore import Qt
 
     return getattr(Qt, f"Key_{name}")

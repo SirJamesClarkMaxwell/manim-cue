@@ -1,3 +1,18 @@
+# REPORT-10a — wznowienie po bramkach, zadania 3–10
+
+**Aktualizacja tej sesji:** bramki 1 i 2 zaliczone przez Claude w ed012bb.
+Kod zadań 3–10 dodany; Qt pozostaje domyślny. Końcowa kontrola skupiona:
+**80 passed**, Ruff check/format zielone (28 plików). Pełny pytest finalnego
+kodu: **649 passed, 2 failed (testy sieciowe), 2 skipped**, 917.21 s.
+Szczegóły końcowego wyniku znajdują się na końcu tego raportu.
+Zadanie 11 pozostaje do odbioru przez Claude; measure.py przygotowane.
+Szczegóły implementacji, dowody, odstępstwa i komendy: końcowe sekcje raportu.
+
+## Historia poprzednich sesji i etapów
+
+Poniższe stare wpisy STOP/bramka 2 niezaliczona opisują stan sprzed aktualizacji
+Claude. Nie są aktualnym statusem bramek.
+
 # REPORT-10a — bramka Windows zaliczona programowo, STOP na bramce Pyodide
 
 **Końcowy pełny pytest bieżącej sesji:** **581 passed, 2 failed, 2 skipped,
@@ -345,3 +360,426 @@ CEST); zakończenie około 11:56 CEST. Czas przeglądu Claude i próby człowiek
 Nie przekroczono 2x budżetu żadnego zadania ani całości. Oczekiwanie na
 Playwright/sieć wymaga nowej sesji z odpowiednim środowiskiem; bramki nie
 zaliczono zastępczym testem PC ani innym narzędziem przeglądarkowym.
+
+## Wznowienie 2026-10-23 po aktualizacji Claude 12:00 — zadanie 3
+
+Bramki 1 i 2 zaliczone w ed012bb zgodnie z przekazaniem Claude: PC/Pyodide
+identyczne, brak zakazanych importów. Poprzednie wpisy STOP opisują stan historyczny.
+Zadanie 3: keys.py, input.py, slides/config.py, test_player_keys.py,
+test_imgui_input.py. Config() korzysta z jednej tabeli kodów bez Qt; bindings
+obsługuje kody TOML, błędy z akcją/decimal/hex i Plus/Asterisk na numpadzie
+oraz Shift. Router zachowuje priorytet edycji/rezerwacji/cue i konsumuje repeat.
+Dowód: test_actions (9), test_live_priority_and_repeat,
+test_plus_asterisk_modifiers, test_config_without_qt_and_numeric_toml,
+test_bindings_custom_unknown oraz dotychczasowe test_player_keys i presenter_state:
+27 passed, 2 warnings, 12.68 s. Ruff check/format zielone. Czas około 5 min.
+Odstępstwa: brak. Nie zmieniono .venv ani stanu gałęzi.
+
+## Zadanie 4 — nawigacja
+
+Pliki: player/controller.py, state.py, test_imgui_navigation.py; clock.py i
+shared_logic bez zmian semantyki. Czysty reducer rozszerzony o tabelę przejść,
+pętlę/EOF, reverse/replay, zmianę decku, indeksy ujemne i zero, komunikaty z
+rewizją, anulowanie starego wejścia i efekty dwufazowego zamykania.
+Dowód: test_preparing_next_pause_replay_and_stale, test_paused_static_and_clock,
+test_loop_exit, test_backward_across_decks_and_beginning,
+test_reverse_to_normal_preserves_live_and_replay_direction, test_eof_and_auto_next,
+test_ended_pause_never_restarts_base, test_start_at_zero_negative_resolution_and_preview,
+test_last_quit_and_message_revision oraz 5 shared cases: 16 passed (0.06 s).
+Ruff check/format zielone. Czas około 5 min. Efekty historii i zachowania live
+wymagają podłączenia przez zadanie 7; reducer nie wykonuje I/O.
+
+## Zadanie 5 — źródła PC
+
+Pliki: player/sources_av.py, decoder_worker.py, tests/test_imgui_sources.py.
+Spawn izoluje PyAV/Pillow; dwa sloty pamięci współdzielonej ze sprawdzaniem
+rewizji, owned RGBA po stronie UI, kontrola przez stały RawArray bez rosnącej
+kolejki poleceń. Proces dekoduje max 4 klatki/iterację, seek po zaległości
+>250 ms, reset unieważnia generację. GIF używa disposal Pillow, minimalnego
+czasu 10 ms i limitu 256 MiB. Przygotowanie 5 s, zastój 2 s, bez join UI.
+Dowód: test_image_reset_owned_rgba_and_eof, test_gif_variable_times,
+test_invalid_file_error, test_cfr_pts_and_bounded_mailbox,
+test_stalled_decoder_poll_and_timeout,
+test_ready_decoder_hang_keeps_frame_and_nonblocking_control (10000 poleceń
+przy rzeczywiście zawieszonym procesie), test_gif_loop_uses_same_generation:
+7 passed, 1.20 s. Ruff check/format zielone po poprawie importów testu.
+Czas około 10 min. Do dalszego odbioru: pomiar budżetu kopii 1080p i
+weryfikacja VFR/PTS na rzeczywistych materiałach; nie wykonano pomiaru GPU.
+
+## Zadanie 6 — kompozycja
+
+Pliki: player/stage.py, geometry.py, textures.py, tests/test_imgui_composition.py.
+Komendy zachowują kontener i clip kadru, live nie dostaje ponownego aspect fit,
+ruch D30, prostą alfę, wewnętrzne obwódki i hit-test marginesów.
+Upload tworzy osobny TextureLease, więc nowa klatka nie mutuje starego snapshotu.
+Dowód: test_composition_geometry_alpha_border_hit_margin,
+test_draw_data_vertices_uv_clip (rzeczywiste vertices/UV/clip/index data z
+renderer_has_textures, set_tex_id/set_status), test_texture_upload_owned_rgba
+(gpu, odczyt pikseli GL i dwie niezależne tekstury): 3 passed, 0.27 s.
+Ruff check/format zielone. Czas około 5 min. Odbiór screenshotów demo 1–11
+względem Qt pozostaje zadaniem 11; test uploadu nie jest tym porównaniem.
+
+## Zadanie 7 — live
+
+Pliki: player/live.py, test_imgui_live.py, test_imgui_live_checkpoint.py.
+Ponownie użyte EntryHistory/LiveSession/LiveSpec. Kontroler przyjmuje słowniki,
+przejmuje sąsiednie sesje o tej samej tożsamości, rezerwuje checkpoint dopiero
+po pierwszych obrazach plików, koreluje granice, przypisuje lease przed ACK,
+odrzuca stare wejścia, pompuje anulowane granice, ma timeout 5 s i start/ACK 2 s,
+start cue dopiero na wspólny start, pauzę i dwufazowy shutdown.
+Dowód: test_ack_after_assign_and_start_after_ready,
+test_pause_prepares_without_enter_and_shutdown,
+test_timeout_degrades_and_does_not_block_files,
+test_cancelled_boundary_ack_without_composition,
+test_history_replay_reverse_and_stale_generation,
+test_closed_lease_never_acknowledged,
+test_real_checkpoint_first_image_and_ack[manimgl/ce-cairo] z prawdziwymi procesami:
+8 passed, 2.81 s. Ruff check/format zielone. Czas około 7 min.
+Ograniczenie dowodu: rzeczywiste procesy używają testowego lease; upload GL
+sprawdzony osobno w zadaniu 6. Pełny parytet scenariuszy Qt wymaga dalszego
+odbioru integracji; nie utożsamiać tych 8 testów z całym test_live_checkpoint.
+
+## Zadanie 8 — wejście live
+
+Pliki: player/input.py, live.py, tests/test_imgui_input.py. Własne Config.keys
+NEXT/PREVIOUS kierują cue tak samo jak domyślne. Agregacja aktywności obu
+okien, Esc, klik najwyższego kontenera (margines blokuje niższe), gesty
+normalizowane wymiarem kontenera, Shift-pan/orbit/zoom/reset; CE view no-op.
+Dowód: 13 passed (0.06 s), w tym test_custom_live_bindings_and_focus_both_windows
+i test_margin_blocks_and_view_normalization. Ruff check/format zielone.
+Czas około 3 min; fizyczny fokus/DPI pozostają próbą człowieka.
+
+## Zadanie 9 — Info i koordynacja aplikacji
+
+Pliki: player/info.py, app.py, tests/test_imgui_info.py. Jeden snapshot dla Info/S,
+Markdown, czas lokalny i elapsed niezależny od pauzy. Preview ma własne źródła,
+normalny kierunek, rozdzielczość docelowego decku, live jako miniatura, ruch
+z PTS każdego źródła; ukrycie zamyka dekodery. App pompuje live przed mediami,
+ustala barierę obrazów plików, zbiera trwałe błędy i odracza usunięcie lease.
+Dowód: test_preview_target_resolution_normal_and_end,
+test_hidden_preview_no_decoders_and_independent_motion,
+test_info_and_s_snapshot_retains_degradation_and_elapsed: 3 passed (0.05 s).
+Ruff check/format zielone. Czas około 6 min. Testy używają źródeł testowych;
+wydajność i wygląd Markdown/Info wymagają odbioru zadania 11.
+
+## Zadanie 10 — CLI i integracja desktop
+
+Pliki: player/desktop.py, app.py, manifest.py, slides/present/__init__.py,
+test_imgui_cli.py, README.md, docs/api.md. Qt pozostaje domyślny; --player imgui
+wybiera jawnie GLFW/OpenGL3. Adapter modelu v4 zwraca JSON, zachowuje reverse,
+warstwy, obwódki i osobne rozdzielczości decków. Kody TOML nie zmienione.
+Naprawiono priorytet zera w --start-at (także wspólna ścieżka Qt), indeksy
+ujemne walidowane przed procesami. Ekrany, Info, F/H, nawigacja i shutdown
+podłączone do aplikacji; gesty liczone w rzeczywistym kontenerze viewportu.
+D44: ostrzeżenie audio raz na materiał, także gdy powtórzony jako klip/deck.
+Dowód: test_backend_default, test_selection_and_common_options,
+test_playback_flags, test_aliases (3), test_geometry_and_rate,
+test_start_indices, test_screens, test_desktop_gui_without_native_windows,
+test_warning_once_per_audio_material: 11 passed, 0.35 s.
+Callbacki GUI testowano z rzeczywistym kontekstem ImGui i testowymi źródłami,
+bez nowego natywnego okna finalnego playera. To nie jest odbiór wyglądu okien.
+Ruff check/format zielone, także jawnie dla dwóch plików slides (uporządkowanie
+importów, formatowanie i usunięcie dwóch nieaktywnych noqa).
+
+### Uzupełnienia po testach integracyjnych — bez zmiany kontraktu
+
+Powrócono do zamkniętych plików etapów 5/6/7/9 w celu poprawienia błędów
+wykrytych podczas integracji; to odstępstwo od ścisłej jednoprzebiegowej
+kolejności plików. Nie zmieniono semantyki PLAN/SPEC ani nie pominięto testów.
+
+- Zadanie 5: pauza/wznowienie zachowuje pozycję; zamówione wyjście z pętli
+  zachowuje prawdziwą ostatnią klatkę; obrazy nie są dekodowane ponownie w pętli.
+  Sonda PTS/DTS pakietów przed pierwszym obrazem, potem kontrola monotonicznych
+  znormalizowanych PTS dekodera. GIF sprawdza limit przed konwersją.
+  Osobne liczniki decode/conversion/seek/loop_seek/published/dropped, bez kolejki
+  metryk. test_cfr_pts_and_bounded_mailbox obejmuje pauzę/wznowienie;
+  test_gif_loop_uses_same_generation obejmuje ostatnią klatkę po wyjściu;
+  test_pts_preflight_rejects_before_first_image (2): źródła 9 passed.
+- Zadanie 6: rzeczywiste renderowanie trójkątów z ImGui draw data do FBO,
+  piksele alfa prosta i clip: test_render_pixels_straight_alpha_and_clip;
+  krycie tła kamery nie jest mnożone drugi raz, aktywna obwódka ma globalne
+  pierwszeństwo przed pierwszym błędem. Kompozycja: 4 passed.
+- Zadanie 7: rzeczywiste piksele GL/CE po ręcznym cue/previous/replay
+  (test_real_previous_replay_and_manual_boundary_pixels, 2); obraz sprzed
+  restore jest przypięty do wyniku operacji, błąd odtwarza jego zasób;
+  test_restore_error_keeps_protected_resource_and_degradation;
+  test_late_operation_status_finishes_after_uploaded_boundary;
+  test_navigation_acknowledges_copied_boundary_waiting_for_status.
+  Anulowane skopiowane granice dostają ACK bez uploadu; spóźniony status może
+  zwolnić barierę bez kolejnego obrazu. Timeout upload/ACK: 2 s.
+  Live i checkpoint: 13 passed.
+- Zadanie 9/10: ruch główny ma osobny aktywny zegar, preview ma osobne kotwice
+  każdego źródła (również obrazu), reset przy pętli/zmianie; usunięto stary
+  preview po zmianie decku/ukryciu. Lease usuwany dopiero po obu viewportach,
+  z uwzględnieniem przypięcia restore.
+
+### Końcowa kontrola skupiona (kod zamrożony 12:42 CEST)
+
+78 passed, 2 warnings, 11.44 s. Log: .tmp/f10a-targeted-final.log.
+Obejmuje wszystkie pliki testów zadań 3–10, pięć shared cases oraz
+ test_pc_shared_imports. Ruff: All checks passed; 28 files already formatted.
+Osobny izolowany interpreter zaimportował manifest/clock/controller/geometry/
+state/keys/input/stage/info z blokadą Qt/PyAV/multiprocessing/Pydantic/rtoml/
+Manima/slides: forbidden_imports=[], bez kontekstu GUI.
+Nie uruchamiano ponownie Pyodide offline jako zastępczego dowodu bramki:
+zaliczenie ed012bb i wynik Claude pozostają autorytatywne.
+
+## Przygotowanie zadania 11 — tylko narzędzie, odbiór dla Claude
+
+experiments/f10a_gate/measure.py: watchdog(command, timeout), measure(options).
+Watchdog nadzoruje proces bez wątków, czyta opcjonalny heartbeat wskazany
+F10_HEARTBEAT, przerywa przy ciszy >2 s (bootstrap 10 s) i twardym timeout.
+Analiza JSONL z nowymi frame_id liczy medianę pełnych okien 1 s, p95 odstępów,
+max ciszy wraz z brzegami próby oraz opcjonalne decode/conversion/upload/seek
+ i input_latency. Nie utożsamia ticków ani swapów z nowymi obrazami.
+Self-check: 120 różnych obrazów/2 s daje 60 fps; poprawny proces kończy się
+kodem 0; zawieszony proces jest przerywany po 0.126 s dla timeout=0.1;
+brak śladu zwraca missing_trace, nigdy fałszywe zaliczenie.
+Ruff check/format zielone.
+
+Narzędzie nie dodaje kompletnego automatycznego kolektora JSONL do playera.
+Claude musi dostarczyć ślad instrumentacji i sprzęt/Hz/CPU/realne swapy,
+30 akcji wejścia, serie N=1..3 dla GL i CE, 3 powtórzenia oraz stabilność.
+Nie wykonano zadania 11 ani nie deklaruje się progu 55 fps, p95/latencji,
+porównań screenshotów demo 1–11, próby 30 min lub 100 przejść.
+
+### Komendy dla Claude
+
+W przygotowanym środowisku (bez instalacji/synchronizacji głównej .venv):
+
+```powershell
+$env:UV_CACHE_DIR='D:/Programming/Python/manim/manim-cue/.cache/uv'
+$env:UV_NO_SYNC='1'
+$env:TMP='D:/Programming/Python/manim/manim-cue/.tmp'
+$env:TEMP=$env:TMP
+$env:QT_QPA_PLATFORM='offscreen'
+$env:UV_OFFLINE='0'
+uv run --frozen --with playwright python experiments/f10a_gate/imports.py --channel msedge --output .tmp/MEASUREMENT-10a-imports-final.json
+uv run --frozen pytest -q -p no:cacheprovider tests/test_imgui_shared_imports.py experiments/f5i_imgui/test_poc.py::test_web_smoke_same_stage_in_browser
+uv run --frozen pytest -q -p no:cacheprovider
+```
+
+Ekran odblokowany, właściwy deck (Demo zastąpić nazwą istniejącego renderu):
+
+```powershell
+uv run --frozen manim-cue present Demo --player imgui --show-info-window --screen 0 --info-window-screen 1
+uv run --frozen manim-cue present Demo --player qt --show-info-window
+uv run --frozen python experiments/f10a_gate/windows.py --main-monitor 0 --info-monitor 1 --output .tmp/MEASUREMENT-10a-windows-final.json
+```
+
+Po zebraniu JSONL nowych obrazów z instrumentacji próby (ten plik nie powstaje
+automatycznie od samego uruchomienia present):
+
+```powershell
+uv run --frozen python experiments/f10a_gate/measure.py --trace .tmp/f10a-trace.jsonl --warmup 5 --seconds 60 --engine manimgl --clips 3 --output .tmp/MEASUREMENT-10a-n3-gl.json
+```
+
+Do potwierdzenia: DPI/ostrość, agregacja fokusu main/Info/inne aplikacje,
+wygląd i brak minimalizacji, F i powrót osobnych geometrii, H tylko główne,
+dwa monitory w praktyce, rzeczywisty vsync i wydajność; niezależny ruch preview
+oraz borderless fullscreen zgodnie z wcześniejszym kontraktem.
+
+### Ostatnie domknięcie integracji
+
+Przegląd parytetu względem istniejącego Qt wykrył dalsze błędy, poprawione
+przed końcowym odbiorem kodu:
+
+- Reverse odtwarza bazę z rev_file, a klipy zachowuje na end_thumbnail lub
+  rzeczywistej ostatniej klatce dekodowanej poza UI; prostokąty są końcowe,
+  podgląd pozostaje normalny. Pierwszy zasób at_end jest ogłaszany dopiero po
+  dotarciu do końca, bez pokazywania klatek pośrednich.
+- Klipy dziedziczą pętlę bazy, skip_all wyłącza pętle również warstw.
+- App.tick obsługuje live/ACK, potem callback wejścia, potem media. Gesty
+  zebrane podczas draw są oznaczone entry_id i przyjmowane w następnym ticku
+  przed mediami; stare wejście je unieważnia. test_live_input_media_order.
+- Info/S pokazuje fokus slajdy/live, pętlę i stany klipów; komunikaty 2 s
+  są widoczne także bez S. Błąd aktywnego live zwalnia jego fokus.
+- Zniknięcie pamięci workera pomiędzy deskryptorem a attach daje error
+  źródła, nie wyjątek z callbacku GUI; rozszerzony test_invalid_file_error.
+
+Finalny skupiony przebieg: **80 passed, 2 warnings in 11.86 s**,
+.tmp/f10a-targeted-final80.log. Liczby plików testowych: player_keys 8,
+input 13, navigation 11, sources 9, composition 4, live 4,
+live_checkpoint 9, info 4, CLI 12, shared_logic 5, PC imports 1.
+Ruff check zielony; format poprawiono po wykryciu pojedynczego mieszanego
+zakończenia linii testu, bez zmiany AST. Żaden test nie został zamieniony w skip.
+
+Przebiegi pośrednie pełnego zestawu (nie końcowy dowód finalnej wersji):
+
+1. .tmp/f10a-pytest-current.log: 638 passed, 2 failed, 2 skipped,
+   57 warnings, 915.80 s. Dwa błędy to wskazane testy sieciowe.
+2. .tmp/f10a-pytest-final.log: 638 passed, 6 failed, 2 skipped,
+   57 warnings, 935.31 s. Ten przebieg został unieważniony: podczas jego
+   trwania poprawiano kod, a spawn importował nowy worker z układem liczników
+   niezgodnym ze starszym rodzicem. Cztery błędy sources nie są przypisane
+   sieci ani ukryte: image_reset_owned_rgba_and_eof, gif_variable_times,
+   cfr_pts_and_bounded_mailbox, gif_loop_uses_same_generation. To błąd
+   organizacji weryfikacji. Następny wymagany pełny przebieg odbywa się na
+   spójnym kodzie; skupiony przebieg wszystkich źródeł po poprawkach: 9 passed.
+
+### Zamrożona wersja do końcowego pełnego pytest (13:05 CEST)
+
+Końcowy przebieg skupiony po wszystkich poprawkach: **80 passed, 2 warnings,
+12.25 s**, .tmp/f10a-targeted-release.log. Ruff: All checks passed;
+28 files already formatted. Sumy SHA256 26 zmienionych plików Python:
+.tmp/f10a-release-hashes.json — po pełnym przebiegu zostaną porównane ponownie.
+
+Ostatnie poprawki parytetu: rezerwacja blokuje tylko cue/view, pozwala na
+anulowanie nawigacją i QUIT; globalny autorepeat oraz kody Qt bez modyfikatorów
+pozostają zgodne z Qt, repeat aktywnego cue jest konsumowany. Plus/Asterisk
+uwzględniają Shift i numpad; dodatkowy Ctrl nie zmienia liczbowego Qt::Key.
+Config() pozostaje bez importu Qt; istniejący helper key_id zachowuje leniwe
+rozpoznawanie innych nazw Qt (test MediaPlay). Ukryty Info ignoruje także
+niepoprawny indeks jego monitora z ostrzeżeniem, jak Qt.
+
+Przebieg .tmp/f10a-pytest-stable.log, wykonany przed ostatnim domknięciem
+wejścia/Info: **648 passed, 2 failed, 2 skipped, 57 warnings, 911.30 s**.
+Oba błędy sieciowe opisane poniżej. Ostateczny log to
+.tmp/f10a-pytest-release.log; w trakcie tego przebiegu kod nie jest edytowany.
+
+### Lista zmian tej sesji
+
+- player/keys.py, input.py: jedna mapa kodów, bindingi i router.
+- slides/config.py: domyślne kody bez Qt, zgodny helper dla innych nazw.
+- player/controller.py, state.py: nawigacja i stan; clock.py pozostał wspólną
+  implementacją zegara, używany też do odrębnego czasu ruchu.
+- player/sources_av.py, decoder_worker.py: nadzorowane procesy, dwa sloty,
+  metryki, walidacja PTS i końcowe obrazy reverse.
+- player/stage.py, geometry.py, textures.py: kompozycja, hit-test, motion,
+  trwałe zasoby GL.
+- player/live.py: historia/bariera/ACK, sesje, gesty i shutdown.
+- player/info.py, app.py: snapshot Info/S, podgląd i koordynacja.
+- player/desktop.py, manifest.py, slides/present/__init__.py: backend desktop,
+  adapter JSON i wybór --player przy domyślnym Qt.
+- test_player_keys.py i nowe test_imgui_{input,navigation,sources,composition,
+  live,live_checkpoint,info,cli}.py: dowody wymienione w sekcjach etapów.
+- README.md, docs/api.md: rzeczywista komenda eksperymentalnego backendu,
+  brak deklaracji zakończonego odbioru/performance/parytetu.
+- experiments/f10a_gate/measure.py: przygotowanie narzędzia zadania 11.
+- reports/REPORT-10a.md i REPORT-10a.md: raport i kopia wyjściowa.
+
+Nie zmieniono PLAN/SPEC/CLAUDE, pyproject.toml, uv.lock ani .venv; nie
+wykonywano commita, stash, reset, checkout ani worktree. Testy i skrypty
+uruchamiano z UV_NO_SYNC=1, UV_OFFLINE=1, cache/TMP/TEMP w repo i Qt offscreen.
+
+Gotowy materiał w repo do podstawowego smoke dwóch okien, bez renderowania
+nowego decku (nie jest próbą live/N=3 ani pomiarem wydajności):
+
+```powershell
+uv run --frozen manim-cue present BasicSlide --folder tests/slides/data/slides --player imgui --show-info-window --screen 0 --info-window-screen 1
+```
+
+## Wynik końcowy tej sesji — 2026-10-23, około 13:21 CEST
+
+Wymagane pełne polecenie, bez wykluczeń i bez zamiany błędów w skip:
+
+```powershell
+uv run --frozen pytest -q -p no:cacheprovider
+```
+
+**649 passed, 2 failed, 2 skipped, 57 warnings in 917.21 s (0:15:17), kod 1.**
+Log: .tmp/f10a-pytest-release.log. Po zakończeniu potwierdzono zgodność SHA256
+wszystkich 26 zmienionych plików Python ze stanem sprzed tego przebiegu.
+To pełny wynik spójnej wersji, w przeciwieństwie do unieważnionego przebiegu
+pośredniego. Nowe testy oraz dotychczasowe Qt/GL/CE i bramka Windows przeszły.
+
+Dwa niepowodzenia do ponowienia przez Claude z siecią:
+
+1. tests/test_imgui_shared_imports.py::test_pyodide_shared_imports:
+   uv nie znajduje Playwright w cache przy UV_OFFLINE=1; nie wykonano części
+   przeglądarkowej. Nie cofa to przekazanego zaliczenia bramki 2 w ed012bb.
+2. experiments/f5i_imgui/test_poc.py::test_web_smoke_same_stage_in_browser:
+   istniejący PoC zwrócił {'error': 'brak metryk po 240.0 s'}; środowisko
+   bez sieci/CDN zgodnie z przekazaniem użytkownika. PoC nie zmieniano.
+
+| Zadanie | Stan końcowy / dowód |
+|---|---|
+| 1–2 | Zaliczone w ed012bb przez Claude; ponowna część PC i testy GPU zielone, Pyodide offline czerwone środowiskowo |
+| 3 | Klawisze/config/router: player_keys 8 i input 13; Config() bez Qt i TOML liczbowy |
+| 4 | Nawigacja: 11 testów + 5 shared cases; pętla, historia/reverse/replay, indeksy, stale ID, rewizje |
+| 5 | Źródła: 9 testów; CFR/GIF/obraz, PTS przed obrazem, EOF/reset/pętla, zawieszony proces i zniknięta pamięć |
+| 6 | Kompozycja: 4 testy, w tym rzeczywisty render GPU, alpha/clip i niezależne trwałe tekstury |
+| 7 | Live: 13 testów; prawdziwe GL/CE checkpoint/previous/replay/piksele, korelacja, ACK, błędy i shutdown |
+| 8 | Wejście: 13 testów routera/gestów; współdzielone z zadaniem 3, nie dodatkowe 13 |
+| 9 | Info: 4 testy; wspólny snapshot, preview, zegary i kolejność live/input/media |
+| 10 | CLI: 12 testów; Qt domyślny, macierz opcji, audio i reverse warstw |
+| 11 | Nie wykonano odbioru; przygotowano measure.py, pozostałe próby i instrumentacja dla Claude |
+
+Skupiony wynik finalnej wersji: **80 passed**, 2 warnings, 12.25 s
+(.tmp/f10a-targeted-release.log). Liczby w tabeli częściowo nakładają się.
+Ruff check: All checks passed; ruff format --check: 28 files already formatted.
+Git diff --check: zielony. Gałąź develop, główne drzewo, bez commita/stash/
+reset/checkout/worktree, instalacji/synchronizacji .venv i łatania Manima.
+
+Czas sesji około **1 h 25 min**, od około 11:57 do 13:21 CEST; w tym cztery
+pełne przebiegi pytest łącznie 3679.62 s (61 min 19.62 s), częściowo równolegle
+z pracą nad poprawkami i raportem. Wcześniejsze czasy etapów są orientacyjne,
+nie należy ich sumować jako pomiaru ściennego. Czas przeglądu Claude i próby
+człowieka w tej sesji: 0. Nie przekroczono 2x budżetu żadnego zadania ani całości.
+
+Odstępstwa: powroty do plików wcześniejszych etapów po wykryciu błędów;
+unieważniony przebieg pośredni z różnymi wersjami rodzica/workerów; brak sieci;
+brak odbioru natywnego finalnego playera w oknie i pełnej instrumentacji próby.
+Nie deklaruje się zakończenia odbioru kontraktu 10a na podstawie tych testów.
+Pełne próby człowieka, screenshoty Qt/ImGui demo 1–11, stabilność, CPU/Hz,
+rzeczywiste swapy i progi wydajności pozostają zadaniem 11 dla Claude.
+Komendy i szczegółowe punkty do potwierdzenia znajdują się wyżej.
+
+## Przegląd Claude — 2026-10-23, ok. 13:25–14:10
+
+**Uruchomione z siecią:** wszystkie testy ImGui, łącznie z obydwoma sieciowymi
+(`test_pyodide_shared_imports`, `test_web_smoke_same_stage_in_browser`): 89 passed.
+Ruff check zielony; format zmienionych plików zielony (5 starszych plików spoza tej
+sesji — `frame_buffer.py`, `conftest.py`, `test_clip_layers.py`, `test_layers.py`,
+`test_live_scene.py` — ruff format by przeformatował; nie ruszane).
+
+**Pierwsze uruchomienie finalnego playera w prawdziwym oknie** (Demo, 11 slajdów,
+GL i CE live, Info na drugim monitorze; ekran zablokowany) przez
+`experiments/f10a_gate/drive.py` — next co 4 s, zrzuty sceny i Info renderowane
+drugi raz z draw data do FBO (domyślny framebuffer przy zablokowanym ekranie daje
+same zera). Wykryte i poprawione:
+
+1. **Scena w osobnym oknie systemowym.** `config_viewports_no_auto_merge = True`
+   dawało oknu „stage” własny viewport nad pustym oknem głównym (3 okna systemowe,
+   główny viewport bez draw data). `F` przełączyłby puste okno, a obraz zostałby
+   960×540. Poprawka: `imgui.set_next_window_viewport(main)` w `desktop.py`.
+   Test: `test_imgui_windows_gate.py::test_player_stage_in_main_viewport` (gpu,
+   prawdziwy player na `BasicSlide`: 2 viewporty, scena w głównym); bez poprawki
+   test pada (`main_lists: 0`).
+2. **Notatki Markdown nie renderowały się** (`RichMd::Render : Markdown was not
+   initialized!` co klatkę): `hello_imgui.run` nie inicjalizuje imgui_md. Poprawka:
+   `immapp.run(params, immapp.AddOnsParams(with_markdown=True))`;
+   `test_desktop_gui_without_native_windows` sprawdza `with_markdown`.
+3. **Ramka 1 px wokół sceny** (`WindowBorderSize` ImGui) — Qt jej nie ma; scena
+   bez ramki i zaokrągleń.
+4. **Osierocone dekodery.** Po EOF pętla `decoder_worker` kręciła się na
+   `sleep(0.002)` bez dotykania potoku — po śmierci rodzica proces żył w
+   nieskończoność i trzymał odziedziczone uchwyty stdout/stderr (pytest z
+   `capture_output` wisiał mimo timeoutu; znaleziony też osierocony proces z
+   22.10). Poprawka: `connection.poll()` w każdej iteracji — po zamknięciu potoku
+   rzuca `BrokenPipeError`, który pętla już obsługuje. Test:
+   `test_orphaned_decoder_exits_when_parent_pipe_closes`.
+5. **Fork przeformatowany wbrew D13.** Codex uruchomił ruff format na
+   `src/manimcue/slides/` (wyłączone w `pyproject.toml`), usunął upstreamowe
+   `noqa` i przetłumaczył docstring `key_id` na polski. Przywrócono stan upstreamu;
+   zostały tylko zmiany funkcjonalne: `key_id` bez Qt dla domyślnych klawiszy,
+   `--player`, `is not None` w `--start-at`, gałąź `imgui`.
+6. README/docs: bez „commands for Claude” w tekście dla użytkownika.
+
+**Wynik po poprawkach (zrzuty w `.tmp/drive-imgui-demo/`):** wszystkie 11 slajdów
+przechodzą bez wyjątków i z kodem wyjścia 0. Na scenie poprawnie: wideo bazy, klipy
+w prostokątach z ruchem, live GL (2D i kostka 3D), CE Cairo z przezroczystym tłem i
+pasami. W Info: scena/slajd/stan/fokus, zegar i elapsed, notatki Markdown, bieżący
+widok i podgląd następnego z miniaturami live. Drobne: brak glifu ◆ w foncie ImGui
+(Qt go ma).
+
+**Diagnoza wydajności bez vsync (nie odbiór):** pętla 580–1090 kl./s; baza w pętli
+(slajdy 2 i 6) 50–56 nowych klatek/s przy materiale 60 fps. Kandydaci do sprawdzenia
+w zadaniu 11 przy N=3: każda nowa klatka to kopia 8 MB `bytes(shm)` w wątku UI
+i **nowa** tekstura (`glGenTextures` + `glTexImage2D`) zamiast `glTexSubImage2D`
+z PoC; `presenter_snapshot` robi `deepcopy` stanu z całym manifestem co klatkę;
+każde wejście na slajd uruchamia nowe procesy spawn (koszt startu PyAV).
+
+**Zadanie 11 — nadal otwarte:** pomiar w oknie z vsync (ekran odblokowany),
+porównanie zrzutów z Qt, DPI, fokus, dwa monitory w praktyce, `F`/`H` na
+prawdziwym ekranie, próba człowieka.

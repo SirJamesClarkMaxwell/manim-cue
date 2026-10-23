@@ -73,3 +73,52 @@ def validate_manifest(data: dict) -> dict:
         for slide_index, slide in enumerate(slides):
             _media(slide, f"{path}.slides[{slide_index}]")
     return deepcopy(data)
+
+
+def model_to_manifest(configs: list) -> dict:
+    """Adapter PC modelu v4; wspólna logika otrzymuje wyłącznie dane JSON."""
+    from pathlib import Path
+
+    from manimcue.media import video_info
+
+    def media_kind(path):
+        suffix = Path(path).suffix.lower()
+        if suffix == ".gif":
+            return "gif"
+        return (
+            "image"
+            if suffix in (".png", ".jpg", ".jpeg", ".webp", ".bmp", ".tif", ".tiff")
+            else "video"
+        )
+
+    presentations = []
+    for config in configs:
+        slides = []
+        for model in config.slides:
+            slide = model.model_dump(mode="json")
+            slide["kind"] = media_kind(slide["file"])
+            slide["rate"] = slide.pop("playback_rate")
+            slide["reverse_rate"] = slide.pop("reversed_playback_rate")
+            if slide["kind"] == "video":
+                slide["duration"], slide["fps"] = video_info(model.file)
+            for index, layer in enumerate(slide["layers"]):
+                if layer["kind"] == "clip":
+                    layer["kind"] = media_kind(layer["file"])
+                    layer["rate"] = layer.pop("playback_rate")
+                else:
+                    for role in ("active_border", "error_border"):
+                        style = getattr(model.layers[index], role)
+                        if style is not None:
+                            layer[role]["color"] = list(style.color.as_rgb_tuple(alpha=True))
+                            layer[role]["color"][:3] = [
+                                value / 255 for value in layer[role]["color"][:3]
+                            ]
+            slides.append(slide)
+        color = list(config.background_color.as_rgb_tuple(alpha=True))
+        color[:3] = [value / 255 for value in color[:3]]
+        presentations.append(
+            {"resolution": list(config.resolution), "slides": slides, "background": color}
+        )
+    return validate_manifest(
+        {"version": 1, "resolution": presentations[0]["resolution"], "presentations": presentations}
+    )

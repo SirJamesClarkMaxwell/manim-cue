@@ -129,6 +129,7 @@ def start_at_callback(
 
 @click.command()
 @click.argument("scenes", nargs=-1)
+@click.option("--player", type=click.Choice(["qt", "imgui"]), default="qt", show_default=True)
 @config_path_option
 @folder_path_option
 @click.option("--start-paused", is_flag=True, help="Start paused.")
@@ -243,6 +244,7 @@ def start_at_callback(
 @verbosity_option
 def present(  # noqa: C901
     scenes: list[str],
+    player: str,
     config_path: Path,
     folder: Path,
     start_paused: bool,
@@ -294,11 +296,39 @@ def present(  # noqa: C901
         logger.debug("No configuration file found, using default configuration.")
         config = Config()
 
-    if start_at[0]:
+    if start_at[0] is not None:
         start_at_scene_number = start_at[0]
 
-    if start_at[1]:
+    if start_at[1] is not None:
         start_at_slide_number = start_at[1]
+
+    if player == "imgui":
+        from manimcue.player.desktop import run_desktop
+        from manimcue.player.manifest import model_to_manifest
+
+        try:
+            code = run_desktop(
+                model_to_manifest(presentation_configs),
+                {
+                    "config": config.model_dump(),
+                    "start_paused": start_paused,
+                    "full_screen": full_screen,
+                    "skip_all": skip_all,
+                    "exit_after_last_slide": exit_after_last_slide,
+                    "hide_mouse": hide_mouse,
+                    "aspect_ratio": aspect_ratio,
+                    "start_at_scene_number": start_at_scene_number,
+                    "start_at_slide_number": start_at_slide_number,
+                    "screen_number": screen_number,
+                    "playback_rate": playback_rate,
+                    "next_terminates_loop": next_terminates_loop,
+                    "hide_info_window": hide_info_window,
+                    "info_window_screen_number": info_window_screen_number,
+                },
+            )
+        except ValueError as error:
+            raise click.UsageError(str(error)) from None
+        sys.exit(code)
 
     from qtpy.QtCore import Qt
     from qtpy.QtGui import QScreen
