@@ -1319,9 +1319,9 @@ zmian. Player Qt zostaje domyślny do próby człowieka 10a; usunięcie to osobn
   floor(t · fps · rate), CFR jak w F5); bariera gotowości D31 i pauza bez zmian semantyki D17.
   Zgodność co do klatki na PC jest skutkiem ubocznym, nie API (brak seek dla autora). W przeglądarce
   `<video>` ma własne zegary: wspólny start i pauza, dryf zaakceptowany (D17 bez zmian).
-- **D44 — dźwięk.** Qt odtwarza dźwięk bazy (`QAudioOutput`). 10a: do rozstrzygnięcia — (a) brak
-  dźwięku na PC z ostrzeżeniem, gdy baza ma strumień audio, albo (b) zależność `sounddevice`
-  i dźwięk bazy prowadzony tym samym zegarem. W przeglądarce dźwięk bazy z `<video>` bez wyciszenia.
+- **D44 — dźwięk.** Qt odtwarza dźwięk bazy (`QAudioOutput`). Prelegent (2026-10-23): w 10a na PC
+  bez dźwięku, z ostrzeżeniem, gdy baza ma strumień audio; decyzja (np. `sounddevice` prowadzone
+  wspólnym zegarem) przed usunięciem playera Qt. W przeglądarce dźwięk bazy z `<video>` bez wyciszenia.
 
 **Projekt 10a (PC):**
 - `player/stage.py` — kompozycja z PoC: z-order warstw, `Rect`, ruch `rect_at(t)`, izotropowe
