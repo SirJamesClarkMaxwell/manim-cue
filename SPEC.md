@@ -662,7 +662,7 @@ Warunek wait jest dynamiczny i kończy czas faktyczny, frozen+warunek jest błę
 Construct należy do bazy; finalizer raz, pierwotny wyjątek zachowany, shutdown przerywa
 callable, blokujący kod kończy nadzorca. Progi GL F2 pozostają bez zmian.
 
-**D37. Historia sekwencji.** CE i GL zapisują stan tylko przed next, z pozycją kursora,
+**D37. Historia sekwencji** (zatwierdzona przez prelegenta 2026-10-23). CE i GL zapisują stan tylko przed next, z pozycją kursora,
 do 50 pozycji bez deduplikacji; nazwane cue nie dodaje wpisu. Back po next i nazwanym
 cue wraca przed next. CE zachowuje oryginalne obiekty, graf submobjects, listy sceny i czas logiczny,
 geometrię/style i referencje updaterów we wspólnym memo; zakres to standardowe panele

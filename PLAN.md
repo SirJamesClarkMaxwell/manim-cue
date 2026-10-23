@@ -1,8 +1,13 @@
 # manim-cue — plan rozwoju
 
 Stan (2026-10-23): **fazy 0–3 i 7.0 zamknięte; F5d-f oraz F7a mają wdrożenie
-i zaliczone kryteria automatyczne. F4–F6a oraz F5d-f/F7a czekają na próbę człowieka,
-6b na decyzję o `greenlet`; faza 8 dopiero po próbie w oknie na komputerze prelegenta.** Kierunek zmieniony 2026-10-21 decyzjami D13-D19 w `SPEC.md`: projekt staje się forkiem
+i zaliczone kryteria automatyczne, F5g także. F4–F6a, F5d-f, F5g i F7a czekają na próbę
+człowieka; faza 8 dopiero po próbie w oknie na komputerze prelegenta.**
+**Decyzje prelegenta (2026-10-23):** D37 zatwierdzone; `greenlet` przyjęty (F6b idzie dalej jako
+API); kolejne etapy: ruch warstw w podglądzie Info, F6b, F7b. Podział na dwie biblioteki
+(osadzanie scen / prezentacje) i serwer prezentacji — task finalny po zamknięciu projektu:
+komputer prelegenta przez Tailscale, live w przeglądarce w obu trybach (nagrany przebieg
+domyślnie, interaktywny strumień, gdy serwer ma zasoby), hosting `.pptx` przez DeckCraft (web). Kierunek zmieniony 2026-10-21 decyzjami D13-D19 w `SPEC.md`: projekt staje się forkiem
 manim-slides 5.7.0, rozszerzonym o warstwy i wstrzykiwany live.
 Rundy 6-7 recenzji (codex) przebudowały fazy 2-9; decyzje D20-D22.
 
@@ -454,7 +459,7 @@ slajd 1 → 2, dwa widoki jednego klipu w CE i GL, cache CE po nowym renderze ź
 w obie strony). Kryterium 8: demo deck, slajd 6 — czeka na próbę. Po drodze: przypięcie
 `pillow<13` (CE 0.21 nie renderował żadnego `ImageMobject`). Czas: ~1 h zegarowo.
 
-## Faza 6b — PoC krokowania sceny podrzędnej (PoC wykonany, czeka na decyzję prelegenta)
+## Faza 6b — PoC krokowania sceny podrzędnej (PoC wykonany, `greenlet` przyjęty 2026-10-23)
 
 Gospodarz i dziecko postępują równolegle bez rekurencyjnego `play()` (synchroniczny w obu
 silnikach). Wynik może zamknąć ten kierunek.
@@ -503,7 +508,8 @@ silnikach). Wynik może zamknąć ten kierunek.
   krokowanym dzieckiem 4,4 s (~21 ms na klatkę razem z renderem dziecka). RNG gospodarza zachowany.
 - Ograniczenia: kod dziecka między `play()` blokuje gospodarza (współbieżność kooperacyjna);
   bez kamery ruchomej dziecka, dźwięku i sekcji; tylko CE (GL — po decyzji).
-- **Do decyzji prelegenta:** zależność `greenlet` (C, szeroko używana: gevent, SQLAlchemy) jako
+- **Decyzja prelegenta (2026-10-23): tak** — kontrakt API przed rundą recenzji.
+- **Pytanie było:** zależność `greenlet` (C, szeroko używana: gevent, SQLAlchemy) jako
   mechanizm współbieżności kooperacyjnej w jednym wątku. Tak → F6b jako API (`ChildView`), testy,
   potem GL. Nie → kierunek zamknięty, „scena w scenie” to F6a (render) i warstwy F5.
 
