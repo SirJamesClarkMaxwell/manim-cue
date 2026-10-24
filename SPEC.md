@@ -793,7 +793,8 @@ Nie resetować generacji ani monotonicznych liczników zachowanego socketu; nowe
 entry_id odrzuca późne statusy/wyniki/ACK. Previous/V/R nie wracają do starej historii.
 Powód: prelegent widzi jednocześnie scenę, następny cel i czytelne notatki oraz może
 wybrać dowolny slajd bez serii strzałek. A+/A− zmienia tylko font notatek i matematyki;
-domyślnie 24 logiczne px, krok 2, zakres 16–48, stan sesji. Układ początkowo 60/40.
+domyślnie 28 logicznych px (runda 30), wzory 1,2× tekstu, krok 2, zakres 16–48, stan sesji.
+Układ początkowo 60/40.
 
 Markdown pozostaje, dochodzą inline `$...$` i display `$$...$$`. PC preferuje MicroTeX;
 offline zweryfikowano imgui-bundle 1.93.0: has_latex False przed init, True po init,
@@ -806,8 +807,12 @@ helperów pakietu, ale slim wheel pobiera fonty osobno; brak dowodu runtime wasm
 10b wymaga próby po inicjalizacji, fontów/licencji w eksporcie offline i braku obowiązkowego
 CDN. Fallback web to rastry przygotowane na PC; brak wzoru pokazuje źródło z komunikatem.
 
-Miniatury: statyczna kompozycja t=0 z thumbnail/pierwszej normalnej klatki, live tylko
-zapisany thumbnail, bez uruchamiania scen. Lazy widoczne+po jednej obok, jeden job
+Miniatury: reprezentacja końcowa niezależnych źródeł (runda 28): rect_at(+∞) każdej warstwy,
+end_thumbnail albo ostatnia klatka wideo/GIF; obraz bez zmian; live zapisany thumbnail jako
+reprezentacja zastępcza, bez aktywnej sesji i bez uruchamiania scen.
+Ekstraktor długożyjący (runda 29): jeden proces na deck renderuje żądania po jednym, wynik od razu
+po odbiorze; kończy się po 2 s bezczynności, ukryciu Info, zmianie decku lub odzysku. Nawigacja
+w decku nie anuluje pracy; zakres widoczne ±1 zastępuje oczekujące. Lazy widoczne+po jednej obok, jeden job
 ekstrakcji (jeden proces, także w trakcie kończenia), niezależnie od dekoderów sceny
 i obowiązkowego ruchomego preview. Pula 4 to zapas bezczynnych ciepłych procesów,
 uzupełniany po pobraniu; każdy obsługuje jedno źródło do końca życia. Brak globalnego

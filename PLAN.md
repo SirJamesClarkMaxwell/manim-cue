@@ -1308,7 +1308,7 @@ LiveSession, protokół transportu i workery Manima pozostają źródłem istnie
 Nie forkujemy ani nie łatamy Manima; jeden wątek aplikacji na proces.
 
 **Decyzje:** D42–D48 w SPEC; D45–D48 mają pierwszeństwo nad starszym opisem 10a
-w zakresie granic cue, Info i gestów. Kolejność: 10a → 10d → 10b → 10c.
+w zakresie granic cue, Info i gestów. Kolejność: 10a → 10d → 10e → 10b → 10c.
 Wykonawca całej F10: **codex**, zadaniami po kolei,
 także kontroler live i odbiór techniczny przypisane w recenzji Claude'owi.
 Claude przegląda po każdym etapie, wykonuje próby człowieka i pomiar przy odblokowanym ekranie.
@@ -1581,7 +1581,20 @@ nad nią zegar lokalny, elapsed, pauza/wznowienie i restart **czasu prelegenta**
 Timer monotoniczny startuje z aplikacją; restart zeruje i zachowuje stan pauzy;
 pauza timera nie pauzuje mediów ani live. Prawa: normalny następny slajd, pod nim
 przewijane notatki. Dotychczasowy niezależny ruch preview zostaje. Notatki domyślnie
-24 logiczne px, A+/A− krok 2 px, zakres 16–48; tylko notatki i ich matematyka,
+28 logicznych px (runda 30, po próbie 2026-10-24; wcześniej 24), A+/A− krok 2 px, zakres
+16–48; wzory 1,2× rozmiaru tekstu notatek (kursywa TeX przy tym samym rozmiarze wyglądała
+na mniejszą od tekstu), nominalnie 19,2–57,6 px. Przepływ: tekst logiczny → ×1,2 → raster ×DPI;
+szerokość, wysokość i baseline wracają do jednostek układu dokładnie raz (bez ponownego ×1,2).
+Ścieżka natywna: tokeny matematyczne przekształcone w `\scalebox{1.2}{…}` przed `imgui_md.render`
+— bramka wykonalności w wheelu 1.93 zaliczona 2026-10-24 (MicroTeX 28 px: x² 32×27, baseline 25 →
+38×32, baseline 30; `\frac{1}{2}` 15×37 → 17×44); walidacja `render_formula` na końcowej,
+przeskalowanej postaci; tekstury MicroTeX ma własny cache (`set_eviction_frames`,
+`clear_texture_cache`) poza LRU adaptera — ograniczenie. Fallback Agg: `render_formula` dostaje
+rozmiar wzoru (walidacja `0 < size ≤ 57,6`); kod i escaped `$` bez skalowania. Testy (runda 30):
+domyślne 28/krok 2/granice 16 i 48; 16/28/40/42/48 → 19,2/33,6/48/50,4/57,6 w obu backendach
+i stylach; natywnie zmiana widocznego wzoru przy niezmienionym tekście (także pogrubienie/lista
+wokół); DPI 1/1,5/2 — proporcja, baseline, wysokość wierszy; cache bez ponownej rasteryzacji
+i rozdzielenie rozmiarów/DPI/stylów; tylko notatki i ich matematyka,
 bez zmiany reszty UI. Ustawienie sesji, wspólne dla slajdów, uwzględnia DPI.
 Stan/degradacja nadal widoczne i zgodne z S. Brak następnego celu ma czytelny pusty podgląd.
 
@@ -1610,11 +1623,51 @@ odrzuca późne statusy/wyniki/ACK. Previous/V/R korzystają wyłącznie z nowej
 Nie rozszerzać D39 o odtwarzanie całej drogi do celu. Kontrolki Info konsumują klik
 i nie nadają fokusu live; klawiatura w obu oknach nadal przechodzi przez router.
 
-Miniatura to statyczna kompozycja w t=0: dostępne `thumbnail`, inaczej pierwsza klatka
-normalnego pliku; live wyłącznie zapisany thumbnail, nigdy nowy worker. Bez obrazu:
-placeholder z numerem, nawigacja dostępna. Zachować rect_at(0), alfa, border i proporcje.
+Miniatura to statyczna kompozycja **stanu końcowego** slajdu (runda 28, po próbie człowieka
+2026-10-24: slajdy Manima zwykle zaczynają się od pustej klatki — w Demo pierwsza klatka bazy jest
+całkiem czarna, a klipy rosną od zerowego rect — więc t=0 dawało czarne miniatury, a PowerPoint
+pokazuje slajd w stanie końcowym). To reprezentacja końcowa **niezależnych źródeł**, nie kadr
+z prezentacji: każda warstwa w `rect_at(+∞)` (ostatni keyframe albo stały rect; `compose` z
+t=+∞), bez `rate`, pętli i długości bazy. Baza i klipy wideo — dostępne `end_thumbnail`, inaczej
+ostatnia klatka pliku po opróżnieniu dekodera (seek jest optymalizacją, nie warunkiem; PTS
+z `time_base` i początkiem strumienia); GIF — ostatnia klatka sekwencji złożona przez Pillow
+w oryginalnych wymiarach, potem pomniejszenie, bez listy wszystkich RGBA; obraz bez zmian;
+live — zapisany thumbnail jako reprezentacja zastępcza (początek sceny; nigdy z aktywnej sesji
+ani nowego workera). Jedno `render_thumbnail` na kompozycję (jeden `run_thumbnail` obsługuje kolejne żądania, runda 29), bez `Source(at_end)` per warstwa.
+Wspólny budżet 5 s całego joba, limit wejścia i kontrola każdej zdekodowanej klatki, ndarray
+dopiero po pomniejszeniu; niepowodzenie lub timeout → placeholder, bez gwarancji sukcesu dla
+każdego pliku ≤4K. Bez obrazu: placeholder z numerem, nawigacja dostępna. Zachować alfa,
+border i proporcje. Testy odbioru (runda 28): baza czarna na starcie i klip od zerowego rect →
+końcowa treść i geometria; różne długości/rate/pętla/keyframe po końcu bazy → ta sama
+reprezentacja; `end_thumbnail` wygrywa, fallback na plik; wideo z kilkoma klatkami, B-frames
+i niezerowym PTS → ostatnia klatka; GIF z klatkami częściowymi, alfą i disposal; limit wejścia,
+jeden wątek, pomniejszenie przed ndarray, timeout, anulowanie, start po exit poprzednika;
+ponowny odbiór Load24 (czytelne miniatury, responsywność, RSS, procesy).
 Ładować widoczne pozycje plus po jednej obok, najwyżej jedno zadanie ekstrakcji naraz,
-niższy priorytet niż scena/live/preview. Limit miniatur: jeden proces ekstrakcji,
+niższy priorytet niż scena/live/preview. **Ekstraktor długożyjący (runda 29, po próbie
+2026-10-24: proces na miniaturę to ~0,45 s, z czego spawn ~0,37 s, render ~0,075 s; 12 widocznych
+ładowało się kilkanaście sekund):** jeden proces ekstrakcji na deck (`run_thumbnail` w pętli
+recv → `render_thumbnail` → SHM → wynik → ACK → sprzątanie SHM po każdym żądaniu); rodzic wysyła
+najwyżej jedno żądanie naraz i trzyma jego tożsamość `(key, revision, began)`. Wynik publikowany
+(upload, cache, zdarzenie) zaraz po odbiorze, niezależnie od exit; exit obsługiwany osobno i dopiero
+on zwalnia slot. Timeout 5 s od wysłania danego żądania; 2 s bezczynności liczy rodzic od końca
+ostatniego żądania, gdy nie ma brakującego obrazu, i sam zatrzymuje proces. Twarde zatrzymanie
+(bez protokołu anulowania renderu) przy ukryciu Info, zmianie decku, odzysku budżetu i timeoucie;
+nowy proces dopiero po exit. Odzysk i bezczynność nie są błędem obrazu — pozycja może być
+ponowiona; błąd materiału daje placeholder tej pozycji, a proces obsługuje następną; crash,
+zerwany protokół i timeout → placeholder właściwej pozycji i restart po exit. Nawigacja w tym
+samym decku nie anuluje żądania w toku ani nie czyści zakresu (miniatura nie zależy od bieżącego
+slajdu); aktualizacja zakresu **zastępuje** listę oczekujących aktualnym „widoczne ±1”, a
+rozpoczęte żądanie może dokończyć się poza zakresem; zmiana decku czyści zakres i cache.
+`allow_start` (reszta budżetu ticku) steruje tylko zimnym startem procesu; odbiór, timeout, reap
+i wysłanie żądania do gotowego procesu działają zawsze. ProcessBudget odmawia przyznania wolnego
+slotu roli niższej, gdy istnieje świeże (<0,5 s) `waiting` roli wyższej — nie tylko `idle`.
+Odbiór pamięci: RSS jednego PID po serii żądań i szczyt sesji, także 1080p/4K naprzemiennie przy
+pełnym obciążeniu D48 (`thumbnail_bytes` to bufory rozliczane, nie RSS). Testy (runda 29): kilka
+wyników z jednego PID przed jego exit; nawigacja zachowuje PID i pracę; szybki scroll usuwa stare
+oczekujące; osobne zegary 5 s/2 s; ukrycie Info, zmiana decku i odzysk w trakcie renderu bez
+procesu zastępczego przed exit; czekająca scena/preview/prefetch wygrywa po reap; `allow_start=False`
+nie blokuje wyników; błąd materiału nie zatrzymuje kolejnych. Limit miniatur: jeden proces ekstrakcji,
 niezależnie od dekoderów sceny i obowiązkowego ruchomego preview; bez globalnego limitu 4.
 Pula 4 to zapas bezczynnych ciepłych procesów, uzupełniany po pobraniu; każdy obsługuje
 jedno źródło do końca życia. Liczyć osobno aktywne scena/preview/miniatura, bezczynne
@@ -1622,7 +1675,7 @@ jedno źródło do końca życia. Liczyć osobno aktywne scena/preview/miniatura
 dopiero po exit poprzedniej, także anulowanej; kończące się nadal wliczać do limitu
 miniatur i sumy żywych. Maks. 256×144 RGBA/miniaturę; LRU 64 obrazy i 16 MiB rozliczanych
 buforów i tekstur miniatur po stronie playera, CPU+GPU (wliczyć kopie robocze playera, zwalniać
-tekstury w kontekście). Ekstraktor (jednorazowy proces) ma osobny **limit wejścia** ≤3840×2160
+tekstury w kontekście). Ekstraktor (długożyjący, runda 29) ma osobny **limit wejścia** ≤3840×2160
 pikseli: oryginalne wymiary obrazu przed draft, deklarowane wideo przed decode i rzeczywista
 klatka po decode (ta kontrola nie zapobiega wcześniejszej alokacji); większe → placeholder
 z błędem. Suma roboczych rastrów ekstraktora nadal ograniczona rezerwą zależną od liczby warstw.
@@ -1829,9 +1882,21 @@ rozstrzygnięcia w REVIEW-LOG.md. Recenzja statyczna diffu
 i kodu, bez testów GPU; przed implementacją przegląd Claude poprawionego kontraktu.
 
 **Do potwierdzenia w próbie (bez renegocjacji decyzji):** wygoda proporcji 60/40 i fontu
-24 px, czułość touchpad zoom/pixelDelta, czytelność na DPI obu monitorów; bramka wasm
+28 px (próba 2026-10-24: 24 px za mały, runda 30), czułość touchpad zoom/pixelDelta, czytelność na DPI obu monitorów; bramka wasm
 i fonty offline przed 10b. Ryzyka: opóźnione wyniki po restore, skład baseline matematyki,
 podzbiór mathtext, zimna ekstrakcja miniatur przy zajętej puli, start live ~1,6 s.
+
+### 10e — edycja notatek w prezentacji (kierunek, kontrakt po 10d)
+
+Po próbie człowieka 2026-10-24 prelegent chce edytować notatki w Info podczas prezentacji,
+z zapisem, obsługą Markdown i podpowiadaniem (auto-completion). Decyzja prelegenta: zmiany
+zapisywane do **pliku obok decku** (np. `slides/Demo.notes.md`), który nadpisuje notatki
+z renderu i przetrwa ponowny render; kod sceny (`next_slide(notes=...)`) i JSON decku bez zmian.
+Stan edycji, komendy i UI wspólne z 10b (D42); odczyt/zapis pliku to adapter platformy PC,
+trwały zapis w web ustali kontrakt 10e.
+Kontrakt (format pliku i mapowanie na slajdy, edytor ImGui, autosave, konflikty z renderem,
+zakres podpowiedzi Markdown/LaTeX, Qt, web 10b) — osobna runda codex po odbiorze 10d;
+kolejność: 10a → 10d → 10e → 10b → 10c, chyba że prelegent zdecyduje inaczej.
 
 ### 10b i 10c — granice wspólnego kodu
 

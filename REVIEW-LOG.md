@@ -2450,3 +2450,82 @@ Etap 2 i `Windows.attach`: bez dodatkowej regresji.
 
 **Werdykt:** A przyjęte z poprawkami 1–3 naniesionymi w PLAN/SPEC; B — wzmocnić testy 4–5 przed commitem,
 6 w odbiorze.
+
+## Runda 28 — codex, 2026-10-24: miniatury ze stanu końcowego (D46)
+
+**Przedmiot:** próba człowieka Load24 po rundzie 26 — miniatury mają obraz, ale czarny. Pomiar: pierwsza klatka bazy
+`slides/files/Demo/2ef13ec76ab360af.mp4` ma max 0, ostatnia 33125 pikseli >20; klipy Orbit rosną od zerowego rect, więc
+t=0 = czerń. Zmiana D46: miniatura ze stanu końcowego zamiast t=0. Claude uruchomił `codex exec -s read-only`.
+
+**Ustalenia i rozstrzygnięcia:**
+
+1. **[BLOKUJĄCE] „Stan końcowy” nie wyznacza kadru** (różne długości bazy/klipów, pętle, keyframes po końcu bazy).
+   Przyjęto: reprezentacja końcowa niezależnych źródeł — każda warstwa `rect_at(+∞)`, ostatnia klatka każdego pliku,
+   bez `rate`, pętli i długości bazy.
+2. **[ISTOTNE] `at_end` reverse nie nadaje się na dekoder miniatur** (skan pakietów, pełne rastry GIF, dwa sloty).
+   Przyjęto: jeden `run_thumbnail` na kompozycję; `end_thumbnail` warstw bez zmian, baza fallback na plik.
+3. **[ISTOTNE] Seek nie gwarantuje taniej ostatniej klatki w 5 s.** Przyjęto: seek jako optymalizacja, wspólny
+   budżet 5 s joba, kontrola każdej klatki, ndarray po pomniejszeniu, niepowodzenie → placeholder.
+4. **[ISTOTNE] GIF wymaga złożenia ostatniej klatki** (disposal, klatki częściowe). Przyjęto: nawigacja sekwencji
+   Pillow w oryginalnych wymiarach, potem pomniejszenie, bez listy RGBA.
+5. **[ISTOTNE] Testy nie potwierdzają nowego kontraktu** (`test_thumbnail_composition` oczekuje rect t=0, wideo
+   z jedną klatką). Przyjęto: lista testów odbioru rundy 28 w PLAN.
+6. **[DROBNE] SPEC: wyjątki obraz/live.** Przyjęto: live = zapisany thumbnail jako reprezentacja zastępcza, nigdy
+   z aktywnej sesji.
+
+**Zmiany:** PLAN.md (D46, akapit miniatur), SPEC.md (D46). Implementacja w zadaniu 3, bez zmiany budżetu.
+
+**Werdykt:** przyjęte z poprawkami 1–6 naniesionymi w PLAN/SPEC.
+
+## Runda 29 — codex, 2026-10-24: długożyjący ekstraktor miniatur (D46)
+
+**Przedmiot:** próba człowieka — w kolumnie widoczne tylko 2 miniatury, reszta placeholdery. Pomiar Load24 poza oknem:
+proces na miniaturę ~0,45 s (spawn ~0,37 s, render ~0,075 s), 12 miniatur 5,4 s; w playerze dłużej, bo `_enter` woła
+`configure(..., [])` i każda nawigacja zabija ekstrakcję w toku, a start czeka na resztę budżetu ticku. Propozycja:
+jeden proces na deck z kolejnymi żądaniami; nawigacja nie anuluje. Claude uruchomił `codex exec -s read-only`.
+
+**Ustalenia i rozstrzygnięcia:**
+
+1. **[BLOKUJĄCE] Wynik publikowany dopiero po exit.** Przyjęto: upload/cache/zdarzenie zaraz po odbiorze, exit osobno
+   zwalnia slot; timeout 5 s od wysłania żądania.
+2. **[BLOKUJĄCE] Odzyskany slot zabierany czekającej scenie** (exit ekstraktora i nowy start w tym samym ticku).
+   Przyjęto: ProcessBudget odmawia roli niższej przy świeżym `waiting` roli wyższej, nie tylko `idle`.
+3. **[ISTOTNE] Nawigacja vs przewijanie kolumny.** Przyjęto: nawigacja w decku zachowuje zakres i pracę; aktualizacja
+   zakresu zastępuje oczekujące; rozpoczęte żądanie może się dokończyć; zmiana decku czyści.
+4. **[ISTOTNE] Budżet 4 ms głodzi wysyłanie.** Przyjęto: `allow_start` tylko dla zimnego startu; odbiór, timeout, reap
+   i wysłanie do gotowego procesu zawsze.
+5. **[ISTOTNE] Bezczynność i odzysk to nie błąd obrazu.** Przyjęto: zegar 2 s w rodzicu, twarde zatrzymanie bez
+   protokołu anulowania renderu, ponowienie pozycji po odzysku; błąd materiału → placeholder pozycji, proces dalej.
+6. **[ISTOTNE] Pamięć długożyjącego PID.** Przyjęto: odbiór RSS po serii żądań i szczyt sesji, 1080p/4K przy pełnym
+   obciążeniu D48; sprzątanie SHM po każdym żądaniu, bez cache kontenerów.
+7. **[DROBNE] Rozdział job/proces w dokumentach.** Przyjęto: „jedno `render_thumbnail` na kompozycję, jeden
+   `run_thumbnail` obsługuje kolejne żądania”; SPEC uzupełniony.
+
+**Zmiany:** PLAN.md (D46 ekstraktor, testy rundy 29), SPEC.md (D46). Implementacja w zadaniu 3, bez zmiany budżetu.
+
+**Werdykt:** przyjęte z poprawkami 1–7 naniesionymi w PLAN/SPEC.
+
+## Runda 30 — codex, 2026-10-24: rozmiar notatek D46 i kierunek 10e
+
+**Przedmiot:** próba człowieka — prelegent: tekst notatek „lekko większy”, a wzory większe względem tekstu (oba).
+Zmiana D46: domyślnie 28 px zamiast 24, wzory 1,2× rozmiaru tekstu (natywnie i w fallbacku Agg). Nowy kierunek 10e:
+edycja notatek w Info z zapisem do pliku obok decku (decyzja prelegenta), Markdown i podpowiedzi — kontrakt po 10d.
+Claude uruchomił `codex exec -s read-only`.
+
+**Ustalenia i rozstrzygnięcia:**
+
+1. **[BLOKUJĄCE] Brak sposobu na 1,2× w natywnym Markdown** (`MarkdownOptions` 1.93 bez skali LaTeX). Bramka
+   wykonalności zaliczona przez Claude: MicroTeX w przypiętym wheelu obsługuje `\scalebox{1.2}{…}` (28 px: x² 32×27,
+   baseline 25 → 38×32, baseline 30; `\frac{1}{2}` 15×37 → 17×44). Przyjęto transformację tokenów matematycznych.
+2. **[ISTOTNE] Limit 48 px a wzory 57,6 px.** Przyjęto: tekst 16–48, wzór nominalnie 19,2–57,6; `render_formula`
+   dostaje rozmiar wzoru z walidacją ≤57,6; skalowanie dokładnie raz.
+3. **[ISTOTNE] Jednostki i DPI.** Przyjęto przepływ tekst → ×1,2 → ×DPI, powrót do jednostek układu raz.
+4. **[ISTOTNE] Cache i walidacja końcowej postaci.** Przyjęto walidację przeskalowanej postaci; tekstury MicroTeX
+   w jego własnym cache jako jawne ograniczenie.
+5. **[ISTOTNE] Testy nie dowodzą proporcji i baseline.** Przyjęto listę testów rundy 30 w PLAN.
+6. **[DROBNE] 10e a wspólny UI.** Przyjęto: stan/komendy/UI wspólne z 10b, plik obok decku jako adapter PC.
+7. **[DROBNE] Kolejność faz i odbiór fontu.** Przyjęto: 10a → 10d → 10e → 10b → 10c; próba fontu 28 px.
+
+**Zmiany:** PLAN.md (D46 notatki, 10e, kolejność), SPEC.md (D46). Implementacja w zadaniu 2/4, bez zmiany budżetu.
+
+**Werdykt:** A przyjęte z poprawkami 1–5 (bramka natywna zaliczona); B przyjęte z 6–7.
