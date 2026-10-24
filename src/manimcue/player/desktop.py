@@ -105,8 +105,11 @@ class Windows:
         if handle and name not in self.handles:
             self.handles[name] = handle
             self.dll.glfwSetWindowCloseCallback(handle, self.callback)
-            x, y, _, _ = self.monitors[monitor]
-            self.dll.glfwSetWindowPos(handle, x + 60, y + 60)
+            # Info ustawia set_next_window_pos: backend ImGui ignoruje ruch okna tuż po
+            # własnym SetWindowPos, a viewport zostawał przesunięty (mysz w Info o 40 px obok).
+            if name == "main":
+                x, y, _, _ = self.monitors[monitor]
+                self.dll.glfwSetWindowPos(handle, x + 60, y + 60)
 
     def toggle_fullscreen(self, options):
         for name, handle in self.handles.items():

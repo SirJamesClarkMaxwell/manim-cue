@@ -407,13 +407,17 @@ def test_thumbnail_large_image_shrinks_before_rgba_or_errors(tmp_path, monkeypat
     png = tmp_path / "large.png"
     Image.new("RGB", (3840, 2160), "red").save(png)
     spec["slide"]["file"] = str(png)
-    with pytest.raises(MemoryError, match="budżet"):
+    assert len(render_thumbnail(spec)["rgba"]) == 256 * 144 * 4
+    # JPEG musi zostać odrzucony przed draft(), który zmniejszyłby jego wymiary.
+    Image.new("RGB", (3841, 2160), "red").save(jpeg)
+    spec["slide"]["file"] = str(jpeg)
+    with pytest.raises(MemoryError, match="limit wejścia"):
         render_thumbnail(spec)
     messages = []
     from types import SimpleNamespace
 
     run_thumbnail(spec, SimpleNamespace(send=messages.append, close=lambda: None))
-    assert len(messages) == 1 and "budżet" in messages[0]["error"]
+    assert len(messages) == 1 and "limit wejścia" in messages[0]["error"]
 
 
 def test_thumbnail_video_reformats_before_array_and_rejects_large(tmp_path, monkeypatch):
@@ -425,9 +429,9 @@ def test_thumbnail_video_reformats_before_array_and_rejects_large(tmp_path, monk
     path = tmp_path / "thumbnail.mp4"
     with av.open(str(path), "w") as output:
         stream = output.add_stream("mpeg4", rate=1)
-        stream.width, stream.height, stream.pix_fmt = 640, 360, "yuv420p"
+        stream.width, stream.height, stream.pix_fmt = 1920, 1080, "yuv420p"
         frame = av.VideoFrame.from_ndarray(
-            np.full((360, 640, 3), 100, dtype=np.uint8), format="rgb24"
+            np.full((1080, 1920, 3), 100, dtype=np.uint8), format="rgb24"
         )
         for packet in [*stream.encode(frame), *stream.encode()]:
             output.mux(packet)
@@ -467,26 +471,40 @@ def test_thumbnail_video_reformats_before_array_and_rejects_large(tmp_path, monk
     monkeypatch.setattr(av, "open", Container)
     spec = {
         "size": (256, 144),
-        "resolution": (640, 360),
+        "resolution": (1920, 1080),
         "slide": {"kind": "video", "file": str(path)},
     }
     assert len(render_thumbnail(spec)["rgba"]) == 256 * 144 * 4
     assert arrays == [(256, 144)]
-    monkeypatch.setattr("manimcue.player.decoder_worker.THUMBNAIL_DECODE_BYTES", 1024)
-    with pytest.raises(MemoryError, match="budżet"):
+    monkeypatch.setattr("manimcue.player.decoder_worker.THUMBNAIL_MAX_PIXELS", 1920 * 1080 - 1)
+    with pytest.raises(MemoryError, match="Wideo przekracza limit wejścia"):
+        render_thumbnail(spec)
+    assert arrays == [(256, 144)]
+
+    # Deklaracja strumienia mieści się w limicie, rzeczywista klatka już nie.
+    monkeypatch.setattr("manimcue.player.decoder_worker.THUMBNAIL_MAX_PIXELS", 3840 * 2160)
+    decode = Container.decode
+
+    def oversized_decode(container, stream):
+        assert stream.codec_context.thread_count == 1
+        frame = next(decode(container, stream))
+        frame.width, frame.height = 3841, 2160
+        return iter([frame])
+
+    monkeypatch.setattr(Container, "decode", oversized_decode)
+    with pytest.raises(MemoryError, match="Klatka przekracza limit wejścia"):
         render_thumbnail(spec)
     assert arrays == [(256, 144)]
 
 
-def test_thumbnail_budget_reserves_decode_and_small_buffers(monkeypatch):
-    from manimcue.player.decoder_worker import THUMBNAIL_DECODE_BYTES
+def test_thumbnail_budget_reserves_small_buffers():
     from manimcue.player.sources_av import Thumbnails
 
     thumbnails = Thumbnails(lambda frame: None, lambda lease: None)
-    # Warstwy plus rezerwa dekodera przekraczają limit przed spawnem.
-    spec = {"slide": {"layers": [{}] * 60}}
+    # Same małe rastry warstw przekraczają limit przed spawnem.
+    spec = {"slide": {"layers": [{}] * 106}}
     thumbnails.configure("deck", [(0, spec)])
     thumbnails.poll_thumbnails(0)
     assert thumbnails.worker is None
     assert "budżet" in thumbnails.cache[0]["error"]
-    assert thumbnails.working_bytes == THUMBNAIL_DECODE_BYTES + 68 * 256 * 144 * 4
+    assert thumbnails.working_bytes == 114 * 256 * 144 * 4

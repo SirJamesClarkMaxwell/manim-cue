@@ -215,6 +215,7 @@ def test_stale_thumbnail_retiring_slot_and_cache_limits():
         thumbnails.worker = process, connection, (1, index), "new", 1
         thumbnails.result = {"width": 256, "height": 144, "rgba": bytes(256 * 144 * 4)}
         thumbnails.poll_thumbnails(1, allow_start=False)
+        assert thumbnails.working_bytes == 8 * 256 * 144 * 4
         assert thumbnails.bytes + thumbnails.working_bytes <= thumbnails.max_bytes
         assert len(thumbnails.cache) <= 64
     assert retired and thumbnails.get((1, 0)) is None

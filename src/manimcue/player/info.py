@@ -127,7 +127,7 @@ def render_info(snapshot: dict, preview: dict) -> list[dict]:
     for index in range(len(slides)):
         if index:
             imgui.same_line()
-        label = f"{'▶ ' if index == current else ''}{index + 1}##slide_{index}"
+        label = f"{'> ' if index == current else ''}{index + 1}##slide_{index}"
         thumbnail = snapshot.get("thumbnails", {}).get(index, {})
         texture = thumbnail.get("texture")
         clicked = (

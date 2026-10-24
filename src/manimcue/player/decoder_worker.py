@@ -10,7 +10,7 @@ from multiprocessing.shared_memory import SharedMemory
 SLOT = struct.Struct("<Qqdd")
 PROGRESS = 2 * SLOT.size
 HEADER = 96
-THUMBNAIL_DECODE_BYTES = 8 * 1024 * 1024
+THUMBNAIL_MAX_PIXELS = 3840 * 2160
 
 
 def render_thumbnail(spec: dict) -> dict:
@@ -36,10 +36,9 @@ def render_thumbnail(spec: dict) -> dict:
             try:
                 try:
                     with Image.open(path) as original:
+                        if original.width * original.height > THUMBNAIL_MAX_PIXELS:
+                            raise MemoryError("Obraz przekracza limit wejścia miniatury 3840×2160")
                         original.draft("RGB", (width, height))
-                        # Dekoder źródła i bufor skalowania, przed pełnym odczytem pikseli.
-                        if original.width * original.height * 16 > THUMBNAIL_DECODE_BYTES:
-                            raise MemoryError("Obraz przekracza budżet dekodowania miniatury 8 MiB")
                         original.thumbnail((width, height))
                         image = original.convert("RGBA")
                 except (OSError, ValueError):
@@ -48,14 +47,12 @@ def render_thumbnail(spec: dict) -> dict:
                     with av.open(path) as container:
                         stream = container.streams.video[0]
                         stream.codec_context.thread_count = 1
-                        # Konserwatywna rezerwa klatek dekodera; bez pełnego RGBA źródła.
-                        if stream.width * stream.height * 32 > THUMBNAIL_DECODE_BYTES:
-                            raise MemoryError("Wideo przekracza budżet dekodowania miniatury 8 MiB")
+                        if stream.width * stream.height > THUMBNAIL_MAX_PIXELS:
+                            raise MemoryError("Wideo przekracza limit wejścia miniatury 3840×2160")
                         frame = next(container.decode(stream))
-                        if frame.width * frame.height * 32 > THUMBNAIL_DECODE_BYTES:
-                            raise MemoryError(
-                                "Klatka przekracza budżet dekodowania miniatury 8 MiB"
-                            )
+                        # Kontrola po decode nie zapobiega wcześniejszej alokacji dekodera.
+                        if frame.width * frame.height > THUMBNAIL_MAX_PIXELS:
+                            raise MemoryError("Klatka przekracza limit wejścia miniatury 3840×2160")
                         scale = min(width / frame.width, height / frame.height, 1)
                         small = frame.reformat(
                             width=max(1, round(frame.width * scale)),

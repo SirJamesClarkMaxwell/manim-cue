@@ -68,7 +68,9 @@ def test_file_first_frame_held_rebase(prefetch, tmp_path):
 
 @pytest.mark.parametrize("engine", ["ce-cairo", pytest.param("manimgl", marks=pytest.mark.gpu)])
 @pytest.mark.parametrize("persistent", [False, True])
-def test_ready_hold_over_5s_then_checkpoint_composition_ack(prefetch, tmp_path, engine, persistent):
+def test_ready_hold_over_5s_then_checkpoint_composition_ack(
+    prefetch, tmp_path, monkeypatch, engine, persistent
+):
     from manimcue.player.live import LiveController
 
     slide = image(tmp_path)
@@ -78,7 +80,7 @@ def test_ready_hold_over_5s_then_checkpoint_composition_ack(prefetch, tmp_path, 
     layer = {
         "kind": "live",
         "scene_file": scene,
-        "scene_name": "LiveCEFirstFrame" if engine == "ce-cairo" else "LiveGLFirstFrame",
+        "scene_name": "LiveCEAddRemoveBack" if engine == "ce-cairo" else "LiveGLAddRemoveBack",
         "engine": engine,
         "rect": [0, 0, 1, 1],
     }
@@ -88,6 +90,15 @@ def test_ready_hold_over_5s_then_checkpoint_composition_ack(prefetch, tmp_path, 
     prefetch.prepare((2,), slide)
     until(lambda: ready(prefetch), lambda: prefetch.poll(time.monotonic()))
     session = prefetch.items["0"]["source"]
+    statuses = []
+    poll = session.poll
+
+    def poll_statuses():
+        events = poll()
+        statuses.extend(events)
+        return events
+
+    monkeypatch.setattr(session, "poll", poll_statuses)
     assert session.checkpoint_metrics == []
     # Techniczny ACK nie tworzy historii ani granicy właściwego wejścia.
     began = time.monotonic()
@@ -116,19 +127,30 @@ def test_ready_hold_over_5s_then_checkpoint_composition_ack(prefetch, tmp_path, 
         until(lambda: bool(frames), tick)
         assert frames[0]["frame"].frame_id > 1 and frames[0]["frame"].boundary
         assert not controller.ready
-        controller.accept_frame(frames.pop(), SimpleNamespace(closed=False))
+        first_frame = frames.pop()
+        controller.accept_frame(first_frame, SimpleNamespace(closed=False))
         assert controller.ready
+        adoption = controller.adoptions.get(session)
         controller.release_prefetch()
         assert not controller.started_group
         controller.entry["requested_playing"] = True
         controller.start_entries(time.monotonic())
-        until(
-            lambda: (
-                not controller.histories.get(session) or not controller.histories[session].reserved
-            ),
-            tick,
-        )
-        assert session.state == "ready"
+        history = controller.histories.get(session)
+        request, checkpoint = history.pending_start if history else ("2", adoption["checkpoint"])
+        until(lambda: f"ENTRY_RELEASED {request} {checkpoint}" in statuses, tick)
+        assert not history or not history.reserved
+        controller.active = 0
+        controller.step("next", 8)
+        step = controller.steps[session][0]
+        until(lambda: "result" in step, tick)
+        assert step["result"] == "done" and step["entry_id"] == 8
+        until(lambda: any(e["frame"].frame_id == step["frame_id"] for e in frames), tick)
+        result_frame = next(e for e in frames if e["frame"].frame_id == step["frame_id"])
+        assert result_frame["request_id"] == step["request"]
+        assert result_frame["frame"].frame_id > first_frame["frame"].frame_id
+        assert result_frame["frame"].pixels != first_frame["frame"].pixels
+        controller.accept_frame(result_frame, SimpleNamespace(closed=False))
+        assert not controller.steps[session]
     finally:
         controller.begin_shutdown()
         until(lambda: controller.closed, lambda: controller.poll(time.monotonic()))
@@ -288,6 +310,8 @@ def test_hold_no_zero_dt_updaters(prefetch, tmp_path, engine):
         assert (marker.read_bytes() if marker.exists() else b"") == before
         controller.accept_frame(frames[-1], SimpleNamespace(closed=False))
         assert controller.ready
+        # Pusta scena bez updaterów nie aktualizuje się w bezczynności (GL i CE); wyjście
+        # z hold dowodzi krok w test_ready_hold_over_5s_then_checkpoint_composition_ack.
     finally:
         controller.begin_shutdown()
         until(lambda: controller.closed, lambda: controller.poll(time.monotonic()))
@@ -382,3 +406,79 @@ def test_memory_limit_skips_only_layer(prefetch, tmp_path):
     source = prefetch.take((8,), 3)["base"]["source"]
     source.request_close()
     until(lambda: source.poll_closed(time.monotonic()), lambda: None)
+
+
+def test_admission_cancels_one_process_and_does_not_retry_token(monkeypatch):
+    from manimcue.player import prefetch as module
+
+    budget = ProcessBudget(2)
+    value = Prefetch(LivePool(budget))
+    created = []
+
+    class FakeSource:
+        role = "prefetch"
+        held = True
+        waiting_slot = False
+
+        def prepare(self, *args, **kwargs):
+            assert budget.try_acquire(self.role)
+            self.process = SimpleNamespace(pid=len(created), exitcode=None)
+            created.append(self)
+            budget.register(self.process, self.role, self.request_close)
+
+        def request_close(self):
+            budget.mark_retiring(self.process.pid)
+
+        def poll_closed(self, now):
+            budget.release_after_exit(self.process.pid)
+            return self.process.exitcode is not None
+
+        def poll(self, *args):
+            return {"rgba": b"frame"}
+
+    monkeypatch.setattr(module, "Source", FakeSource)
+    slide = {"kind": "image", "resolution": [1, 1], "layers": [{"kind": "image"}]}
+    token = (1,)
+    value.prepare(token, slide)
+    for pid in range(2):
+        for _ in range(3):
+            assert not budget.try_acquire("preview")
+            value.prepare(token, slide)
+            value.poll(time.monotonic())
+            assert len(created) == 2
+            assert budget.retiring == {pid}
+        created[pid].process.exitcode = 0
+        value.poll(time.monotonic())
+        assert budget.try_acquire("preview")
+        budget.register(SimpleNamespace(pid=10 + pid, exitcode=None), "preview")
+    for _ in range(3):
+        value.prepare(token, slide)
+        value.poll(time.monotonic())
+    assert value.failed == token and not value.items and not value.retiring
+    assert len(created) == 2
+    budget.processes[10].exitcode = 0
+    budget.release_after_exit(10)
+    value.prepare((2,), {**slide, "layers": []})
+    assert len(created) == 3
+
+
+def test_decoder_idle_reclaimer_stops_one_and_shutdown_stops_all(monkeypatch):
+    from manimcue.player import sources_av as adapter
+
+    budget = ProcessBudget(2)
+    workers = []
+    for pid in range(2):
+        process = SimpleNamespace(pid=pid, exitcode=None)
+        workers.append((process, SimpleNamespace(close=lambda: None), None))
+        assert budget.try_acquire("idle")
+        budget.register(process, "idle")
+    monkeypatch.setattr(adapter, "_pool", workers)
+    monkeypatch.setattr(adapter, "_retiring_pool", [])
+    monkeypatch.setattr(adapter, "_budget", None)
+    adapter.configure_budget(budget)
+    assert not budget.try_acquire("thumbnail")
+    assert len(workers) == 1 and len(budget.retiring) == 1
+    assert not budget.try_acquire("scene")
+    assert len(workers) == 1
+    adapter.close_pool()
+    assert not workers and budget.retiring == {0, 1}

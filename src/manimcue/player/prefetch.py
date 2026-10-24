@@ -113,7 +113,7 @@ class Prefetch:
                 break
 
     def take(self, token: tuple, entry_id: int) -> dict | None:
-        if token != self.token:
+        if token != self.token or token == self.failed:
             self.cancel("miss")
             return None
         result = {key: item for key, item in self.items.items() if item["ready"]}
@@ -134,12 +134,17 @@ class Prefetch:
         return result
 
     def cancel(self, reason: str) -> None:
-        for item in self.items.values():
+        if reason == "admission" and self.token is not None:
+            self.failed = self.token
+        for key, item in list(self.items.items()):
             source = item["source"]
             if "spec" in item:
                 source.request_stop()
             else:
                 source.request_close()
             self.retiring.append(item)
+            del self.items[key]
+            if reason == "admission":
+                return
         self.items = {}
         self.token = None

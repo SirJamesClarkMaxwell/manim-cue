@@ -23,8 +23,10 @@ def configure_budget(budget):
     retire_live = budget.reclaimers.get("idle", lambda: None)
 
     def retire_idle():
-        close_pool()
-        retire_live()
+        if _pool:
+            close_pool(count=1)
+        else:
+            retire_live()
 
     budget.reclaimers["idle"] = retire_idle
 
@@ -54,6 +56,8 @@ def _take(role="scene"):
     while _pool:
         worker = _pool.pop(0)
         if worker[0].is_alive():
+            if _budget is not None:
+                _budget.waiting.pop(role, None)
             break
         worker[1].close()
         if _budget is not None:
@@ -69,9 +73,9 @@ def _take(role="scene"):
     return worker
 
 
-def close_pool() -> None:
+def close_pool(*, count=None) -> None:
     """Zamknięty potok kończy czekający proces puli bez join w UI."""
-    while _pool:
+    for _ in range(len(_pool) if count is None else min(count, len(_pool))):
         process, connection, _ = _pool.pop()
         connection.close()
         if _budget is not None:
@@ -423,13 +427,8 @@ class Thumbnails:
             )
             if request:
                 key, spec = request
-                # Dekodowanie źródła oraz małe rastry, canvas, resize/crop, SHM i upload.
-                from .decoder_worker import THUMBNAIL_DECODE_BYTES
-
-                self.working_bytes = (
-                    THUMBNAIL_DECODE_BYTES
-                    + (len(spec["slide"].get("layers", [])) + 8) * 256 * 144 * 4
-                )
+                # Małe rastry ekstraktora oraz canvas, resize/crop, SHM i upload playera.
+                self.working_bytes = (len(spec["slide"].get("layers", [])) + 8) * 256 * 144 * 4
                 self._evict(self.working_bytes)
                 if self.working_bytes > self.max_bytes:
                     self.cache[key] = {"error": "Kompozycja przekracza budżet miniatur"}

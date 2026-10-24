@@ -515,3 +515,124 @@ Zwykły pytest po etapie 2: **701 passed, 2 failed**; po poprawkach niżej **702
   wołał Pythona dla każdego zdarzenia; sekwencja plików Qt odtwarzała spadek do 43 fps, bez filtra test
   przechodził). Zamienione na sygnały `applicationStateChanged`/`focusWindowChanged`
   (`composition.py`); test anulowania capture emituje sygnały. Sekwencja Qt: 76 passed.
+
+### Recenzja codex etapu 2 i poprawki
+
+Recenzja statyczna diffu `9b52acb..572c73f`, poprawki na gałęzi
+`fix/10d-stage2-review` (2026-10-24). Powyższe wyniki testów dotyczą wcześniejszego
+stanu; **testy po tych poprawkach nie były uruchamiane**. Trwa próba playera
+użytkownika: bez pytest, procesów roboczych i okien. Bez commita.
+
+1. **Zagłodzenie admisji przez refill — poprawione.**
+   `src/manimcue/live_pool.py:26`: budżet pamięta kategorię, która odbiła się od
+   pełnego limitu; `idle` nie dostaje slotu do udanej admisji tej kategorii.
+   Przejęcie gotowego workera również usuwa oczekiwanie
+   (`src/manimcue/live_pool.py:197`, `src/manimcue/player/sources_av.py:54`).
+   Wspólny budżet obejmuje ImGui i Qt, bez zmiany kolejności ich poll.
+   Test `tests/test_live_pool.py:179` symuluje opóźniony exit przy automatycznym
+   refill i dowodzi, że odzyskany slot trafia do sceny.
+2. **Nadmierny odzysk procesów — poprawione.**
+   `src/manimcue/live_pool.py:26`: najwyżej jeden odzysk naraz, kolejno idle →
+   thumbnail → prefetch → preview; obecność `retiring` blokuje kolejny odzysk
+   aż do odebrania exit. `src/manimcue/live_pool.py:220` zatrzymuje jeden worker,
+   a `src/manimcue/live_pool.py:269` nadal zamyka wszystkie przy shutdown.
+   `src/manimcue/player/sources_av.py:20` i `:76` odzyskują jeden dekoder albo
+   jeden worker live. `src/manimcue/player/prefetch.py:136` również zatrzymuje
+   tylko jeden element na żądanie admisji; pozostałe można odzyskać po exit.
+   Nowe testy: `tests/test_live_pool.py:213`, `:234`, `:249` oraz
+   `tests/test_imgui_prefetch.py:470` (jeden proces, kolejność kategorii,
+   powtarzane odmowy do exit i pełny shutdown obu pul).
+3. **Ponawianie prefetcha anulowanego przez admisję — poprawione.**
+   `src/manimcue/player/prefetch.py:136`: zapamiętanie tokenu jako `failed`;
+   `:115`: odrzucony cel nie jest przejmowany, także przy częściowym odzysku.
+   Zmiana tokenu pozwala przygotować nowe wejście. Test offline
+   `tests/test_imgui_prefetch.py:416` obejmuje kilka cykli preview–prefetch,
+   opóźnione exity, brak ponowienia i dopuszczenie nowego tokenu.
+4. **Globalny budżet dekoderów przy dwóch App — znane ograniczenie.**
+   Zgodnie z poleceniem bez poprawki: `src/manimcue/player/sources_av.py:20`
+   nadal konfiguruje globalną pulę/budżet. Produkcja zakłada **jedną App na
+   proces**; dwie App w jednym interpreterze nie mają izolacji tych zasobów.
+5. **Test przejęcia bez historii nie dowodził wyjścia z hold — poprawione.**
+   `tests/test_imgui_prefetch.py:71`: po przejęciu w pauzie i wznowieniu test
+   czeka na skorelowane `ENTRY_RELEASED`, wykonuje rzeczywisty krok sekwencji,
+   sprawdza wynik `done`, entry/request/frame_id i zmienione piksele, następnie
+   przyjmuje klatkę/ACK. Obejmuje brak historii oraz trwałą sesję, GL i CE.
+   `tests/test_imgui_prefetch.py:258` dodatkowo sprawdza wznowienie updaterów po
+   release. Warianty GL zachowują znacznik `gpu`. Uruchomienie i szerszy odbiór
+   nawigacji/pętli z zadania 8 pozostają po stronie Claude.
+
+**Pliki spoza zamkniętych list zadań 6–8 w recenzowanym etapie:**
+
+- `README.md` — dokumentacja użytkowa puli, prefetcha, wcześniejszego wykonania
+  `build_objects` i jego I/O oraz limitów; wcześniejsze osobne upoważnienie
+  dokumentacyjne opisane w raporcie.
+- `docs/api.md` — ten sam kontrakt zachowania i ograniczeń w dokumentacji API.
+- `src/manimcue/composition.py` — poprawka regresji wydajności Qt: sygnały
+  aplikacji/fokusu zamiast globalnego filtra zdarzeń, z zachowaniem anulowania
+  capture po utracie aktywności/fokusu.
+- `tests/test_live_layers.py` — dostosowanie kontroli osieroconych dzieci do
+  legalnego zapasu D48 oraz testu anulowania capture do sygnałów Qt. Test
+  emituje sygnały ręcznie; rzeczywista kolejność zdarzeń Player–Info wymaga
+  próby okienkowej.
+
+Te cztery odstępstwa należą do wcześniejszego diffu; niniejsza poprawka ich nie
+rozszerza. Zmieniono trzy pliki implementacji, dwa pliki testów i ten raport.
+Weryfikacja ograniczona do `ruff check`, `ruff format --check` pięciu zmienionych
+własnych plików Python (bez forka slides) oraz `git diff --check` — bez błędów.
+Nie zmierzono p95, RSS ani VRAM; odbiór zadania 8 pozostaje otwarty.
+
+### Runda 26 — miniatury D46
+
+- `src/manimcue/player/decoder_worker.py:13`: osobny limit wejścia ekstraktora
+  3840×2160 pikseli (iloczyn), zamiast 8 MiB i mnożników 16/32. Kontrole
+  oryginalnego obrazu przed `draft()`, deklaracji wideo przed decode i klatki
+  po decode; ostatnia nie zapobiega wcześniejszej alokacji. Zachowane jeden
+  wątek dekodera, natychmiastowy reformat do małego RGBA i błąd → placeholder.
+- `src/manimcue/player/sources_av.py:430`: budżet 16 MiB rozlicza bufory
+  i tekstury miniatur playera, bez rezerwy dekodowania źródła. Zachowana
+  rezerwa zależna od liczby warstw, ograniczająca też sumę małych rastrów
+  ekstraktora, oraz odrzucenie kompozycji przekraczającej budżet.
+- `tests/test_imgui_sources.py:388`: JPEG i PNG 4K dają miniaturę, większy
+  JPEG jest odrzucany przed draft i zwraca błąd placeholdera; `:423`: wideo
+  1920×1080 daje obraz, ndarray powstaje dopiero po zmniejszeniu, przekroczenie
+  limitu deklaracji lub rzeczywistej klatki daje błąd; `:500`: budżet warstw
+  bez rezerwy dekodera. `tests/test_imgui_info.py:218`: rezerwa cache obejmuje
+  wyłącznie małe bufory, nadal obowiązuje suma CPU+GPU z rezerwą ≤16 MiB.
+
+Testy **nieuruchomione** zgodnie z poleceniem podczas próby playera; bez pytest,
+ekstrakcji, procesów roboczych i okien. Weryfikacja: `ruff check`,
+`ruff format --check` czterech zmienionych plików Python oraz `git diff --check`.
+Nie mierzono RSS ekstraktora; limit wejścia nie obiecuje limitu RSS, pomiary
+1080p/4K z kodekiem i formatem pikseli pozostają do odbioru. Istniejące poprawki
+etapu 2 zachowane; bez commita.
+
+### Przegląd Claude poprawek i próba człowieka (2026-10-24)
+
+Poprawki Claude po przeglądzie diffu codex:
+
+- `src/manimcue/live_pool.py`: `ProcessBudget.waiting` to słownik rola → czas ostatniej odmowy; `idle` czeka tylko
+  na odmowy młodsze niż 0,5 s. Wcześniej porzucone żądanie (np. miniatura po ukryciu Info, anulowany prefetch)
+  blokowało uzupełnianie puli do następnej udanej admisji tej roli. Test `test_abandoned_wait_stops_blocking_refill`.
+- `tests/test_live_pool.py::test_cancelled_refill_does_not_disable_engine`: `retire_idle` zatrzymuje teraz jeden
+  worker, więc test zatrzymuje wskazany worker przez `_stop`.
+- `tests/test_imgui_prefetch.py::test_hold_no_zero_dt_updaters`: usunięty dopisek codex czekający na updatery po
+  release — pusta scena bez updaterów nie aktualizuje się w bezczynności (GL i CE); wyjście z hold dowodzi krok
+  w `test_ready_hold_over_5s_then_checkpoint_composition_ack`.
+
+Usterki z próby człowieka ImGui (Demo, Load24):
+
+- **Miniatury bez obrazów** — każda była placeholderem: limit 8 MiB z poprawki 3 etapu 1 odrzucał każde wideo
+  1080p. Runda 26 (wyżej).
+- **Krzaczek przed numerem bieżącej miniatury** — `▶` spoza zakresu fontu; `src/manimcue/player/info.py` używa `> `.
+- **Mysz w Info przesunięta o 40 px** (pasek przewijania trafiany tylko daleko poniżej). Sonda w oknie: viewport
+  ImGui Info (3540,−488), rzeczywisty klient (3500,−528) przez całą sesję. `Windows.attach` przesuwał okno Info
+  przez `glfwSetWindowPos` tuż po utworzeniu viewportu; backend ImGui ignoruje ruch okna zaraz po własnym
+  ustawieniu pozycji. `src/manimcue/player/desktop.py`: ruch tylko okna głównego; Info ustawia
+  `set_next_window_pos`. Po zmianie sonda: viewport = klient.
+- **Chwilowe zawieszenie na pierwszym slajdzie Load24** — zgodne z ustaleniami 1–2 recenzji etapu 2 (odzysk całej
+  puli i zagłodzenie admisji przy pełnym budżecie); do ponownej próby po poprawkach.
+- Prelegent chce miniatur w pionowej kolumnie po lewej (sorter PowerPoint) — runda 27, zadanie 2.
+
+Testy po poprawkach (kod worktree przez `PYTHONPATH`): zwykły pytest **711 passed, 1 failed, 2 skipped,
+58 deselected, 637 s**; jedyny błąd to dopisek updaterów wyżej — po usunięciu oba testy hold **6 passed**.
+`ruff check`/`ruff format --check` 10 plików Python: zielone.

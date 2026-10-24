@@ -17,23 +17,36 @@ class ProcessBudget:
         self.retiring = set()
         self.pending = 0
         self.reclaimers = {}
+        # Rola → czas ostatniej odmowy; czekający ponawia co klatkę, porzucony wygasa po 0,5 s.
+        self.waiting = {}
 
     def configure(self, limit):
         self.target = limit
         self.limit = max(self.limit, limit) if self.processes else limit
 
     def try_acquire(self, role: str) -> bool:
-        if len(self.processes) + self.pending >= self.limit:
-            priorities = {"scene": 0, "preview": 1, "prefetch": 2, "thumbnail": 3, "idle": 4}
-            for name in sorted(self.reclaimers, key=lambda r: priorities[r], reverse=True):
-                if priorities[name] > priorities[role]:
-                    self.reclaimers[name]()
-            for pid in sorted(
-                self.stoppers, key=lambda pid: priorities[self.roles[pid]], reverse=True
-            ):
-                if priorities[self.roles[pid]] > priorities[role]:
-                    self.stoppers[pid]()
+        now = time.monotonic()
+        if role == "idle" and any(now - t < 0.5 for t in self.waiting.values()):
             return False
+        if len(self.processes) + self.pending >= self.limit:
+            if role != "idle":
+                self.waiting[role] = now
+            if self.retiring:
+                return False
+            priorities = {"scene": 0, "preview": 1, "prefetch": 2, "thumbnail": 3, "idle": 4}
+            for name in reversed(priorities):
+                if priorities[name] <= priorities[role]:
+                    continue
+                if name in self.reclaimers:
+                    self.reclaimers[name]()
+                    if self.retiring:
+                        break
+                for pid in self.stoppers:
+                    if self.roles[pid] == name:
+                        self.stoppers[pid]()
+                        return False
+            return False
+        self.waiting.pop(role, None)
         self.pending += 1
         return True
 
@@ -192,6 +205,7 @@ class LivePool:
                 and worker.process.exitcode is None
             ):
                 self.workers.remove(worker)
+                self.budget.waiting.pop(role, None)
                 self.hits += 1
                 return worker
         worker = self._spawn(engine, role)
@@ -207,7 +221,9 @@ class LivePool:
 
     def retire_idle(self):
         for worker in self.workers:
-            self._stop(worker)
+            if worker.stopping is None:
+                self._stop(worker)
+                break
 
     def poll(self, now: float) -> None:
         for worker in list(self.workers):
@@ -254,7 +270,8 @@ class LivePool:
 
     def begin_shutdown(self) -> None:
         self.closing = True
-        self.retire_idle()
+        for worker in self.workers:
+            self._stop(worker)
 
     @property
     def closed(self):

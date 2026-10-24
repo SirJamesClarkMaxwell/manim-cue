@@ -2,10 +2,11 @@
 
 import time
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
-from manimcue.live_pool import LivePool, ProcessBudget
+from manimcue.live_pool import LivePool, ProcessBudget, WarmWorker
 from manimcue.live_session import LiveSession, LiveSpec
 
 
@@ -170,6 +171,109 @@ def test_cancelled_refill_does_not_disable_engine(pool):
     pool.poll(time.monotonic())
     for _ in range(2):
         worker = pool.workers[-1]
-        pool.retire_idle()
+        pool._stop(worker)
         until(lambda worker=worker: worker not in pool.workers, lambda: pool.poll(time.monotonic()))
         assert not pool.failures.get("ce-cairo")
+
+
+def test_refill_yields_to_waiting_scene_after_delayed_exit(monkeypatch):
+    budget = ProcessBudget(1)
+    pool = LivePool(budget)
+    pool.configure({"ce-cairo"})
+    connection = SimpleNamespace(close=lambda: None, poll=lambda timeout: False)
+    process = SimpleNamespace(pid=1, exitcode=None, join=lambda timeout: None, close=lambda: None)
+    worker = WarmWorker(process, connection, connection, None, "ce-cairo", 0)
+    pool.workers.append(worker)
+    assert budget.try_acquire("idle")
+    budget.register(process, "idle", lambda: pool._stop(worker))
+    spawned = []
+
+    def spawn(engine, role):
+        if budget.try_acquire(role):
+            spawned.append(role)
+            return object()
+        return None
+
+    monkeypatch.setattr(pool, "_spawn", spawn)
+    assert not budget.try_acquire("scene")
+    for _ in range(3):
+        pool.poll(0)
+        assert not budget.try_acquire("scene")
+    assert budget.retiring == {1} and not spawned
+    process.exitcode = 0
+    pool.poll(0)
+    assert not pool.workers and not spawned
+    assert budget.try_acquire("scene")
+    budget.abort()
+    assert budget.try_acquire("idle")
+    budget.abort()
+
+
+def test_abandoned_wait_stops_blocking_refill(monkeypatch):
+    clock = [0.0]
+    monkeypatch.setattr("manimcue.live_pool.time.monotonic", lambda: clock[0])
+    budget = ProcessBudget(0)
+    assert not budget.try_acquire("thumbnail")
+    budget.limit = 1
+    assert not budget.try_acquire("idle")
+    clock[0] = 1.0
+    assert budget.try_acquire("idle")
+    budget.abort()
+
+
+@pytest.mark.parametrize("role", ["thumbnail", "prefetch", "preview", "scene"])
+def test_budget_reclaims_one_lowest_process_until_exit(role):
+    budget = ProcessBudget(5)
+    stopped = []
+    for pid, category in enumerate(["preview", "prefetch", "thumbnail", "idle", "idle"]):
+        assert budget.try_acquire(category)
+
+        def stop(pid=pid):
+            stopped.append(pid)
+            budget.mark_retiring(pid)
+
+        budget.register(SimpleNamespace(pid=pid, exitcode=None), category, stop)
+    for _ in range(3):
+        assert not budget.try_acquire(role)
+    assert stopped == [3]
+    assert budget.snapshot()["total"] == 5
+    budget.processes[3].exitcode = 0
+    budget.release_after_exit(3)
+    assert budget.try_acquire(role)
+    assert stopped == [3]
+
+
+def test_live_idle_reclaimer_stops_one_but_shutdown_stops_all():
+    pool = LivePool(ProcessBudget(2))
+    for pid in range(2):
+        process = SimpleNamespace(pid=pid, exitcode=None)
+        connection = SimpleNamespace(close=lambda: None)
+        worker = WarmWorker(process, connection, connection, None, "ce-cairo", 0)
+        pool.workers.append(worker)
+        assert pool.budget.try_acquire("idle")
+        pool.budget.register(process, "idle")
+    pool.retire_idle()
+    assert pool.budget.retiring == {0}
+    pool.begin_shutdown()
+    assert pool.budget.retiring == {0, 1}
+
+
+def test_budget_reclaim_order():
+    budget = ProcessBudget(4)
+    stopped = []
+    for pid, role in enumerate(["preview", "prefetch", "thumbnail", "idle"]):
+        assert budget.try_acquire(role)
+
+        def stop(pid=pid):
+            stopped.append(pid)
+            budget.mark_retiring(pid)
+
+        budget.register(SimpleNamespace(pid=pid, exitcode=None), role, stop)
+    for pid in [3, 2, 1, 0]:
+        assert not budget.try_acquire("scene")
+        assert stopped[-1] == pid
+        budget.processes[pid].exitcode = 0
+        budget.release_after_exit(pid)
+        assert budget.try_acquire("scene")
+        budget.register(SimpleNamespace(pid=pid + 10, exitcode=None), "scene")
+    assert stopped == [3, 2, 1, 0]
