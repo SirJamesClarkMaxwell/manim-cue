@@ -779,10 +779,10 @@ parytetu 3 h/stop 6 h i osobny zakres. Odrzucone: hover focus, parsowanie logów
 liczenie cue w playerze, automatyczny skok po ostatnim cue i obejście bariery.
 
 **D46. Info jak widok prezentera PowerPoint — tylko ImGui (rozszerza D42).**
-Lewa kolumna: duża bieżąca kompozycja współdzielona ze sceną, nad nią zegar lokalny,
-elapsed i pauza/restart czasu prelegenta, niezależne od pauzy mediów. Prawa: następny
-slajd i pod nim większe przewijane notatki; na dole miniatury wszystkich slajdów bieżącego
-decku. Klik miniatury wywołuje start_at i pełną barierę nawigacji; bieżący cel to no-op
+Skrajnie po lewej pionowa, przewijana kolumna miniatur wszystkich slajdów bieżącego decku
+(sorter PowerPoint, runda 27). Obok kolumna: duża bieżąca kompozycja współdzielona ze sceną,
+nad nią zegar lokalny, elapsed i pauza/restart czasu prelegenta, niezależne od pauzy mediów.
+Prawa: następny slajd i pod nim większe przewijane notatki. Klik miniatury wywołuje start_at i pełną barierę nawigacji; bieżący cel to no-op
 w reducerze po normalizacji indeksu, przed _enter(): entry_id, pauza, reverse
 i przygotowanie bez zmian, brak efektów.
 Skok niesąsiedni daje zimny lokalny początek live bez enter_cue i bez rekonstrukcji drogi;
@@ -813,7 +813,8 @@ i obowiązkowego ruchomego preview. Pula 4 to zapas bezczynnych ciepłych proces
 uzupełniany po pobraniu; każdy obsługuje jedno źródło do końca życia. Brak globalnego
 limitu 4: osobno liczyć aktywne scena/preview/miniatura, bezczynne ≤4 i kończące się
 do potwierdzonego exit oraz sumę żywych; odbiór przy pełnym obciążeniu.
-LRU 64 obrazy/16 MiB CPU+GPU, 256×144 RGBA.
+LRU 64 obrazy/16 MiB buforów i tekstur miniatur playera (CPU+GPU), 256×144 RGBA;
+dekodowanie w ekstraktorze poza tym limitem, z limitem wejścia ≤3840×2160 (runda 26).
 Przy 20 obrazach ok. 5,6 MiB CPU+GPU, bez N dekoderów; web eksportuje miniatury na PC.
 Formuły: LRU 128/16 MiB CPU+GPU, limit 4096 znaków/2048×2048 px; bez pracy co klatkę.
 Szczegóły anulowania, błędów, fontów/DPI i odbioru w PLAN 10d.

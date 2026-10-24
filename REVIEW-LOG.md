@@ -2381,3 +2381,72 @@ nie wprowadziły sprzeczności z kodem i D9/D10/D20/D28/D31/D39–D48, spójnoś
 
 **Werdykt:** kontrakt 10d (D45–D48, budżet 54 h, stop 108 h) zamknięty rundami 22–25; implementacja codex
 zadaniami po kolei, przegląd Claude i próba człowieka.
+
+## Runda 26 — codex, 2026-10-24: limit pamięci miniatur D46 po próbie człowieka
+
+**Przedmiot:** próba człowieka 10d (ImGui, Demo): każda miniatura to placeholder z numerem. Claude zmierzył offline
+`render_thumbnail` dla 11 slajdów `slides/Demo.json`: wszędzie `MemoryError('Wideo przekracza budżet dekodowania
+miniatury 8 MiB')`. Poprawka po recenzji etapu 1 wliczyła szczyt dekodowania do 16 MiB D46 (`THUMBNAIL_DECODE_BYTES`
+8 MiB, rezerwa 32 klatek); jedna klatka YUV420 1080p to ~3 MiB, DPB H.264 kilka klatek — przy tym odczytaniu
+kontraktu żadna miniatura wideo 1080p nie powstaje. Propozycja: 16 MiB = pamięć miniatur po stronie playera,
+dekodowanie w ekstraktorze z osobnym limitem źródła 3840×2160. Claude uruchomił `codex exec -s read-only`.
+
+**Ustalenia i rozstrzygnięcia:**
+
+1. **[BLOKUJĄCE] Bez rezerwy znika limit kompozycji w ekstraktorze.** Przyjęto: suma roboczych rastrów ekstraktora
+   nadal ograniczona rezerwą zależną od liczby warstw; sam limit rozdzielczości nie wystarcza.
+2. **[ISTOTNE] Jedna klatka i jeden wątek nie ograniczają RSS.** Przyjęto: 3840×2160 to limit wejścia, bez obietnicy
+   limitu RSS; odbiór podaje zmierzony szczyt start→exit z kodekiem/formatem pikseli, także przy obciążeniu
+   scena+preview+prefetch.
+3. **[ISTOTNE] Miejsce kontroli limitu.** Przyjęto: oryginalne wymiary obrazu przed `draft()`, deklarowane wideo przed
+   decode, rzeczywista klatka po decode; jawnie zapisane, że ostatnia kontrola nie zapobiega wcześniejszej alokacji.
+4. **[ISTOTNE] Ewikcja nie zwalnia GPU natychmiast.** Ograniczenie: ewikcja przy uploadzie korzysta z rezerwy roboczej
+   ekstrakcji, która po odebraniu wyniku jest już wolna; tekstury z kolejki zwalniane po renderze klatki.
+   Współistnienie ≤1 klatki, bez osobnego licznika.
+5. **[DROBNE] Nazwa limitu i web.** Przyjęto: „rozliczane bufory i tekstury miniatur po stronie playera”; ekstraktor
+   multiprocessing/PyAV tylko PC, web nadal eksportuje miniatury na PC.
+
+Odrzucona alternatywa: generowanie plików `thumbnail` przy renderze decku — zmiana forka i ponowny render istniejących
+decków; ścieżka `thumbnail` pozostaje preferowana, gdy plik istnieje.
+
+**Zmiany:** PLAN.md (10d, miniatury), SPEC.md (D46, miniatury). Implementacja w ramach zadania 3, bez zmiany budżetu.
+
+**Werdykt:** przyjęte z poprawkami 1–3 i 5; 4 jako ograniczenie. Do kontroli wraz z implementacją.
+
+## Runda 27 — codex, 2026-10-24: kolumna miniatur D46 i kontrola rundy 26
+
+**Przedmiot:** (A) po próbie człowieka prelegent chce miniatur jako pionowej kolumny po lewej stronie Info ImGui
+(sorter slajdów PowerPoint) zamiast poziomego paska na dole — niezacommitowany diff PLAN.md/SPEC.md D46.
+(B) kontrola wdrożenia rundy 26 w worktree `fix/10d-stage2-review` (limit wejścia ekstraktora, `working_bytes` bez
+rezerwy dekodera) oraz pobieżnie poprawek etapu 2 i `Windows.attach`. Claude uruchomił `codex exec -s read-only`.
+
+Kontekst `Windows.attach`: sonda w oknie (pozycja viewportu ImGui vs `glfwGetWindowPos`/`ClientToScreen`) pokazała
+viewport Info (3540,−488) przy rzeczywistym kliencie (3500,−528) przez całą sesję — ruch okna przez
+`glfwSetWindowPos` tuż po utworzeniu viewportu był ignorowany przez backend ImGui, mysz w Info przesunięta o 40 px.
+Po zmianie (ruch tylko okna głównego) sonda: viewport = klient.
+
+**Ustalenia i rozstrzygnięcia — A (z poprawkami):**
+
+1. **[ISTOTNE] Minimalna szerokość i ciasne okno.** Przyjęto: szerokość kolumny = miniatura + ramka, padding
+   i scrollbar w jednostkach UI; minimalna szerokość Info z kontrolek (`set_next_window_size_constraints`), przyciski
+   czasu mogą przejść do osobnych wierszy.
+2. **[ISTOTNE] Wyzwalacz auto-przewijania.** Przyjęto: tylko zmiana `(deck, slide)` i pierwsze pokazanie Info, gdy
+   przycisk bieżącego nie przecina widoku; ręczne przewijanie i zmiana rozmiaru nie przewijają.
+3. **[DROBNE] Stare opisy i odbiór.** Przyjęto: „kolumna miniatur” w D42, screenshot trzech kolumn, testy odbioru
+   rundy 27 w wierszu zadania 2; web 10b obejmuje ten sam układ, Qt bez zmian.
+
+**Ustalenia — B (poprawki):**
+
+4. **[ISTOTNE] Test obrazu nie dowodzi odrzucenia przed pełnym dekodowaniem.** Przyjęto: obraz 7680×4320, strażnicy
+   na `load()`/`draft()`, oczekiwany `MemoryError` i komunikat z `run_thumbnail`.
+5. **[ISTOTNE] Test deklarowanych wymiarów wideo nie dowodzi pominięcia decode.** Przyjęto: `Container.decode`
+   zastąpione funkcją zgłaszającą błąd; test rzeczywistej klatki zostaje osobno.
+6. **[ISTOTNE — odbiór] Pomiar RSS ekstraktora (runda 26, ustalenie 2) niewykonany.** Pozostaje w zadaniu 8 —
+   brak dowodu odbiorowego, nie błąd.
+
+Etap 2 i `Windows.attach`: bez dodatkowej regresji.
+
+**Budżet:** zadanie 2: 5 → 7 h (kolumna miniatur); 10d 54 → 56 h, stop 108 → 112 h.
+
+**Werdykt:** A przyjęte z poprawkami 1–3 naniesionymi w PLAN/SPEC; B — wzmocnić testy 4–5 przed commitem,
+6 w odbiorze.

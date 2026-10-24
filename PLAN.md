@@ -1575,8 +1575,8 @@ może najpierw wrócić do normalnego pliku tego samego indeksu (tabela 10a).
 Rekomendacja: wyjątek teraz; późniejszy parytet szacowany 3 h, stop 6 h, osobny kontrakt
 routera Qt i testów. D47 ma parytet obu playerów już w 10d.
 
-**D46 — Info i zasoby.** Dwie kolumny, orientacyjnie 60/40 szerokości dostępnej ponad
-paskiem miniatur: lewa duża bieżąca kompozycja z tego samego snapshotu/tekstur co scena,
+**D46 — Info i zasoby.** Dwie kolumny, orientacyjnie 60/40 szerokości dostępnej obok
+kolumny miniatur (runda 27): lewa duża bieżąca kompozycja z tego samego snapshotu/tekstur co scena,
 nad nią zegar lokalny, elapsed, pauza/wznowienie i restart **czasu prelegenta**.
 Timer monotoniczny startuje z aplikacją; restart zeruje i zachowuje stan pauzy;
 pauza timera nie pauzuje mediów ani live. Prawa: normalny następny slajd, pod nim
@@ -1585,8 +1585,18 @@ przewijane notatki. Dotychczasowy niezależny ruch preview zostaje. Notatki domy
 bez zmiany reszty UI. Ustawienie sesji, wspólne dla slajdów, uwzględnia DPI.
 Stan/degradacja nadal widoczne i zgodne z S. Brak następnego celu ma czytelny pusty podgląd.
 
-Na dole przewijany poziomo pasek **wszystkich slajdów bieżącego decku**, indeks i zaznaczenie
-bieżącego. Klik wysyła `start_at` z jawnym indeksem decku/slajdu, nie symuluje serii next.
+Po lewej, na całą wysokość Info, przewijana pionowo kolumna **wszystkich slajdów bieżącego
+decku** jak sorter slajdów PowerPoint (runda 27, po próbie człowieka 2026-10-24; wcześniej
+poziomy pasek na dole): stała szerokość jednej miniatury 128×72 logicznych px z numerem,
+zaznaczenie bieżącego; zmiana bieżącego slajdu przewija kolumnę tylko wtedy, gdy bieżący
+wypadł poza widok. Próba odsłonięcia bieżącego tylko przy zmianie `(deck, slide)` i pierwszym
+pokazaniu Info, gdy jego przycisk nie przecina widocznego obszaru; ręczne przewijanie i zmiana
+rozmiaru bez zmiany celu nie przewijają. Szerokość kolumny = miniatura + ramka przycisku,
+padding i pionowy scrollbar, w jednostkach UI ze skalowaniem stylu (bez dodatkowego mnożenia
+przez DPI framebufferu); raster nadal 256×144. Minimalna szerokość Info wynika z kontrolek
+(`set_next_window_size_constraints`); przy ciasnym oknie przyciski czasu przechodzą do osobnych
+wierszy. Wheel nad kolumną przewija miniatury, kolumna nie daje `focus_live`. Ten sam układ
+i zakres lazy load obejmie web 10b; Qt Info bez zmian. Klik wysyła `start_at` z jawnym indeksem decku/slajdu, nie symuluje serii next.
 Nowe entry_id anuluje stare przygotowanie; ta sama bariera/ACK/deadline co nawigacja.
 Klik bieżącego slajdu jest no-op w `p/controller.py` po normalizacji indeksu, przed
 `_enter()`: bez zmiany entry_id, pauzy, reverse, przygotowania i bez efektów.
@@ -1610,8 +1620,15 @@ Pula 4 to zapas bezczynnych ciepłych procesów, uzupełniany po pobraniu; każd
 jedno źródło do końca życia. Liczyć osobno aktywne scena/preview/miniatura, bezczynne
 (≤4) i kończące się (od stop do potwierdzonego exit) oraz sumę żywych. Nowa ekstrakcja
 dopiero po exit poprzedniej, także anulowanej; kończące się nadal wliczać do limitu
-miniatur i sumy żywych. Maks. 256×144 RGBA/miniaturę; LRU 64 obrazy i 16 MiB łącznie CPU+GPU
-(wliczyć kopie robocze, zwalniać tekstury w kontekście). Przy 20 obrazach to ok. 5,6 MiB
+miniatur i sumy żywych. Maks. 256×144 RGBA/miniaturę; LRU 64 obrazy i 16 MiB rozliczanych
+buforów i tekstur miniatur po stronie playera, CPU+GPU (wliczyć kopie robocze playera, zwalniać
+tekstury w kontekście). Ekstraktor (jednorazowy proces) ma osobny **limit wejścia** ≤3840×2160
+pikseli: oryginalne wymiary obrazu przed draft, deklarowane wideo przed decode i rzeczywista
+klatka po decode (ta kontrola nie zapobiega wcześniejszej alokacji); większe → placeholder
+z błędem. Suma roboczych rastrów ekstraktora nadal ograniczona rezerwą zależną od liczby warstw.
+Szczyt RSS ekstraktora nie wlicza się do 16 MiB i nie jest obiecany; odbiór podaje zmierzony
+szczyt start→exit dla 1080p i 4K z kodekiem i formatem pikseli, także przy scena+preview+prefetch
+(runda 26). Przy 20 obrazach to ok. 5,6 MiB
 CPU+GPU; metadane O(N), dekodowanie tylko potrzebnych, nie N procesów. Ukryte Info
 nie uruchamia ekstrakcji ani dekoderów preview; zmiana decku anuluje stare wyniki.
 
@@ -1629,7 +1646,7 @@ CPU+GPU, maks. 4096 znaków i 2048×2048 px/wzór; bez rasteryzacji co klatkę.
 Roboto pozostaje bazą Markdown; `MarkdownOptions.font_options.merge_fonts` z Inconsolata
 uzupełnia ←→, również po A+/A− i zmianie DPI; bez globalnej zamiany fontu.
 
-D42: układ, timer, A+/A−, pasek i routing wspólne; adaptery dają obrazy/tekstury.
+D42: układ, timer, A+/A−, kolumna miniatur i routing wspólne; adaptery dają obrazy/tekstury.
 Lokalny `_pyodide_latex_fonts.py` i `pyodide_patch_runners.py` potwierdzają ścieżkę MicroTeX
 w Pyodide: slim wheel pomija fonty i pobiera je przy with_latex. **Nie jest to test
 przypiętego wheelu wasm**: brak lokalnego runtime/wheelu do uruchomienia offline.
@@ -1785,7 +1802,7 @@ live odrzucony: zależy od czasu cue i kamery; deterministyczne treści jako pli
 |---|---|---|---|
 | 0. Kontrakt / 4 h | PLAN.md, SPEC.md, REVIEW-LOG.md | próba + odczyt protokołu/API → D45–D48 | spójność ze stanem 10a i D39–D44, przegląd Claude; rozszerzenie D48 PLAN/SPEC + REVIEW-LOG |
 | 1. Granice cue / 6 h | m/live_transport.py, p/live.py, p/input.py, p/app.py, t/test_live_scene.py, t/test_live_ce.py, t/test_imgui_input.py, t/test_imgui_live.py, t/test_imgui_live_checkpoint.py | LiveController.step(direction:str, entry_id:int)->None; poll(now:float)->list[dict]; step_result(request_id:int,result:str,frame_id:int)->dict | test_sequence_start_end_empty; test_no_log_parsing; test_stale_step_result; test_step_repeat_until_keyup; test_busy_reserved_step; test_step_loop_keyup_step; test_loop_over_5s_then_stall; test_cue_over_5s_then_stall; test_interrupt_deadline_despite_heartbeat; test_persistent_boundary_restore; test_reverse_boundary; GL i CE, ACK przed jednym reducer effect, błąd/timeout bez skoku |
-| 2. Info / 5 h | p/info.py, p/state.py, p/controller.py, p/live.py, m/live_entry.py, p/app.py, p/desktop.py, t/test_imgui_info.py, t/test_imgui_navigation.py, t/test_imgui_live_checkpoint.py, t/test_live_entry.py | render_info(snapshot:dict,preview:dict)->list[dict]; update_timer(state:dict,action:str,now:float)->dict | test_presenter_columns; test_timer_pause_restart; test_notes_scale_limits; test_thumbnail_start_at_barrier; test_jump_live_history; test_thumbnail_during_restore_stale_status_previous_v_r; test_current_thumbnail_noop_entry_pause_reverse_preparing_no_effects; test_info_widgets_consume_click; screenshot dwóch kolumn i pustego preview |
+| 2. Info / 7 h (runda 27: +2 h kolumna miniatur) | p/info.py, p/state.py, p/controller.py, p/live.py, m/live_entry.py, p/app.py, p/desktop.py, t/test_imgui_info.py, t/test_imgui_navigation.py, t/test_imgui_live_checkpoint.py, t/test_live_entry.py | render_info(snapshot:dict,preview:dict)->list[dict]; update_timer(state:dict,action:str,now:float)->dict | test_presenter_columns; test_timer_pause_restart; test_notes_scale_limits; test_thumbnail_start_at_barrier; test_jump_live_history; test_thumbnail_during_restore_stale_status_previous_v_r; test_current_thumbnail_noop_entry_pause_reverse_preparing_no_effects; test_info_widgets_consume_click; screenshot trzech kolumn (miniatury, bieżący, następny+notatki) i pustego preview; runda 27: test_thumbnail_column_min_width (domyślny i minimalny rozmiar, brak obciętych kontrolek i poziomego przewijania), test_thumbnail_column_visible_range (24 slajdy, widoczne ±1 także na początku i końcu), test_thumbnail_autoscroll_on_target_change (ręczne odsunięcie zachowane, cel poza widokiem przewija raz, widoczny cel nie przesuwa; pierwsze pokazanie i zmiana decku), kliknięcia kolumny konsumowane bez focus_live/gestów, DPI 100/150/200% i przeniesienie między monitorami |
 | 3. Miniatury / 6 h | p/info.py, p/app.py, p/sources_av.py, p/decoder_worker.py, p/textures.py, p/manifest.py, t/test_imgui_info.py, t/test_imgui_sources.py | request_thumbnail(index:tuple,size:tuple)->None; poll_thumbnails(now:float)->list[dict] | test_thumbnails_24_slides_bounded; test_thumbnail_composition; test_hidden_info_no_extract; test_stale_thumbnail; 24 slajdy, baza+3 klipy+ruchome preview+miniatury; jeden proces ekstrakcji wraz z kończącym się, ≤4 bezczynne; osobne liczniki aktywnych/bezczynnych/kończących się i suma żywych, LRU/limity CPU+GPU, responsywność podczas przewijania |
 | 4. Matematyka / 4 h | p/info.py, p/desktop.py, p/notes_math.py (nowy adapter PC), p/textures.py, t/test_imgui_info.py, t/test_imgui_shared_imports.py | render_formula(text:str,size:float,dpi:float,style:str)->dict; formula dict: rgba,width,height,baseline,error | test_latex_after_init; test_inline_display_baseline; test_mathtext_fallback; test_formula_cache_limits; test_markdown_arrow_merge; PC offline raster, gpu upload, oba font size/DPI; brak importu matplotlib w shared modules |
 | 5. Gesty obu playerów / 5 h | p/input.py, p/live.py, p/desktop.py, m/composition.py, m/live_layers.py, t/test_imgui_input.py, t/test_live_layers.py | route(event:dict,state:dict)->list[dict]; view(event:dict,container:tuple)->dict; LiveLayerController.drag(point:QPointF,shift:bool,button:str='middle',alt:bool=False)->None; sygnał pointer_dragged(point,shift,button,alt) | test_gesture_matrix parametrized Qt/ImGui; test_lmb_drag_no_orbit; test_gesture_focus_capture_cancel; test_dpi_fps_invariant; test_zoom_steps; test_reserved_ce_noop; test_reset_last_boundary |
@@ -1793,7 +1810,7 @@ live odrzucony: zależy od czasu cue i kamery; deterministyczne treści jako pli
 | 7. Prefetch N+1 / 11 h | m/live_pool.py, m/live_session.py, m/live_worker.py, m/live_scene.py, m/live_scene_ce.py, m/live_transport.py, t/test_live_scene.py, t/test_live_ce.py, p/prefetch.py (nowy), p/app.py, p/desktop.py, p/controller.py, p/live.py, p/sources_av.py, p/decoder_worker.py, p/textures.py, t/test_imgui_prefetch.py (nowy), t/test_imgui_sources.py, t/test_imgui_live_checkpoint.py, t/test_imgui_navigation.py | Prefetch.prepare(token:tuple,slide:dict)->None; poll(now:float)->None; take(token:tuple,entry_id:int)->dict\|None; cancel(reason:str)->None; Source.prepare(entry_id:int,media:dict,*,hold_first:bool=False)->None; Source.poll(now:float)->None; Source.adopt(entry_id:int,now:float,paused:bool)->None; LiveController.enter(entry:dict,*,prefetched:dict\|None=None)->None | test_file_first_frame_held_rebase; test_preview_independent; test_prefetch_no_cue_history_reservation; test_hold_no_zero_dt_updaters_gl_ce; test_next_adopt_checkpoint_ack; test_adopt_no_session_no_cue_next_paused_gl_ce; test_ready_hold_over_5s_then_checkpoint_composition_ack_gl_ce; test_adjacent_wins; test_previous_v_jump_cancel_history_unchanged; test_stale_deck_error_timeout; test_loop_auto_skip_exit; test_budget_cancel_waits_exit; test_source_wait_poll_delayed_exit_new_entry; brak prefetcha Qt |
 | 8. Odbiór / 3 h | PLAN.md, SPEC.md, t/test_imgui_acceptance.py, e/measure.py | measure(options:dict)->dict | pełny pytest, regresje Qt i GL/CE/5g; 24 slajdy pod pełnym obciążeniem scena+preview+prefetch+miniatury+pule, także anulowanie i exit procesów; metryki 10a bez obniżania progów, pomiar D48 z/bez prefetcha, RSS/VRAM i liczniki procesów; Claude przegląd i próba człowieka |
 
-Budżet 10d **54 h** (33 + 10 + 11), stop **108 h** całości lub 2× zadania; nie podnosić automatycznie.
+Budżet 10d **56 h** (35 + 10 + 11; runda 27 +2 h), stop **112 h** całości lub 2× zadania; nie podnosić automatycznie.
 Po rundzie 24 zadanie 6: 8 → 10 h (Qt i nieblokująca admisja), zadanie 7: 9 → 11 h
 (hold/ACK i oczekiwanie Source). Zadanie 8 obejmuje regresje tych scenariuszy bez zmiany 3 h.
 Zadanie 3 przeszacowane 4 → 6 h po rundzie 22: osobny limit ekstrakcji, lifecycle
