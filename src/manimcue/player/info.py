@@ -70,13 +70,72 @@ def update_timer(state: dict, action: str, now: float) -> dict:
 
 
 def render_info(snapshot: dict, preview: dict) -> list[dict]:
-    """Dwie kolumny i kontrolki zwracają akcje, bez bezpośredniej nawigacji."""
+    """Kolumna miniatur i dwa podglądy zwracają akcje bez bezpośredniej nawigacji."""
     from imgui_bundle import imgui, imgui_md
 
     actions = []
+    style = imgui.get_style()
+    thumbnail_width, thumbnail_height = (
+        128 * style.font_size_base / 16,
+        72 * style.font_size_base / 16,
+    )
+    view_state = preview.setdefault("view_state", {})
+    target = tuple(snapshot["index"])
+    target_changed = view_state.get("thumbnail_target") != target
+    view_state["thumbnail_target"] = target
+    imgui.begin_child(
+        "presenter_thumbnails",
+        (
+            thumbnail_width
+            + 2 * style.frame_padding.x
+            + 2 * style.window_padding.x
+            + style.scrollbar_size,
+            0,
+        ),
+        child_flags=imgui.ChildFlags_.always_use_window_padding,
+        window_flags=imgui.WindowFlags_.always_vertical_scrollbar,
+    )
+    deck, current = snapshot["index"]
+    slides = snapshot["manifest"]["presentations"][deck]["slides"]
+    visible = []
+    for index in range(len(slides)):
+        label = f"{'> ' if index == current else ''}{index + 1}##slide_{index}"
+        thumbnail = snapshot.get("thumbnails", {}).get(index, {})
+        texture = thumbnail.get("texture")
+        clicked = (
+            imgui.image_button(
+                label, imgui.ImTextureRef(texture), (thumbnail_width, thumbnail_height)
+            )
+            if texture is not None
+            else imgui.button(label, (thumbnail_width, thumbnail_height))
+        )
+        item_visible = imgui.is_item_visible()
+        if item_visible:
+            visible.append(index)
+        if index == current and target_changed and not item_visible:
+            imgui.set_scroll_here_y()
+        if texture is not None:
+            a, b = imgui.get_item_rect_min(), imgui.get_item_rect_max()
+            draw_list = imgui.get_window_draw_list()
+            if index == current:
+                draw_list.add_rect(a, b, 0xFF00C8FF, thickness=2)
+            draw_list.add_rect_filled(a, (a.x + 28, a.y + 20), 0xCC000000)
+            draw_list.add_text(a, 0xFFFFFFFF, str(index + 1))
+        if clicked:
+            actions.append({"type": "start_at", "index": [deck, index]})
+    if visible:
+        actions.append(
+            {
+                "type": "thumbnail_range",
+                "indices": list(range(max(0, visible[0] - 1), min(len(slides), visible[-1] + 2))),
+            }
+        )
+    imgui.end_child()
+    imgui.same_line()
+    imgui.begin_child("presenter_details", (0, 0))
     imgui.text_wrapped(state_text(snapshot))
     available = imgui.get_content_region_avail()
-    height = max(100, available.y - 110)
+    height = max(1, available.y)
     spacing = imgui.get_style().item_spacing.x
     left = max(1, (available.x - spacing) * 0.6)
     imgui.begin_child("presenter_current", (left, height))
@@ -84,7 +143,10 @@ def render_info(snapshot: dict, preview: dict) -> list[dict]:
     paused = snapshot.get("presenter_timer", {}).get("paused", False)
     if imgui.button("Wznów czas" if paused else "Pauza czasu"):
         actions.append({"type": "timer_pause"})
-    imgui.same_line()
+    if imgui.get_content_region_avail().x - imgui.get_item_rect_size().x >= (
+        imgui.calc_text_size("Restart czasu").x + 2 * style.frame_padding.x + style.item_spacing.x
+    ):
+        imgui.same_line()
     if imgui.button("Restart czasu"):
         actions.append({"type": "timer_restart"})
     render = preview.get("render")
@@ -118,40 +180,5 @@ def render_info(snapshot: dict, preview: dict) -> list[dict]:
         imgui.pop_font()
     imgui.end_child()
     imgui.end_child()
-    imgui.begin_child(
-        "presenter_thumbnails", (0, 100), window_flags=imgui.WindowFlags_.horizontal_scrollbar
-    )
-    deck, current = snapshot["index"]
-    slides = snapshot["manifest"]["presentations"][deck]["slides"]
-    visible = []
-    for index in range(len(slides)):
-        if index:
-            imgui.same_line()
-        label = f"{'> ' if index == current else ''}{index + 1}##slide_{index}"
-        thumbnail = snapshot.get("thumbnails", {}).get(index, {})
-        texture = thumbnail.get("texture")
-        clicked = (
-            imgui.image_button(label, imgui.ImTextureRef(texture), (128, 72))
-            if texture is not None
-            else imgui.button(label, (128, 72))
-        )
-        if imgui.is_item_visible():
-            visible.append(index)
-        if texture is not None:
-            a, b = imgui.get_item_rect_min(), imgui.get_item_rect_max()
-            draw_list = imgui.get_window_draw_list()
-            if index == current:
-                draw_list.add_rect(a, b, 0xFF00C8FF, thickness=2)
-            draw_list.add_rect_filled(a, (a.x + 28, a.y + 20), 0xCC000000)
-            draw_list.add_text(a, 0xFFFFFFFF, str(index + 1))
-        if clicked:
-            actions.append({"type": "start_at", "index": [deck, index]})
-    if visible:
-        actions.append(
-            {
-                "type": "thumbnail_range",
-                "indices": list(range(max(0, visible[0] - 1), min(len(slides), visible[-1] + 2))),
-            }
-        )
     imgui.end_child()
     return actions

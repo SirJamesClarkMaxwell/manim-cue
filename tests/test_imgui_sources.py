@@ -117,8 +117,8 @@ def test_thumbnail_composition(tmp_path):
         }
     )
     image = Image.frombytes("RGBA", (256, 144), result["rgba"])
-    assert image.getpixel((64, 72)) == (128, 0, 127, 255)
-    assert image.getpixel((200, 72)) == (0, 0, 255, 255)
+    assert image.getpixel((200, 72)) == (128, 0, 127, 255)
+    assert image.getpixel((64, 72)) == (0, 0, 255, 255)
 
 
 def test_thumbnail_worker_exit_and_upload(tmp_path):
@@ -142,7 +142,7 @@ def test_thumbnail_worker_exit_and_upload(tmp_path):
             assert process_counts(thumbnails)["thumbnail"] <= 1
             time.sleep(0.01)
         assert thumbnails.get((0, 0))["texture"] == 99
-        assert thumbnails.worker is None
+        assert thumbnails.worker[0].is_alive()
         assert thumbnails.bytes == 256 * 144 * 8
     finally:
         thumbnails.clear()
@@ -409,14 +409,32 @@ def test_thumbnail_large_image_shrinks_before_rgba_or_errors(tmp_path, monkeypat
     spec["slide"]["file"] = str(png)
     assert len(render_thumbnail(spec)["rgba"]) == 256 * 144 * 4
     # JPEG musi zostać odrzucony przed draft(), który zmniejszyłby jego wymiary.
-    Image.new("RGB", (3841, 2160), "red").save(jpeg)
+    Image.new("RGB", (7680, 4320), "red").save(jpeg)
+    opened = Image.open
+
+    def guarded_open(*args, **kwargs):
+        image = opened(*args, **kwargs)
+
+        def forbidden(*args, **kwargs):
+            raise AssertionError("Odrzucenie musi poprzedzać load()/draft()")
+
+        monkeypatch.setattr(image, "load", forbidden)
+        monkeypatch.setattr(image, "draft", forbidden)
+        return image
+
+    monkeypatch.setattr(Image, "open", guarded_open)
     spec["slide"]["file"] = str(jpeg)
     with pytest.raises(MemoryError, match="limit wejścia"):
         render_thumbnail(spec)
     messages = []
     from types import SimpleNamespace
 
-    run_thumbnail(spec, SimpleNamespace(send=messages.append, close=lambda: None))
+    def receive():
+        if messages:
+            raise EOFError
+        return spec
+
+    run_thumbnail(SimpleNamespace(recv=receive, send=messages.append, close=lambda: None))
     assert len(messages) == 1 and "limit wejścia" in messages[0]["error"]
 
 
@@ -465,6 +483,9 @@ def test_thumbnail_video_reformats_before_array_and_rejects_large(tmp_path, monk
         def __exit__(self, *args):
             self.container.close()
 
+        def seek(self, *args, **kwargs):
+            return self.container.seek(*args, **kwargs)
+
         def decode(self, stream):
             return (Frame(frame) for frame in self.container.decode(stream))
 
@@ -476,6 +497,12 @@ def test_thumbnail_video_reformats_before_array_and_rejects_large(tmp_path, monk
     }
     assert len(render_thumbnail(spec)["rgba"]) == 256 * 144 * 4
     assert arrays == [(256, 144)]
+    decode = Container.decode
+
+    def forbidden_decode(container, stream):
+        raise AssertionError("Odrzucenie deklarowanych wymiarów musi poprzedzać decode")
+
+    monkeypatch.setattr(Container, "decode", forbidden_decode)
     monkeypatch.setattr("manimcue.player.decoder_worker.THUMBNAIL_MAX_PIXELS", 1920 * 1080 - 1)
     with pytest.raises(MemoryError, match="Wideo przekracza limit wejścia"):
         render_thumbnail(spec)
@@ -483,13 +510,12 @@ def test_thumbnail_video_reformats_before_array_and_rejects_large(tmp_path, monk
 
     # Deklaracja strumienia mieści się w limicie, rzeczywista klatka już nie.
     monkeypatch.setattr("manimcue.player.decoder_worker.THUMBNAIL_MAX_PIXELS", 3840 * 2160)
-    decode = Container.decode
 
     def oversized_decode(container, stream):
         assert stream.codec_context.thread_count == 1
         frame = next(decode(container, stream))
         frame.width, frame.height = 3841, 2160
-        return iter([frame])
+        return iter([Frame(frame.frame), frame, Frame(frame.frame)])
 
     monkeypatch.setattr(Container, "decode", oversized_decode)
     with pytest.raises(MemoryError, match="Klatka przekracza limit wejścia"):
@@ -508,3 +534,234 @@ def test_thumbnail_budget_reserves_small_buffers():
     assert thumbnails.worker is None
     assert "budżet" in thumbnails.cache[0]["error"]
     assert thumbnails.working_bytes == 114 * 256 * 144 * 4
+
+
+def test_thumbnail_persistent_scroll_error_and_idle(tmp_path):
+    from types import SimpleNamespace
+
+    from manimcue.player.sources_av import Thumbnails
+
+    path = tmp_path / "persistent.png"
+    Image.new("RGBA", (16, 9), "red").save(path)
+    spec = {
+        "size": (256, 144),
+        "resolution": (16, 9),
+        "slide": {"kind": "image", "file": str(path)},
+    }
+    oversized = tmp_path / "oversized.png"
+    Image.new("RGB", (3841, 2160), "red").save(oversized)
+    bad = {**spec, "slide": {"kind": "image", "file": str(oversized)}}
+    thumbnails = Thumbnails(lambda frame: SimpleNamespace(texture=7), lambda lease: None)
+    thumbnails.configure("deck", [(0, spec), (1, spec), (2, spec)])
+    try:
+        thumbnails.poll_thumbnails(time.monotonic())
+        process = thumbnails.worker[0]
+        # Nawigacja zachowuje pracę, scroll zastępuje tylko oczekujące.
+        thumbnails.configure("deck", [(0, spec), (1, spec), (2, spec)])
+        assert thumbnails.worker[0] is process and thumbnails.current[0] == 0
+        thumbnails.configure("deck", [(3, bad), (4, spec)])
+        deadline = time.monotonic() + 8
+        events = []
+        while 4 not in thumbnails.cache and time.monotonic() < deadline:
+            events.extend(thumbnails.poll_thumbnails(time.monotonic(), allow_start=False))
+            time.sleep(0.005)
+        assert {event["index"] for event in events} == {0, 3, 4}
+        assert set(thumbnails.cache) == {0, 3, 4}
+        assert thumbnails.get(3)["error"] and thumbnails.get(4)["texture"] == 7
+        assert thumbnails.worker[0] is process and process.is_alive()
+        thumbnails.poll_thumbnails(thumbnails.idle_since + 1.99, allow_start=False)
+        assert not thumbnails.cancelled
+        thumbnails.poll_thumbnails(thumbnails.idle_since + 2.01, allow_start=False)
+        assert thumbnails.cancelled and not thumbnails.get(4).get("error")
+    finally:
+        thumbnails.clear()
+        deadline = time.monotonic() + 5
+        while thumbnails.worker and time.monotonic() < deadline:
+            thumbnails.poll_thumbnails(time.monotonic(), allow_start=False)
+            time.sleep(0.005)
+        assert thumbnails.worker is None
+
+
+@pytest.mark.parametrize("reason", ["hide", "deck", "reclaim"])
+def test_thumbnail_cancel_during_request_waits_for_exit(monkeypatch, reason):
+    from types import SimpleNamespace
+
+    from manimcue.player.sources_av import Thumbnails
+
+    process = SimpleNamespace(
+        exitcode=None, terminate=lambda: None, join=lambda _: None, close=lambda: None
+    )
+    connection = SimpleNamespace(poll=lambda: False, close=lambda: None)
+    thumbnails = Thumbnails(lambda frame: None, lambda lease: None)
+    spec = {"slide": {}}
+    thumbnails.configure("deck", [(0, spec)])
+    thumbnails.worker = process, connection
+    thumbnails.current = 0, "deck", 0
+    if reason == "deck":
+        thumbnails.configure("new", [(1, spec)])
+    else:
+        if reason == "hide":
+            thumbnails.configure("deck", [])
+        thumbnails.cancel()
+    monkeypatch.setattr(
+        "manimcue.player.sources_av.get_context", lambda *args: pytest.fail("Start przed exit")
+    )
+    thumbnails.poll_thumbnails(6)
+    assert thumbnails.worker and not thumbnails.cache
+    process.exitcode = -1
+    thumbnails.poll_thumbnails(6, allow_start=False)
+    assert thumbnails.worker is None and not thumbnails.cache
+    if reason == "reclaim":
+        assert thumbnails.requests == [(0, spec)]
+
+
+@pytest.mark.parametrize("use_end", [False, True])
+@pytest.mark.parametrize("seek_mode", ["normal", "error", "empty", "decode_error"])
+def test_thumbnail_independent_video_ends(tmp_path, monkeypatch, use_end, seek_mode):
+    import av
+    import numpy as np
+
+    from manimcue.player.decoder_worker import render_thumbnail
+
+    paths = [tmp_path / "base.mp4", tmp_path / "clip.mp4"]
+    for path, count, color in zip(paths, (8, 40), ((0, 0, 240), (240, 0, 0)), strict=True):
+        with av.open(str(path), "w") as output:
+            stream = output.add_stream("libx264", rate=10)
+            stream.width, stream.height, stream.pix_fmt = 32, 32, "yuv420p"
+            stream.codec_context.max_b_frames = 2
+            for index in range(count):
+                pixels = np.zeros((32, 32, 3), dtype=np.uint8)
+                if index == count - 1:
+                    pixels[:] = color
+                frame = av.VideoFrame.from_ndarray(pixels, format="rgb24")
+                frame.pts = index + 50
+                for packet in stream.encode(frame):
+                    output.mux(packet)
+            for packet in stream.encode():
+                output.mux(packet)
+    end, start = tmp_path / "end.png", tmp_path / "start.png"
+    Image.new("RGB", (32, 32), "lime").save(end)
+    Image.new("RGB", (32, 32), "black").save(start)
+    layer = {
+        "kind": "video",
+        "file": str(paths[1]),
+        "thumbnail": str(start),
+        "end_thumbnail": str(end if use_end else tmp_path / "missing.png"),
+        "rate": 17,
+        "loop": True,
+        "keyframes": [{"t": 0, "rect": [0, 0, 0, 0]}, {"t": 100, "rect": [0.5, 0, 0.5, 1]}],
+    }
+    spec = {
+        "size": (128, 128),
+        "resolution": (32, 32),
+        "slide": {
+            "kind": "video",
+            "file": str(paths[0]),
+            "thumbnail": str(start),
+            "layers": [layer],
+        },
+    }
+    opened = av.open
+    seeks = []
+
+    class Container:
+        def __init__(self, path):
+            self.container = opened(path)
+            self.streams = self.container.streams
+            self.sought = False
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            self.container.close()
+
+        def seek(self, offset, **kwargs):
+            seeks.append(offset)
+            self.sought = True
+            if seek_mode == "error":
+                raise OSError("Brak seek")
+            return self.container.seek(offset, **kwargs)
+
+        def decode(self, stream):
+            assert stream.codec_context.thread_count == 1
+            if self.sought and seek_mode == "empty":
+                return iter(())
+            if self.sought and seek_mode == "decode_error":
+                raise ValueError("Błąd po seek")
+            return self.container.decode(stream)
+
+    monkeypatch.setattr(av, "open", Container)
+    result = render_thumbnail(spec)
+    assert seeks and all(offset > 0 for offset in seeks)
+    image = Image.frombytes("RGBA", (128, 128), result["rgba"])
+    assert image.getpixel((20, 64))[2] > 220
+    pixel = image.getpixel((96, 64))
+    assert pixel[1 if use_end else 0] > 220
+    layer.update(rate=0.5, loop=False)
+    assert render_thumbnail(spec) == result
+
+
+def test_thumbnail_gif_final_composited_frame(tmp_path):
+    from manimcue.player.decoder_worker import render_thumbnail
+
+    path = tmp_path / "partial.gif"
+    first = Image.new("RGBA", (40, 40), (0, 0, 0, 0))
+    second = first.copy()
+    second.paste("red", (0, 0, 20, 40))
+    third = first.copy()
+    third.paste("blue", (20, 0, 40, 40))
+    first.save(
+        path,
+        save_all=True,
+        append_images=[second, third],
+        duration=100,
+        disposal=[1, 2, 1],
+        optimize=True,
+    )
+    with Image.open(path) as original:
+        original.seek(original.n_frames - 1)
+        expected = original.convert("RGBA")
+    expected.thumbnail((20, 20))
+    canvas = Image.new("RGBA", (20, 20), "lime")
+    canvas.alpha_composite(expected)
+    result = render_thumbnail(
+        {
+            "size": (20, 20),
+            "resolution": (40, 40),
+            "background": [0, 1, 0, 1],
+            "slide": {"kind": "gif", "file": str(path)},
+        }
+    )
+    assert result["rgba"] == canvas.tobytes()
+
+
+def test_thumbnail_timeout_waits_for_exit_before_next_start(monkeypatch):
+    from types import SimpleNamespace
+
+    from manimcue.player.sources_av import Thumbnails
+
+    stopped = []
+    process = SimpleNamespace(
+        exitcode=None,
+        terminate=lambda: stopped.append(True),
+        join=lambda _: None,
+        close=lambda: None,
+    )
+    connection = SimpleNamespace(poll=lambda: False, close=lambda: None)
+    thumbnails = Thumbnails(lambda frame: None, lambda lease: None)
+    thumbnails.configure("deck", [(0, {}), (1, {})])
+    thumbnails.worker = process, connection
+    thumbnails.current = 0, "deck", 0
+    monkeypatch.setattr(
+        "manimcue.player.sources_av.get_context",
+        lambda *args: pytest.fail("Start przed exit poprzednika"),
+    )
+    thumbnails.poll_thumbnails(5.01)
+    assert stopped and thumbnails.cancelled
+    assert "Timeout" in thumbnails.get(0)["error"]
+    thumbnails.poll_thumbnails(6)
+    assert thumbnails.worker is not None
+    process.exitcode = -1
+    thumbnails.poll_thumbnails(6, allow_start=False)
+    assert thumbnails.worker is None

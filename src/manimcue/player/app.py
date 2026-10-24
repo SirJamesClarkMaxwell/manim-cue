@@ -265,8 +265,10 @@ class App:
         else:
             self._retire_unused(old_frames)
         self._prepare_preview()
-        self.thumbnail_indices = []
-        self.thumbnails.configure((id(self.manifest), self.state["index"][0]), [])
+        revision = (id(self.manifest), self.state["index"][0])
+        if self.thumbnails.revision != revision:
+            self.thumbnail_indices = []
+            self.thumbnails.configure(revision, [])
         self.prepare_deadline = now + 5
 
     def _prepare_preview(self):
@@ -294,6 +296,7 @@ class App:
             self._prepare_preview()
             if not visible:
                 self.thumbnails.configure(self.thumbnails.revision, [])
+                self.thumbnails.cancel()
 
     def dispatch(self, event, now):
         """Przyjmij akcję routera i wykonaj jawne efekty reducera."""

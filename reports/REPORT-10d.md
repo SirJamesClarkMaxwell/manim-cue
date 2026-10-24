@@ -636,3 +636,105 @@ Usterki z próby człowieka ImGui (Demo, Load24):
 Testy po poprawkach (kod worktree przez `PYTHONPATH`): zwykły pytest **711 passed, 1 failed, 2 skipped,
 58 deselected, 637 s**; jedyny błąd to dopisek updaterów wyżej — po usunięciu oba testy hold **6 passed**.
 `ruff check`/`ruff format --check` 10 plików Python: zielone.
+
+### Runda 27 — kolumna miniatur i testy limitu
+
+- `src/manimcue/player/info.py:72`: pionowa kolumna miniatur na całą wysokość
+  Info, przed statusem i dwiema kolumnami podglądów. Szerokość uwzględnia
+  miniaturę 128×72, skalę stylu, ramkę, padding i pionowy scrollbar, bez
+  mnożenia przez DPI framebufferu. Lazy load nadal obejmuje elementy
+  przecinające widok oraz po jednym sąsiedzie. Odsłonięcie bieżącego przycisku
+  tylko przy pierwszym pokazaniu lub zmianie `(deck, slide)`, jeśli jest poza
+  widokiem; ręczne przewijanie i resize nie ponawiają odsłonięcia. Przyciski
+  czasu zawijają się do osobnych wierszy. Klik nadal zwraca `start_at`.
+- `src/manimcue/player/desktop.py:398`: minimalna szerokość Info wyliczona
+  z kontrolek i proporcji 60/40, zastosowana przez
+  `set_next_window_size_constraints` (`:424`). Stan poprzedniego celu należy
+  do widoku (`:464`), jest usuwany po ukryciu Info (`:475`); bez zmian w app.py
+  i stanie nawigacji.
+- `tests/test_imgui_info.py:150`: rozszerzony test układu trzech kolumn
+  dla domyślnej i minimalnej szerokości oraz skali stylu 100/150/200%,
+  położenia przycisków i braku poziomego przewijania miniatur. Fixture
+  `:238` używa wyłącznie kontekstu ImGui, bez okna i GPU. Testy `:299`,
+  `:315`, `:345`: 24 slajdy i widoczne ±1 na obu końcach, jednorazowe
+  auto-przewijanie, ręczne odsunięcie i resize, widoczny cel, pierwsze
+  pokazanie i zmiana decku oraz klik placeholdera/miniatury → `start_at`
+  bez `focus_live`. Wywołanie auto-przewijania obserwowane strażnikiem.
+- `tests/test_imgui_sources.py:388`: obraz 7680×4320, strażnicy `load()`
+  i `draft()` założeni po odczytaniu nagłówka; wymagany `MemoryError`
+  oraz komunikat błędu z `run_thumbnail`. `:436`: strażnik `Container.decode`
+  dla przekroczonej deklaracji wideo; niezależne sprawdzenie limitu
+  rzeczywistej klatki zachowane, z oryginalną funkcją dekodowania.
+- `README.md:59`: opis lewej kolumny zamiast dolnego paska.
+
+Weryfikacja: `ruff check` i `ruff format --check` czterech zmienionych plików
+Python oraz `git diff --check` — bez błędów. Testy **nieuruchomione** na
+polecenie użytkownika: bez pytest, playera, okien i procesów roboczych.
+Nie wykonano screenshotów, próby przenoszenia między monitorami, pomiarów
+RSS/p95/VRAM ani odbioru w oknie; skala stylu w testach offline nie zastępuje
+próby DPI na monitorach. Bez commita.
+
+### Runda 28 — miniatury ze stanu końcowego
+
+- `src/manimcue/player/decoder_worker.py:32`: wideo/GIF wybierają
+  `end_thumbnail`, a przy jego braku lub błędzie plik źródłowy; początkowy
+  `thumbnail` nie zastępuje ostatniej klatki. Live używa wyłącznie zapisanego
+  `thumbnail`, obraz pozostaje obrazem pliku.
+- `src/manimcue/player/decoder_worker.py:43`: GIF składa ostatnią klatkę
+  przez Pillow (`seek(n_frames - 1)`) w oryginalnych wymiarach, następnie
+  konwertuje i pomniejsza; bez listy rastrów RGBA.
+- `src/manimcue/player/decoder_worker.py:54`: seek blisko końca uwzględnia
+  `start_time`, `duration` i `time_base`; dekodowanie do EOF zachowuje ostatnią
+  klatkę, także po opróżnieniu B-frames. Błąd seek/decode lub brak klatek po
+  seek powoduje ponowne otwarcie i dekodowanie od początku. Kontrola limitu
+  deklaracji i każdej klatki, jeden wątek kodeka, reformat i ndarray tylko
+  ostatniej klatki po pomniejszeniu; pełna klatka zwalniana przed kolejną warstwą.
+- `src/manimcue/player/decoder_worker.py:109`: kompozycja z `float("inf")`;
+  istniejące `stage.compose` i `geometry.rect_at` obsługują końcowy rect bez
+  poprawek. Rate, pętla i długość bazy nie wyznaczają końca innych źródeł.
+  Jeden job kompozycji, nadzór 5 s i anulowanie procesu pozostają bez zmian.
+- `tests/test_imgui_sources.py:91`: oczekiwany końcowy rect i alfa live.
+  `:436`: limit także klatki pośredniej i pomniejszenie przed ndarray.
+  `:536`: generowane w tmp_path wieloklatkowe wideo H.264 z B-frames,
+  niezerowym PTS, czarnym początkiem, różnymi długościami, zerowym rect,
+  końcowym keyframe po bazie, rate/pętlą, priorytetem end_thumbnail oraz
+  fallbackiem pliku i seek (błąd, pusty wynik, błąd decode).
+  `:612`: częściowe klatki GIF, przezroczystość i disposal.
+  `:635`: timeout i zakaz następnego startu przed exit; istniejące testy
+  anulowania i startu po exit zachowane.
+
+Weryfikacja: uruchomiono wyłącznie wskazane dwa moduły pytest z `-m "not gpu"`,
+`-p no:cacheprovider`, PYTHONPATH wskazującym src tego worktree oraz TMP/TEMP
+w `.tmp`, ustawionymi w tej samej komendzie. Końcowy wynik: **50 errors,
+2 warnings, 0.42 s** — wszystkie błędy na etapie setup, `PermissionError:
+[WinError 5] Access is denied` dla `.tmp/pytest-of-Franek`. Żaden test nie
+wykonał ciała; wynik nie potwierdza poprawności implementacji. Pierwsza próba
+przed rozszerzeniem parametrów: analogiczne 43 błędy setup. Nie uruchamiano
+innych testów, playera, GPU ani formattera. Ponowny odbiór Load24, pomiary
+RSS/procesów i responsywności pozostają do próby w oknie. Zmiany rundy 27
+zachowane, bez commita.
+
+### Runda 29 — długożyjący ekstraktor
+
+Codex wdrożył, przerwany przeciążeniem modelu przed raportem; raport i przegląd Claude.
+
+- `src/manimcue/player/decoder_worker.py` `run_thumbnail(connection)`: pętla recv → `render_thumbnail` → SHM → wynik →
+  ACK, sprzątanie SHM po każdym żądaniu; błąd materiału wysyła błąd i obsługuje następne żądanie.
+- `src/manimcue/player/sources_av.py` `Thumbnails`: uchwyt procesu osobno od bieżącego żądania `(key, revision,
+  began)`; wynik publikowany po odbiorze, exit zwalnia slot osobno; timeout 5 s od wysłania; 2 s bezczynności liczone
+  w rodzicu; `configure` zastępuje oczekujące bez anulowania pracy; `allow_start` tylko dla zimnego startu; odczyt
+  SHM przycięty do `width*height*4` (Windows zaokrągla rozmiar SHM).
+- `src/manimcue/player/app.py`: `_enter` czyści zakres tylko przy zmianie decku; ukrycie Info zatrzymuje ekstraktor.
+- `src/manimcue/live_pool.py` `try_acquire`: odmowa roli niższej przy świeżym (<0,5 s) `waiting` roli wyższej.
+- Claude: usunięty zbędny `except: raise` (ruff TRY203), `ruff format` 5 plików.
+
+Pomiar bez okna (Load24, 12 miniatur, `Thumbnails` z fałszywym uploaderem, bez budżetu): **1,31 s** (pierwsza 0,45 s
+ze spawnem, kolejne co ~0,08 s) zamiast 5,43 s. Testy: `test_imgui_info`, `test_imgui_sources`, `test_imgui_cli`,
+`test_imgui_navigation`, `test_live_pool`, `test_imgui_prefetch` — **116 passed, 55 s**; ruff zielony.
+RSS długożyjącego PID — w odbiorze (zadanie 8).
+
+Zwykły pytest po rundach 27–29 (kod worktree przez `PYTHONPATH`): **738 passed, 2 skipped, 58 deselected, 0 failed,
+625 s**. Próba człowieka Demo: kolumna miniatur, obrazy stanu końcowego, skok miniaturą i interakcja live w oknie
+głównym działają. Load24 (24 identyczne kopie jednego slajdu) dawało wrażenie „zawieszenia na slajdzie 1” —
+sondy klawiatury i wejść: każde → przyjęte, wejścia ~0,1 s. Otwarte: jednorazowe „Brak postępu dekodera przez 2 s”
+po ~45 min bezczynności (sonda bez źródła błędu w tamtej sesji; do obserwacji w odbiorze).

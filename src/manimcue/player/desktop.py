@@ -395,6 +395,35 @@ def run_desktop(manifest: dict, options: dict) -> int:
                 x, y, _, _ = windows.monitors[runtime["options"]["info_window_screen_number"]]
                 imgui.set_next_window_pos((x + 100, y + 100))
                 imgui.set_next_window_size((600, 800))
+            style = imgui.get_style()
+            thumbnail_width = (
+                128 * style.font_size_base / 16
+                + 2 * style.frame_padding.x
+                + 2 * style.window_padding.x
+                + style.scrollbar_size
+            )
+            current_width = (
+                max(
+                    imgui.calc_text_size(label).x
+                    for label in ("Wznów czas", "Restart czasu", "00:00:00 · elapsed 9999.9 s")
+                )
+                + 2 * style.frame_padding.x
+            )
+            notes_width = (
+                sum(imgui.calc_text_size(label).x for label in ("A−", "A+", "48 px"))
+                + 4 * style.frame_padding.x
+                + 2 * style.item_spacing.x
+            )
+            minimum_width = (
+                thumbnail_width
+                + 2 * style.item_spacing.x
+                + max(current_width / 0.6, notes_width / 0.4)
+                + 2 * style.window_padding.x
+                + style.scrollbar_size
+            )
+            imgui.set_next_window_size_constraints(
+                (minimum_width, 300), (float("inf"), float("inf"))
+            )
             # Pasek przewijania stale: gdy treść jest prawie tak wysoka jak okno, pojawiał się
             # i znikał co klatkę, a szerokość podglądów skakała razem z nim (drżenie Info).
             _, opened = imgui.begin("Info", True, imgui.WindowFlags_.always_vertical_scrollbar)
@@ -432,6 +461,7 @@ def run_desktop(manifest: dict, options: dict) -> int:
             for effect in render_info(
                 state,
                 {
+                    "view_state": runtime.setdefault("info_view_state", {}),
                     "composition": app.preview_composition,
                     "render": render,
                     "render_notes": lambda text, size: runtime["notes"].render(
@@ -441,6 +471,8 @@ def run_desktop(manifest: dict, options: dict) -> int:
             ):
                 action(effect, now)
             imgui.end()
+        else:
+            runtime.pop("info_view_state", None)
         if app.closed:
             app.drop_all()
             close_pool()

@@ -14,7 +14,7 @@ THUMBNAIL_MAX_PIXELS = 3840 * 2160
 
 
 def render_thumbnail(spec: dict) -> dict:
-    """Statyczna kompozycja t=0; live korzysta wyłącznie z zapisanego obrazu."""
+    """Statyczna kompozycja stanu końcowego; live korzysta wyłącznie z zapisanego obrazu."""
     from PIL import Image
 
     from .stage import compose
@@ -29,7 +29,9 @@ def render_thumbnail(spec: dict) -> dict:
         ("base", slide),
         *[(str(i), m) for i, m in enumerate(slide.get("layers", []))],
     ]:
-        paths = [media.get("thumbnail")]
+        paths = [media.get("thumbnail")] if media["kind"] == "live" else []
+        if media["kind"] in ("video", "gif"):
+            paths.append(media.get("end_thumbnail"))
         if media["kind"] != "live":
             paths.append(media.get("file"))
         for path in dict.fromkeys(p for p in paths if p):
@@ -38,28 +40,59 @@ def render_thumbnail(spec: dict) -> dict:
                     with Image.open(path) as original:
                         if original.width * original.height > THUMBNAIL_MAX_PIXELS:
                             raise MemoryError("Obraz przekracza limit wejścia miniatury 3840×2160")
-                        original.draft("RGB", (width, height))
-                        original.thumbnail((width, height))
-                        image = original.convert("RGBA")
+                        if original.format == "GIF":
+                            original.seek(original.n_frames - 1)
+                            image = original.convert("RGBA")
+                        else:
+                            original.draft("RGB", (width, height))
+                            original.thumbnail((width, height))
+                            image = original.convert("RGBA")
                 except (OSError, ValueError):
                     import av
 
-                    with av.open(path) as container:
-                        stream = container.streams.video[0]
-                        stream.codec_context.thread_count = 1
-                        if stream.width * stream.height > THUMBNAIL_MAX_PIXELS:
-                            raise MemoryError("Wideo przekracza limit wejścia miniatury 3840×2160")
-                        frame = next(container.decode(stream))
-                        # Kontrola po decode nie zapobiega wcześniejszej alokacji dekodera.
-                        if frame.width * frame.height > THUMBNAIL_MAX_PIXELS:
-                            raise MemoryError("Klatka przekracza limit wejścia miniatury 3840×2160")
-                        scale = min(width / frame.width, height / frame.height, 1)
-                        small = frame.reformat(
-                            width=max(1, round(frame.width * scale)),
-                            height=max(1, round(frame.height * scale)),
-                            format="rgba",
-                        )
-                        image = Image.fromarray(small.to_ndarray())
+                    frame = None
+                    for near_end in (True, False):
+                        with av.open(path) as container:
+                            stream = container.streams.video[0]
+                            stream.codec_context.thread_count = 1
+                            if stream.width * stream.height > THUMBNAIL_MAX_PIXELS:
+                                raise MemoryError(
+                                    "Wideo przekracza limit wejścia miniatury 3840×2160"
+                                )
+                            if near_end:
+                                if stream.duration is None or stream.time_base is None:
+                                    continue
+                                try:
+                                    offset = (stream.start_time or 0) + max(
+                                        0, stream.duration - int(1 / stream.time_base)
+                                    )
+                                    container.seek(offset, stream=stream, backward=True)
+                                except (OSError, ValueError):
+                                    continue
+                            try:
+                                for frame in container.decode(stream):
+                                    # Kontrola po decode nie zapobiega alokacji dekodera.
+                                    if frame.width * frame.height > THUMBNAIL_MAX_PIXELS:
+                                        raise MemoryError(
+                                            "Klatka przekracza limit wejścia miniatury 3840×2160"
+                                        )
+                            except (OSError, ValueError):
+                                frame = None
+                                if near_end:
+                                    continue
+                                raise
+                            if frame is not None:
+                                break
+                    if frame is None:
+                        raise ValueError("Wideo bez klatek")
+                    scale = min(width / frame.width, height / frame.height, 1)
+                    small = frame.reformat(
+                        width=max(1, round(frame.width * scale)),
+                        height=max(1, round(frame.height * scale)),
+                        format="rgba",
+                    )
+                    image = Image.fromarray(small.to_ndarray())
+                    del frame, small
                 image.thumbnail((width, height))
                 images[key] = image
                 frames[key] = {"texture": key, "width": image.width, "height": image.height}
@@ -75,7 +108,7 @@ def render_thumbnail(spec: dict) -> dict:
             "background": spec.get("background", [0, 0, 0, 1]),
         },
         frames,
-        0,
+        float("inf"),
     )
     for command in commands:
         x, y, w, h = command["box"]
@@ -115,24 +148,32 @@ def render_thumbnail(spec: dict) -> dict:
     return {"rgba": canvas.tobytes(), "width": width, "height": height}
 
 
-def run_thumbnail(spec: dict, connection) -> None:
-    """Jeden proces obsługuje jedną miniaturę, bez sceny i bez okna."""
-    memory = None
+def run_thumbnail(connection) -> None:
+    """Kolejne miniatury jednego decku, bez sceny i bez okna."""
     try:
-        result = render_thumbnail(spec)
-        pixels = result.pop("rgba")
-        memory = SharedMemory(create=True, size=len(pixels))
-        memory.buf[:] = pixels
-        connection.send({**result, "memory": memory.name})
-        if connection.poll(5):
-            connection.recv()
-    except Exception as error:  # noqa: BLE001 — błąd materiału daje placeholder
-        connection.send({"error": str(error)})
+        while True:
+            spec = connection.recv()
+            memory = None
+            try:
+                try:
+                    result = render_thumbnail(spec)
+                except Exception as error:  # noqa: BLE001 — błąd materiału nie kończy procesu
+                    connection.send({"error": str(error)})
+                    continue
+                pixels = result.pop("rgba")
+                memory = SharedMemory(create=True, size=len(pixels))
+                memory.buf[:] = pixels
+                connection.send({**result, "memory": memory.name})
+                if not connection.poll(5) or connection.recv() != "received":
+                    return
+            finally:
+                if memory is not None:
+                    memory.close()
+                    memory.unlink()
+    except (EOFError, OSError):
+        pass
     finally:
         connection.close()
-        if memory is not None:
-            memory.close()
-            memory.unlink()
 
 
 def run_pooled(control, connection) -> None:

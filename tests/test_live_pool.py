@@ -221,6 +221,28 @@ def test_abandoned_wait_stops_blocking_refill(monkeypatch):
     budget.abort()
 
 
+@pytest.mark.parametrize("role", ["scene", "preview", "prefetch"])
+def test_thumbnail_yields_to_fresh_waiter_after_reap(monkeypatch, role):
+    clock = [0.0]
+    monkeypatch.setattr("manimcue.live_pool.time.monotonic", lambda: clock[0])
+    budget = ProcessBudget(1)
+    assert budget.try_acquire("thumbnail")
+    process = SimpleNamespace(pid=123, exitcode=None)
+    budget.register(process, "thumbnail", lambda: budget.mark_retiring(123))
+    assert not budget.try_acquire(role)
+    process.exitcode = -1
+    budget.release_after_exit(123)
+    assert not budget.try_acquire("thumbnail")
+    assert budget.try_acquire(role)
+    budget.abort()
+    assert budget.try_acquire("thumbnail")
+    budget.abort()
+    budget.waiting[role] = 0
+    clock[0] = 0.5
+    assert budget.try_acquire("thumbnail")
+    budget.abort()
+
+
 @pytest.mark.parametrize("role", ["thumbnail", "prefetch", "preview", "scene"])
 def test_budget_reclaims_one_lowest_process_until_exit(role):
     budget = ProcessBudget(5)

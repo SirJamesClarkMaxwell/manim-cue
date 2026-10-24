@@ -2,6 +2,8 @@
 
 from types import SimpleNamespace
 
+import pytest
+
 from manimcue.player.app import App
 from manimcue.player.info import preview_target, state_text
 from manimcue.player.live import LiveController
@@ -143,7 +145,9 @@ def test_timer_pause_restart_and_notes_scale_limits():
     assert app.state["clock"] == media_state
 
 
-def test_presenter_columns(monkeypatch):
+@pytest.mark.parametrize("size", ["default", "minimum"])
+@pytest.mark.parametrize("scale", [1, 1.5, 2])
+def test_thumbnail_column_min_width(monkeypatch, size, scale):
     from imgui_bundle import imgui, imgui_md
 
     from manimcue.player.info import render_info
@@ -151,11 +155,32 @@ def test_presenter_columns(monkeypatch):
     context = imgui.create_context()
     try:
         io = imgui.get_io()
-        io.display_size = (1000, 800)
+        io.display_size = (2000, 1800)
         io.delta_time = 1 / 60
         io.backend_flags |= imgui.BackendFlags_.renderer_has_textures
         io.set_ini_filename(None)
-        sizes, fonts = [], []
+        imgui.get_style().scale_all_sizes(scale)
+        imgui.get_style().font_size_base *= scale
+        sizes, fonts, children, buttons = [], [], {}, []
+        begin_child, button = imgui.begin_child, imgui.button
+
+        def child(name, size, **kwargs):
+            result = begin_child(name, size, **kwargs)
+            children[name] = (imgui.get_window_pos(), imgui.get_window_size())
+            if name == "presenter_thumbnails":
+                assert not kwargs["window_flags"] & imgui.WindowFlags_.horizontal_scrollbar
+                assert imgui.get_scroll_max_x() == 0
+            return result
+
+        def observed_button(label, *args):
+            result = button(label, *args)
+            a, b = imgui.get_item_rect_min(), imgui.get_item_rect_max()
+            position, size = imgui.get_window_pos(), imgui.get_window_size()
+            buttons.append((label, a.x, b.x, position.x, position.x + size.x))
+            return result
+
+        monkeypatch.setattr(imgui, "begin_child", child)
+        monkeypatch.setattr(imgui, "button", observed_button)
         monkeypatch.setattr(imgui_md, "render", lambda text: fonts.append(imgui.get_font_size()))
 
         def render(commands):
@@ -164,7 +189,29 @@ def test_presenter_columns(monkeypatch):
             imgui.dummy((100, 100))
 
         imgui.new_frame()
-        imgui.set_next_window_size((900, 700))
+        style = imgui.get_style()
+        current_width = (
+            max(
+                imgui.calc_text_size(label).x
+                for label in ("Wznów czas", "Restart czasu", "00:00:00 · elapsed 9999.9 s")
+            )
+            + 2 * style.frame_padding.x
+        )
+        notes_width = (
+            sum(imgui.calc_text_size(label).x for label in ("A−", "A+", "48 px"))
+            + 4 * style.frame_padding.x
+            + 2 * style.item_spacing.x
+        )
+        minimum_width = (
+            128 * style.font_size_base / 16
+            + 2 * style.frame_padding.x
+            + 4 * style.window_padding.x
+            + 2 * style.scrollbar_size
+            + 2 * style.item_spacing.x
+            + max(current_width / 0.6, notes_width / 0.4)
+        )
+        width = max(600 * scale, minimum_width) if size == "default" else minimum_width
+        imgui.set_next_window_size((width, 800 * scale))
         imgui.begin("test")
         state = make_app().presenter_snapshot(0)
         actions = render_info(state, {"render": render, "composition": [{}]})
@@ -173,9 +220,140 @@ def test_presenter_columns(monkeypatch):
         assert actions == [{"type": "thumbnail_range", "indices": [0]}]
         assert len(sizes) == 2 and sizes[0][0] < sizes[1][0]
         assert 1.4 < sizes[0][1] / sizes[1][1] < 1.7
-        assert fonts == [round(imgui.get_style().font_size_base * 24 / 16)]
+        assert fonts == [pytest.approx(imgui.get_style().font_size_base * 24 / 16, abs=1)]
+        thumbnails, current, notes = (
+            children[name]
+            for name in ("presenter_thumbnails", "presenter_current", "presenter_next_notes")
+        )
+        assert thumbnails[0].x < current[0].x < notes[0].x
+        assert thumbnails[0].y < current[0].y
+        assert thumbnails[1].y > current[1].y
+        assert notes[0].x + notes[1].x <= thumbnails[0].x + width
+        assert all(left <= a < b <= right for _, a, b, left, right in buttons)
     finally:
         imgui.destroy_context(context)
+
+
+@pytest.fixture
+def thumbnail_view(monkeypatch):
+    from imgui_bundle import imgui, imgui_md
+
+    from manimcue.player.info import render_info
+
+    context = imgui.create_context()
+    io = imgui.get_io()
+    io.display_size = (1200, 1000)
+    io.delta_time = 1 / 60
+    io.backend_flags |= imgui.BackendFlags_.renderer_has_textures
+    io.set_ini_filename(None)
+    state = make_app().presenter_snapshot(0)
+    state["manifest"]["presentations"][0]["slides"] *= 24
+    state["manifest"]["presentations"][1]["slides"] *= 24
+    preview = {"view_state": {}}
+    observed = {"visible": [], "scrolls": [], "click": None, "scroll_y": None}
+    begin_child, button, is_visible = imgui.begin_child, imgui.button, imgui.is_item_visible
+
+    def child(name, size, **kwargs):
+        result = begin_child(name, size, **kwargs)
+        if name == "presenter_thumbnails" and observed["scroll_y"] is not None:
+            imgui.set_scroll_y(observed["scroll_y"])
+        return result
+
+    def clicked(label, *args):
+        result = button(label, *args)
+        if "##slide_" in label:
+            observed["item"] = int(label.split("##slide_")[1])
+            return observed["item"] == observed["click"]
+        return result
+
+    def visible():
+        result = is_visible()
+        if result:
+            observed["visible"].append(observed["item"])
+        return result
+
+    monkeypatch.setattr(imgui, "begin_child", child)
+    monkeypatch.setattr(imgui, "button", clicked)
+    monkeypatch.setattr(imgui, "is_item_visible", visible)
+    monkeypatch.setattr(
+        imgui, "set_scroll_here_y", lambda: observed["scrolls"].append(observed["item"])
+    )
+    monkeypatch.setattr(imgui_md, "render", lambda text: None)
+
+    def frame(size=(600, 800)):
+        observed["visible"].clear()
+        imgui.new_frame()
+        imgui.set_next_window_size(size)
+        imgui.begin("thumbnail tests")
+        actions = render_info(state, preview)
+        imgui.end()
+        imgui.render()
+        return actions
+
+    try:
+        yield state, preview, observed, frame
+    finally:
+        imgui.destroy_context(context)
+
+
+def test_thumbnail_column_visible_range(thumbnail_view):
+    _, _, observed, frame = thumbnail_view
+    for scroll_y, endpoint in ((0, 0), (100000, 23)):
+        observed["scroll_y"] = scroll_y
+        for _ in range(3):
+            actions = frame()
+        visible = observed["visible"]
+        assert endpoint in visible and 1 < len(visible) < 24
+        assert actions == [
+            {
+                "type": "thumbnail_range",
+                "indices": list(range(max(0, visible[0] - 1), min(24, visible[-1] + 2))),
+            }
+        ]
+
+
+def test_thumbnail_autoscroll_on_target_change(thumbnail_view):
+    state, preview, observed, frame = thumbnail_view
+    state["index"] = [0, 23]
+    frame()
+    assert observed["scrolls"] == [23]
+    frame()
+    assert observed["scrolls"] == [23]
+    # Ręczne przewinięcie i resize bez zmiany celu nie ponawiają odsłonięcia.
+    observed["scroll_y"] = 0
+    frame((700, 850))
+    frame()
+    assert observed["scrolls"] == [23]
+    state["index"] = [0, 0]
+    frame()
+    assert observed["scrolls"] == [23]
+    state["index"] = [0, 22]
+    frame()
+    frame()
+    assert observed["scrolls"] == [23, 22]
+    state["index"] = [1, 22]
+    frame()
+    assert observed["scrolls"] == [23, 22, 22]
+    # Desktop usuwa stan widoku przy ukryciu Info.
+    preview["view_state"].clear()
+    frame()
+    frame()
+    assert observed["scrolls"] == [23, 22, 22, 22]
+
+
+@pytest.mark.parametrize("textured", [False, True])
+def test_thumbnail_column_click_start_at_without_focus_live(thumbnail_view, monkeypatch, textured):
+    from imgui_bundle import imgui
+
+    state, _, observed, frame = thumbnail_view
+    observed["click"] = 2
+    if textured:
+        state["thumbnails"] = {2: {"texture": 99}}
+        button = imgui.button
+        monkeypatch.setattr(imgui, "image_button", lambda label, texture, size: button(label, size))
+    actions = frame()
+    assert {"type": "start_at", "index": [0, 2]} in actions
+    assert all(action["type"] in ("start_at", "thumbnail_range") for action in actions)
 
 
 def test_thumbnails_24_slides_hidden_no_extract(monkeypatch):
@@ -202,8 +380,8 @@ def test_stale_thumbnail_retiring_slot_and_cache_limits():
     )
     connection = SimpleNamespace(poll=lambda: False, close=lambda: None)
     thumbnails.configure("old", [((0, 0), {})])
-    thumbnails.worker = process, connection, (0, 0), "old", 0
-    thumbnails.result = {"width": 256, "height": 144, "rgba": bytes(256 * 144 * 4)}
+    thumbnails.worker = process, connection
+    thumbnails.current = (0, 0), "old", 0
     thumbnails.configure("new", [((1, 0), {})])
     assert thumbnails.cancelled
     assert thumbnails.poll_thumbnails(1) == []
@@ -212,8 +390,10 @@ def test_stale_thumbnail_retiring_slot_and_cache_limits():
     thumbnails.poll_thumbnails(1, allow_start=False)
     assert thumbnails.worker is None and not thumbnails.cache
     for index in range(80):
-        thumbnails.worker = process, connection, (1, index), "new", 1
-        thumbnails.result = {"width": 256, "height": 144, "rgba": bytes(256 * 144 * 4)}
+        thumbnails.worker = process, connection
+        thumbnails.current = (1, index), "new", 1
+        connection.poll = lambda: True
+        connection.recv = lambda: {"width": 256, "height": 144, "rgba": bytes(256 * 144 * 4)}
         thumbnails.poll_thumbnails(1, allow_start=False)
         assert thumbnails.working_bytes == 8 * 256 * 144 * 4
         assert thumbnails.bytes + thumbnails.working_bytes <= thumbnails.max_bytes

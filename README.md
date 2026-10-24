@@ -56,7 +56,7 @@ the independently playing next slide and scrollable Markdown notes on the right.
 Timer pause/restart affects only presenter time; restart preserves its paused state.
 A−/A+ changes notes and math from 16 to 48 logical pixels (default 24), for the session.
 Notes support `$inline$` and `$$display$$` math with local MicroTeX and an Agg fallback.
-Invalid formulas remain visible with an error. The bottom strip lazily loads static
+Invalid formulas remain visible with an error. The full-height column on the left lazily loads static
 thumbnails for the current deck; clicking one jumps directly through the normal entry
 barrier. Clicking the current slide does nothing. A jump starts local live history without
 an entry cue; a compatible adjacent session may stay alive. Earlier history is discarded.

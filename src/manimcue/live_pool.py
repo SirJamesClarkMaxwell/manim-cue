@@ -26,14 +26,17 @@ class ProcessBudget:
 
     def try_acquire(self, role: str) -> bool:
         now = time.monotonic()
-        if role == "idle" and any(now - t < 0.5 for t in self.waiting.values()):
+        priorities = {"scene": 0, "preview": 1, "prefetch": 2, "thumbnail": 3, "idle": 4}
+        if any(
+            now - t < 0.5 and priorities[name] < priorities[role]
+            for name, t in self.waiting.items()
+        ):
             return False
         if len(self.processes) + self.pending >= self.limit:
             if role != "idle":
                 self.waiting[role] = now
             if self.retiring:
                 return False
-            priorities = {"scene": 0, "preview": 1, "prefetch": 2, "thumbnail": 3, "idle": 4}
             for name in reversed(priorities):
                 if priorities[name] <= priorities[role]:
                     continue

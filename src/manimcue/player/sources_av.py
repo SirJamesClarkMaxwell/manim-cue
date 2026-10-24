@@ -330,7 +330,8 @@ class Thumbnails:
         self.revision = None
         self.worker = None
         self.cancelled = False
-        self.result = None
+        self.current = None
+        self.idle_since = 0
         self.bytes = 0
         self.budget = _budget
 
@@ -342,13 +343,11 @@ class Thumbnails:
         self.requests = list(requests)
         for key, _ in requests:
             self.get(key)
-        if self.worker and self.worker[2] not in {key for key, _ in requests}:
-            self.cancel()
 
     def cancel(self):
         if self.worker and not self.cancelled:
             self.cancelled = True
-            self.result = None
+            self.current = None
             self.worker[0].terminate()
             if self.budget is not None:
                 self.budget.mark_retiring(self.worker[0].pid)
@@ -378,75 +377,102 @@ class Thumbnails:
         return value
 
     def poll_thumbnails(self, now: float, *, allow_start=True) -> list[dict]:
-        """Odbiór wyniku i exit poprzedza nowy start, także po anulowaniu."""
+        """Publikuj przed exit; tylko zimny start podlega budżetowi ticku."""
         events = []
+        value = None
         if self.worker:
-            process, connection, key, revision, began = self.worker
-            if not self.cancelled:
+            process, connection = self.worker
+            if not self.cancelled and self.current:
+                key, revision, began = self.current
                 try:
                     if connection.poll():
-                        self.result = connection.recv()
-                        if "memory" in self.result:
-                            memory = SharedMemory(name=self.result.pop("memory"))
+                        value = connection.recv()
+                        if "memory" in value:
+                            memory = SharedMemory(name=value.pop("memory"))
                             try:
-                                self.result["rgba"] = bytes(memory.buf)
+                                value["rgba"] = bytes(
+                                    memory.buf[: value["width"] * value["height"] * 4]
+                                )
                             finally:
                                 memory.close()
                             connection.send("received")
-                except (EOFError, OSError):
-                    pass
-                if now - began > 5:
-                    self.cache[key] = {"error": "Timeout ekstrakcji miniatury 5 s"}
+                        elif "error" not in value and "rgba" not in value:
+                            raise ValueError("Niepoprawny wynik ekstrakcji")
+                    elif now - began > 5:
+                        value = {"error": "Timeout ekstrakcji miniatury 5 s"}
+                        self.cancel()
+                    elif process.exitcode is not None:
+                        value = {"error": "Ekstrakcja zakończona bez obrazu"}
+                except (EOFError, OSError, ValueError, KeyError) as error:
+                    value = {"error": f"Błąd protokołu miniatur: {error}"}
                     self.cancel()
-            if process.exitcode is None:
-                return events
-            if self.budget is not None:
-                self.budget.release_after_exit(process.pid)
-            process.join(0)
-            process.close()
-            connection.close()
-            self.worker = None
-            if not self.cancelled and revision == self.revision:
-                value = self.result or {"error": "Ekstrakcja zakończona bez obrazu"}
-                if "rgba" in value:
-                    size = len(value["rgba"]) * 2
-                    self._evict(size + self.working_bytes)
-                    try:
-                        lease = self.uploader(value)
-                        value = {**value, "lease": lease, "texture": lease.texture, "bytes": size}
-                    except Exception as error:  # noqa: BLE001 — placeholder zamiast awarii UI
-                        value = {"error": str(error)}
-                self.cache[key] = value
-                self.bytes += value.get("bytes", 0)
-                events.append({"index": key, **value})
-            self.result = None
-            self.cancelled = False
-        if allow_start:
-            request = next(
-                ((key, spec) for key, spec in self.requests if key not in self.cache), None
-            )
-            if request:
-                key, spec = request
-                # Małe rastry ekstraktora oraz canvas, resize/crop, SHM i upload playera.
-                self.working_bytes = (len(spec["slide"].get("layers", [])) + 8) * 256 * 144 * 4
-                self._evict(self.working_bytes)
-                if self.working_bytes > self.max_bytes:
-                    self.cache[key] = {"error": "Kompozycja przekracza budżet miniatur"}
-                    return events
-                if self.budget is not None and not self.budget.try_acquire("thumbnail"):
-                    return events
-                context = get_context("spawn")
-                connection, child = context.Pipe()
-                process = context.Process(target=run_thumbnail, args=(spec, child), daemon=True)
-                try:
-                    process.start()
-                except Exception:
-                    if self.budget is not None:
-                        self.budget.abort()
-                    raise
-                finally:
-                    child.close()
+                if value is not None:
+                    if revision == self.revision:
+                        self._evict()
+                        if "rgba" in value:
+                            size = len(value["rgba"]) * 2
+                            self._evict(size + self.working_bytes)
+                            try:
+                                lease = self.uploader(value)
+                                value = {
+                                    **value,
+                                    "lease": lease,
+                                    "texture": lease.texture,
+                                    "bytes": size,
+                                }
+                            except Exception as error:  # noqa: BLE001 — placeholder zamiast awarii UI
+                                value = {"error": str(error)}
+                        self.cache[key] = value
+                        self.bytes += value.get("bytes", 0)
+                        events.append({"index": key, **value})
+                    self.current = None
+                    self.idle_since = now
+            if process.exitcode is not None:
                 if self.budget is not None:
-                    self.budget.register(process, "thumbnail", self.cancel)
-                self.worker = process, connection, key, self.revision, now
+                    self.budget.release_after_exit(process.pid)
+                process.join(0)
+                process.close()
+                connection.close()
+                self.worker = None
+                self.cancelled = False
+                self.current = None
+            elif self.cancelled or self.current:
+                return events
+        request = next(((key, spec) for key, spec in self.requests if key not in self.cache), None)
+        if request is None:
+            if self.worker and now - self.idle_since >= 2:
+                self.cancel()
+            return events
+        if self.worker is None and not allow_start:
+            return events
+        key, spec = request
+        # Małe rastry ekstraktora oraz canvas, resize/crop, SHM i upload playera.
+        self.working_bytes = (len(spec["slide"].get("layers", [])) + 8) * 256 * 144 * 4
+        self._evict(self.working_bytes)
+        if self.working_bytes > self.max_bytes:
+            self.cache[key] = {"error": "Kompozycja przekracza budżet miniatur"}
+            return events
+        if self.worker is None:
+            if self.budget is not None and not self.budget.try_acquire("thumbnail"):
+                return events
+            context = get_context("spawn")
+            connection, child = context.Pipe()
+            process = context.Process(target=run_thumbnail, args=(child,), daemon=True)
+            try:
+                process.start()
+            except Exception:
+                if self.budget is not None:
+                    self.budget.abort()
+                raise
+            finally:
+                child.close()
+            if self.budget is not None:
+                self.budget.register(process, "thumbnail", self.cancel)
+            self.worker = process, connection
+        self.current = key, self.revision, now
+        try:
+            self.worker[1].send(spec)
+        except (EOFError, OSError):
+            self.cache[key] = {"error": "Zerwane połączenie ekstraktora"}
+            self.cancel()
         return events
