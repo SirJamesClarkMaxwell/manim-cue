@@ -302,3 +302,8 @@ def test_raw_last_section_without_newline():
         (5, "nowe"),
     ]
     assert not again.errors
+
+
+def test_canonical_path_keeps_scene_case(tmp_path):
+    """normcase na Windows dawał demo.notes.md; na Linuksie nakładka by zginęła."""
+    assert Path(notes.canonical_path(tmp_path / "Demo.notes.md")).name == "Demo.notes.md"

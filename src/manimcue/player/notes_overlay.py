@@ -139,7 +139,8 @@ def update(overlay, rendered, dirty, *, acknowledge=False):
 
 
 def canonical_path(path):
-    return os.path.normcase(str(Path(path).resolve()))
+    # Bez normcase: plik powstaje pod nazwą sceny (Demo.notes.md), resolve daje stabilny klucz.
+    return str(Path(path).resolve())
 
 
 def read_overlay(path):
