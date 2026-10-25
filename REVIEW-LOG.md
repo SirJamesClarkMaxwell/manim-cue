@@ -2573,3 +2573,41 @@ i ImGui, atomowy read-modify-write z ratunkiem, `TextEditor` imgui-bundle 1.93 w
 SPEC.md (D49). Kolejność 10e → odbiór 10d według decyzji prelegenta; zadanie 8 10d pozostaje obowiązkowe.
 
 **Werdykt:** przyjęte z poprawkami 1–11 naniesionymi w PLAN/SPEC; wykonalność edytora warunkowa do B1–B6.
+
+---
+
+## Runda 32 — codex, 2026-10-25: tryb blokowy edytora notatek 10e (D49, zadanie 6)
+
+**Przedmiot:** decyzja prelegenta 2026-10-25 po pierwszej próbie edytora — „jak w Obsidian”, bez przełącznika
+Edytuj/Podgląd. Kontrakt: notatka zawsze wyrenderowana, surowy tylko aktywny blok (akapit między pustymi wierszami,
+cały blok ``` lub `$$`), render per blok, aktywacja kliknięciem, ↑/↓ i Backspace/Delete na krawędzi, Esc i utrata
+fokusu dezaktywują z flushem, undo per aktywacja, bramka B7, budżet +5 h. Prawdziwy live preview odrzucony
+(`TextEditor` czysto tekstowy). Claude uruchomił `codex exec -s read-only`.
+
+**Ustalenia i rozstrzygnięcia:**
+
+1. **[BLOKUJĄCE] Zakres aktywnego bloku nie może żyć w stanie widoku** (ukrycie Info go czyści, sam tekst widgetu
+   nie odtworzy notatki). Przyjęto: pełny tekst roboczy, zakres i tożsamość slajdu w `runtime`; każde przejście
+   najpierw składa i utrwala stary slajd, potem zmienia zakres/slajd; test zmiany slajdu przed autozapisem.
+2. **[BLOKUJĄCE] Dezaktywacja gubi tekst odrzucony przez walidację** (`capture_notes` nie wkłada go do bufora).
+   Przyjęto: niepoprawny tekst w `runtime` per (ścieżka, N), powrót go przywraca, wyjście wypisuje na stderr
+   i do schowka; test invalid → inny blok → inny slajd → powrót i wyjście.
+3. **[ISTOTNE] Kolejność kliknięcia i utraty fokusu.** Przyjęto: rozstrzyganie raz na klatkę po zebraniu zdarzeń;
+   podpowiedź, klik w inny blok i „Z renderu” przed ogólną dezaktywacją, fokus popupu = fokus edytora; A−/A+
+   i „Zastosuj” dezaktywują po flushu; testy obu stron aktywnego bloku i „Z renderu” + Ctrl+Z.
+4. **[ISTOTNE] B7 nie domyka wysokości i przewijania.** Przyjęto: jedna klatka korekty, potem brak wewnętrznego
+   przewinięcia i kursor widoczny; B7 rozszerzona o długi zawinięty blok, aktywację poza viewportem, wklejenie,
+   scalenie, zmianę szerokości i A−/A+; porażka zatrzymuje odbiór zadania 6.
+5. **[ISTOTNE] Notatka z samych separatorów nie ma bloku.** Przyjęto: wirtualny pusty blok `(len, len)` na końcu,
+   białe znaki zachowane; testy `"\n\n"`, `" \t\n"`.
+6. **[ISTOTNE] Render per blok omija `MAX_FORMULAS`** (licznik od zera w każdym wywołaniu, notes_math.py:146).
+   Przyjęto: budżet wzorów wspólny dla notatki; test 129 wzorów w osobnych blokach i stabilności cache.
+7. **[ISTOTNE] Modyfikatory i repeat.** Przyjęto: przejście i scalanie tylko bez modyfikatorów, krawędź = wiersz
+   wizualny, repeat przechodzi przez kolejne bloki (każde przejście w osobnej klatce); testy Shift/Ctrl/Alt,
+   popupu, wielu kursorów, repeat i zawiniętego wiersza.
+
+**Zmiany:** PLAN.md (10e: tryb blokowy zamiast przełącznika, stan roboczy w `runtime`, rozstrzyganie przejść,
+wirtualny blok, wspólny limit wzorów, modyfikatory, zadanie 6 z B7, testy, budżet +7 h → 23 h, stop 46 h,
+re-estymacja po B7; flush czyta wiersze edytora, nie stratne `get_text()`), SPEC.md (D49).
+
+**Werdykt:** przyjęte z poprawkami 1–7 naniesionymi w PLAN/SPEC; odbiór zadania 6 warunkowy do B7.

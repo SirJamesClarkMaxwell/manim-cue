@@ -1939,10 +1939,11 @@ renderowi usuwa sekcję. Każdy zapis ustawia H bieżącego renderu i K.
 **Bufory i zapis (runda 31, blokujące 2–3).** Niezapisane treści żyją poza widokiem Info:
 magazyn adaptera PC w `runtime` (nie `info_view_state`, który desktop.py:475 czyści po ukryciu
 Info), klucz `(ścieżka kanoniczna, N)`, do udanego zapisu albo ratunku. Ukrycie Info usuwa
-najwyżej stan rysowania. Każdy flush czyta tekst bezpośrednio z `TextEditor.get_text()`, także
-przed upływem opóźnienia. Autozapis 500 ms po ostatniej zmianie (własny zegar monotoniczny
-w GUI albo change callback z opóźnieniem), flush przy zmianie slajdu, przejściu do podglądu,
-ukryciu Info i wyjściu (przed zamknięciem okien). Zapis: ponowny odczyt pliku, podmiana/
+najwyżej stan rysowania. Każdy flush czyta tekst bezpośrednio z edytora, także przed upływem
+opóźnienia (`"\n".join(get_line_text(i) …)` — `get_text()` jest stratny, bramka B6). Autozapis
+500 ms po ostatniej zmianie (własny zegar monotoniczny w GUI albo change callback
+z opóźnieniem), flush przy zmianie slajdu, zmianie i opuszczeniu aktywnego bloku, ukryciu Info
+i wyjściu (przed zamknięciem okien). Zapis: ponowny odczyt pliku, podmiana/
 usunięcie sekcji brudnych slajdów, serializacja w kolejności N, zapis do zamkniętego pliku
 tymczasowego w tym samym katalogu i `os.replace`; przy błędzie (także sharing violation na
 Windows, gdy zewnętrzny program trzyma plik) temp usuwany, bufor zostaje brudny, komunikat
@@ -1956,21 +1957,87 @@ nadpisania; kolizja → kolejny sufiks) obok decku, przy porażce w `tempfile.ge
 ścieżka w logu; gdy oba zawiodą — pełna treść na stderr i do schowka (`imgui.set_clipboard_text`)
 z komunikatem przed zakończeniem. Bez wątku (jeden wątek aplikacji); plik notatek jest mały.
 
-**Edytor ImGui.** Panel notatek: przycisk „Edytuj”/„Podgląd” obok A−/A+. Podgląd = obecny
-render D46 (MicroTeX/Agg, 28 px, wzory 1,2×). Edycja = jeden `TextEditor`
-(`imgui_color_text_edit`, `Language.markdown()`, zawijanie wierszy, bez numerów wierszy,
-paleta ciemna, font notatek przez push_font). Zmiana slajdu w trybie edycji: flush bieżącego,
-`set_text` nowego (historia undo per wejście na slajd; brudny bufor poprzedniego zostaje
-w magazynie). Tryb edycji i popup w stanie widoku Info, bufory w magazynie adaptera, nic
-w reducerze playera. „Edycja przechwytuje wejście” = fokus ImGui childa edytora **lub** jego
-popupu podpowiedzi; flaga unieważniana przy ukryciu Info i `io.app_focus_lost`. Wartość
-z poprzedniej klatki trafia do `input_state["editing_markdown"]` (process_input działa przed
-rysowaniem Info, desktop.py:255/461): router odrzuca wtedy klawisze i gesty (input.py:36), więc
-Q, strzałki, spacja i klikacz nie działają podczas pisania. Klik w okno główne zabiera fokus
-ImGui i przywraca skróty. Esc: zamyka podpowiedzi; bez podpowiedzi oddaje fokus edytora (tryb
-edycji zostaje). Status zapisu w panelu: „zapisano”, „zapisywanie…”, błąd.
-Własne komendy (podpowiedzi, Ctrl+B/I, „Z renderu”) tylko przy jednym kursorze; przy wielu
-kursorach wyłączone.
+**Edytor ImGui — tryb blokowy (decyzja prelegenta 2026-10-25 po pierwszej próbie edytora:
+„jak w Obsidian”, bez przełącznika; zastępuje przycisk „Edytuj”/„Podgląd” z etapu 2).**
+Notatka jest zawsze wyrenderowana (render D46: MicroTeX/Agg, 28 px, wzory 1,2×); surowy
+Markdown ma tylko **aktywny blok** — ten z kursorem. Live preview Obsidiana (render wewnątrz
+wiersza edytora) jest niewykonalny: `TextEditor` to widget czysto tekstowy, a render D46 to
+osobne wywołania `imgui_md` i obrazy wzorów.
+- *Bloki.* Czysta funkcja we wspólnym module `notes_complete.py` (Pyodide): tekst → zakresy
+  `(start, end)` w znakach. Granica = jeden lub więcej pustych wierszy (tylko spacje/tab) poza
+  blokami ```` ``` ```` … ```` ``` ```` i `$$` … `$$` (ta sama tokenizacja co `TOKEN`); blok kodu
+  albo wzoru z pustymi wierszami w środku to jeden blok, niezamknięty ```` ``` ```` lub `$$`
+  ciągnie blok do końca tekstu. Separatory nie należą do bloków; złożenie
+  `text[:start] + edytor + text[end:]` jest dokładne — bez edycji tekst identyczny, także
+  `""`, wiodące i końcowe puste wiersze oraz brak końcowego `\n`. Notatka bez bloków (`""`,
+  `"\n\n"`, `" \t\n"` — także po usunięciu całej treści) = jeden wirtualny pusty blok
+  `(len, len)` na końcu tekstu, istniejące białe znaki zachowane, napis „kliknij, aby pisać”
+  (runda 32, 5).
+- *Render.* Bloki nieaktywne osobno, każdy własnym wywołaniem renderu D46 w grupie będącej
+  celem kliknięcia (hover podświetla). Limit 128 wzorów (`MAX_FORMULAS`) jest wspólny dla całej
+  notatki: budżet przekazywany między renderami bloków, nie liczony od nowa w każdym (runda 32,
+  6). Render per blok gubi kontekst Markdown między blokami (luźna lista z numeracją,
+  kontynuacja elementu listy po pustym wierszu — wcięcie 4 spacji staje się kodem, linki
+  referencyjne) — jawne ograniczenie.
+- *Aktywny blok.* Jeden `TextEditor` jak w etapie 2 (`Language.markdown()`, zawijanie, bez
+  numerów wierszy, ciemna paleta, Inconsolata w rozmiarze notatek) z tekstem tylko tego bloku;
+  szerokość panelu, wysokość = liczba wierszy wizualnych (`doc_pos2_vis_pos` końca tekstu
+  z poprzedniej klatki, w pierwszej klatce wiersze logiczne) × `get_line_height()` + padding,
+  bez własnego przewijania (`no_scrollbar | no_scroll_with_mouse`); po `set_text`, scaleniu,
+  wklejeniu, zmianie szerokości i A−/A+ dopuszczalna jest jedna klatka korekty wysokości, potem
+  brak wewnętrznego przewinięcia (runda 32, 4). Panel notatek przewija się tak, by kursor był
+  widoczny (aktywacja i pisanie).
+- *Stan roboczy w `runtime` (runda 32, 1–2).* Pełny tekst roboczy slajdu, zakres `(start, end)`
+  zastępowany przez widget i tożsamość slajdu `(ścieżka, N)` należą do `runtime` adaptera, nie
+  do stanu widoku (ukrycie Info go nie usuwa). Pełny tekst = prefiks + edytor + sufiks. Każde
+  przejście (zmiana bloku, scalenie, dezaktywacja, zmiana slajdu, ukrycie Info, wyjście): najpierw
+  odczyt widgetu i złożenie pełnego tekstu starego slajdu, potem utrwalenie jego bufora, dopiero
+  potem zmiana zakresu albo slajdu. Tekst odrzucony przez walidację (znacznik `<!-- manim-cue`)
+  też zostaje w `runtime` per `(ścieżka, N)` — nie trafia do nakładki, ale powrót na slajd
+  przywraca go do edytora, a wyjście z nim wypisuje go na stderr i do schowka z komunikatem
+  (format nakładki go nie pomieści).
+- *Aktywacja i nawigacja.* Klik w blok aktywuje go: kursor na początku wiersza logicznego
+  proporcjonalnego do Y kliknięcia w bloku (render nie mapuje się na pozycje źródła —
+  przybliżenie, ograniczenie), `set_focus` edytora; klik pod ostatnim blokiem → koniec
+  ostatniego bloku. ↑ w pierwszym wierszu wizualnym / ↓ w ostatnim → sąsiedni blok (kursor
+  w jego ostatnim/pierwszym wierszu, kolumna przycięta). Backspace na początku bloku / Delete na
+  końcu → scalenie z poprzednim/następnym blokiem (usunięcie separatora; jedyny sposób łączenia
+  akapitów, bo separatory są poza edytorem), kursor w miejscu złączenia. Klawisze nawigacji
+  i scalania przejmowane tylko bez popupu, przy jednym kursorze bez zaznaczenia i **bez
+  modyfikatorów** (Shift+↓, Ctrl+Backspace, Alt, Super zostają dla edytora; runda 32, 7),
+  mechanizmem B1 (`set_key_owner` przed `render`); krawędź = pierwszy/ostatni wiersz
+  **wizualny** (↑ w drugim wierszu wizualnym zawiniętego pierwszego wiersza logicznego zostaje
+  w edytorze). Repeat dozwolony: przytrzymanie ↑/↓ przechodzi przez kolejne bloki,
+  przytrzymanie Backspace kasuje przez kolejne separatory, jak w Obsidianie; każde przejście
+  w osobnej klatce. Puste wiersze wpisane w aktywnym bloku zostają w nim do
+  jego opuszczenia; podział liczony od nowa przy każdej zmianie bloku, cel wskazany offsetem
+  w nowym tekście (nie indeksem bloku). Logika celu (sąsiad, scalenie, przesunięcie offsetu
+  klikniętego bloku za edytowanym) to czyste funkcje we wspólnym module.
+- *Opuszczenie.* Esc najpierw zamyka popup, potem dezaktywuje blok (wszystko wyrenderowane)
+  i oddaje fokus. Dezaktywują też: utrata fokusu edytora i popupu (klik w inne miejsce Info albo
+  w okno główne, `io.app_focus_lost`), zmiana slajdu i ukrycie Info. Każda zmiana bloku
+  i dezaktywacja to flush (zastępuje „przejście do podglądu”). Rozstrzyganie raz na klatkę po
+  zebraniu zdarzeń panelu i popupu (runda 32, 3): zaakceptowana podpowiedź, klik w inny blok
+  (po obu stronach aktywnego) i „Z renderu” mają pierwszeństwo przed ogólną dezaktywacją
+  z utraty fokusu — fokus popupu liczy się jak fokus edytora; A−/A+ i „Zastosuj do obecnych
+  slajdów” dezaktywują po flushu.
+- *Undo.* Historia per aktywacja bloku: zmiana bloku, scalenie i dezaktywacja ją kończą
+  (ograniczenie wobec Obsidiana; treść i tak trafia do pliku). Zaznaczenie, Ctrl+A/C/X tylko
+  w obrębie bloku.
+- *„Z renderu”* aktywuje cały tekst slajdu jako jeden blok i podmienia go
+  `replace_section_text` — Ctrl+Z cofa do opuszczenia bloku. Tryb tylko do odczytu
+  i wstrzymanie: bloki renderowane, aktywacja zablokowana, komunikaty jak dotąd.
+
+Popup i rysowanie: stan widoku Info; tekst roboczy, aktywny zakres i bufory: `runtime`
+adaptera; nic w reducerze playera.
+„Edycja przechwytuje wejście” = fokus ImGui childa edytora **lub** jego popupu podpowiedzi;
+flaga unieważniana przy ukryciu Info i `io.app_focus_lost`. Wartość z poprzedniej klatki trafia
+do `input_state["editing_markdown"]` (process_input działa przed rysowaniem Info,
+desktop.py:255/461): router odrzuca wtedy klawisze i gesty (input.py:36), więc Q, strzałki,
+spacja i klikacz nie działają podczas pisania. Klik w okno główne zabiera fokus ImGui,
+dezaktywuje blok i przywraca skróty. Status zapisu w panelu: „zapisano”, „zapisywanie…”, błąd.
+Własne komendy (podpowiedzi, Ctrl+B/I, „Z renderu”, nawigacja i scalanie bloków) tylko przy
+jednym kursorze; przy wielu kursorach wyłączone.
 
 **Podpowiedzi (auto-completion) i obsługa Markdown.** Popup pod kursorem
 (`doc_pos2_screen_pos`), najwyżej 8 pozycji filtrowanych prefiksem, ↑/↓ wybór, Tab/Enter
@@ -2011,7 +2078,16 @@ zakresu) i adapter PC (magazyn brudnych buforów, atomowy zapis, read-modify-wri
 z fallbackiem); 2 stosowanie w `present` dla Qt i ImGui, pola manifestu; 3 edytor w Info
 (tryb, fokus edytora/popupu → `editing_markdown`, Esc, autozapis, flush, status, „Z renderu”,
 „Zastosuj do obecnych slajdów”); 4 podpowiedzi i Ctrl+B/I (czyste funkcje + popup);
-5 README (format pliku, skróty, ograniczenia) i raport `reports/REPORT-10e.md`.
+5 README (format pliku, skróty, ograniczenia) i raport `reports/REPORT-10e.md`;
+6 tryb blokowy (decyzja 2026-10-25): podział na bloki i logika celu w `notes_complete.py`,
+render per blok, aktywacja kliknięciem, ↑/↓ i Backspace/Delete na krawędzi, dezaktywacja,
+usunięcie przełącznika, testy, README i raport; bramka B7 w oknie (Claude; runda 32, 4):
+wysokość edytora z wierszy wizualnych — po najwyżej jednej klatce korekty brak wewnętrznego
+przewinięcia i kursor widoczny w panelu — dla długiego zawiniętego bloku, aktywacji bloku poza
+viewportem panelu, wklejenia, scalenia, zmiany szerokości okna i A−/A+; klik w blok →
+pierwszy klawisz trafia do edytora w tej samej albo następnej klatce; przejęcie
+↑/↓/Backspace/Delete na krawędzi bez zmiany tekstu edytora, z modyfikatorami bez przejęcia.
+Porażka B7 zatrzymuje odbiór zadania 6; Claude decyduje o zamienniku z kosztem.
 
 **Testy (offline, bez okna, poza B1–B6):** round-trip dokładny dla `""`, `"tekst"`,
 `"tekst\n"`, `"tekst\n\n"`, nagłówek K, BOM na wejściu i brak BOM po zapisie, błędny UTF-8 →
@@ -2032,14 +2108,33 @@ slajdu/ukryciu Info/wyjściu (atrapa zegara, flush czyta tekst z edytora przed u
 opóźnienia); podpowiedzi: wyzwalacze, poza `$` brak komend LaTeX, `\$` i kod inline bez
 wyzwalacza, filtrowanie, wstawianie z kursorem, otaczanie zaznaczenia, wiele kursorów →
 wyłączone, Ctrl+Alt nie jest Ctrl+B/I, lista LaTeX renderuje się w MicroTeX i Agg; shared
-imports (Pyodide) z nowym modułem bez `notes_math`. Zwykły pytest bez regresji. Próba
-człowieka: edycja w trakcie prezentacji, zapis przetrwa restart i ponowny render Demo,
-podpowiedzi i skróty, polskie znaki, konflikt po zmianie kodu, wstrzymanie po dodaniu slajdu.
+imports (Pyodide) z nowym modułem bez `notes_math`. Tryb blokowy: podział na bloki
+i złożenie bez edycji dokładne dla `""`, `"a"`, `"a\n"`, `"\n\na\n\n\nb"`, wiersza ze spacjami
+jako separatora, ```` ``` ```` i `$$` z pustym wierszem w środku, niezamkniętego ```` ``` ````,
+notatki z samych separatorów (`"\n\n"`, `" \t\n"`: wirtualny blok na końcu, wpisanie zachowuje
+białe znaki); `\$` nie otwiera wzoru; logika celu: sąsiad ↑/↓ po wpisaniu pustego wiersza
+w aktywnym bloku, scalenie Backspace/Delete (separator usunięty, kursor w złączeniu, polskie
+litery — glify), offset klikniętego bloku za edytowanym; 129 różnych wzorów w osobnych
+blokach — limit wspólny, cache stabilny w kolejnych klatkach; integracja desktop: aktywacja
+kliknięciem i zmiana bloku nie brudzą bufora, ↑ w pierwszym wierszu zmienia blok bez zmiany
+tekstu, ↑ w drugim wierszu wizualnym zawiniętego wiersza zostaje w edytorze, Shift/Ctrl/Alt
++ klawisz krawędzi, popup, wiele kursorów i zaznaczenie — bez przejęcia, repeat przechodzi
+przez bloki; zmiana slajdu przed autozapisem (także z brudnym buforem innego slajdu) nie gubi
+tekstu; niepoprawny tekst → inny blok → inny slajd → powrót przywraca go, wyjście wypisuje go
+na stderr; kliknięcie bloku przed i za aktywnym, akceptacja podpowiedzi myszą i „Z renderu”
+z natychmiastowym Ctrl+Z nie są zjadane przez dezaktywację; Esc i utrata fokusu dezaktywują
+z flushem; tylko do odczytu blokuje aktywację.
+Zwykły pytest bez regresji. Próba człowieka: edycja w trakcie prezentacji, zapis przetrwa
+restart i ponowny render Demo, podpowiedzi i skróty, polskie znaki, konflikt po zmianie kodu,
+wstrzymanie po dodaniu slajdu, tryb blokowy (klik, ↑/↓, scalanie, Esc).
 
 **Budżet (runda 31):** bramki 2 h, nakładka i adapter 2,5 h, `present`/manifest 1 h, edytor 3 h,
 podpowiedzi 3 h, testy 2 h, README/raport 0,5 h, przegląd, poprawki i próba człowieka 2 h —
 **16 h, stop 32 h**; ponowna estymacja po zadaniu 0. Stop nie usprawiedliwia niedokończonej
-ochrony danych (bufory, atomowy zapis, ratunek).
+ochrony danych (bufory, atomowy zapis, ratunek). Zadanie 6 (zmiana zakresu decyzją prelegenta
+2026-10-25): funkcje bloków 1 h, UI 2,5 h, stan roboczy w `runtime` 0,5 h, B7 1 h, testy
+1,5 h, przegląd i próba 0,5 h — **+7 h, razem 23 h, stop 46 h** (runda 32); ponowna estymacja
+po B7.
 
 ### 10b i 10c — granice wspólnego kodu
 

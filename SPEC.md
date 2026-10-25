@@ -958,15 +958,23 @@ i ponawia; przy wyjściu ratunek z unikalną nazwą bez nadpisania obok decku, p
 tymczasowym, a gdy oba zawiodą — treść na stderr i do schowka z komunikatem.
 
 Edytor: `imgui_color_text_edit.TextEditor` z imgui-bundle 1.93 (Markdown, zawijanie, undo),
-przełącznik podgląd/edycja w panelu notatek, font notatek. Fokus edytora lub jego popupu
-ustawia `editing_markdown` routera — klawisze i gesty playera, łącznie z Q i strzałkami, nie
-działają podczas pisania; Esc najpierw zamyka podpowiedzi, potem oddaje fokus. Podpowiedzi:
+font notatek, w **trybie blokowym** (decyzja prelegenta 2026-10-25 po pierwszej próbie, „jak
+w Obsidian”; zastępuje przełącznik podgląd/edycja): notatka zawsze wyrenderowana, surowy jest
+tylko blok z kursorem (akapit między pustymi wierszami; cały blok ```` ``` ```` lub `$$`). Klik
+aktywuje blok, ↑/↓ na krawędzi przechodzi do sąsiada, Backspace/Delete na krawędzi scala
+bloki; undo i zaznaczenie w obrębie aktywacji bloku. Pełny tekst roboczy, aktywny zakres
+i tekst odrzucony przez walidację żyją w `runtime` adaptera do zapisu albo ratunku; limit
+wzorów wspólny dla całej notatki (runda 32). Render wewnątrz wiersza edytora
+(prawdziwy live preview) odrzucony — `TextEditor` to widget czysto tekstowy. Fokus edytora lub
+jego popupu ustawia `editing_markdown` routera — klawisze i gesty playera, łącznie z Q
+i strzałkami, nie działają podczas pisania; Esc najpierw zamyka podpowiedzi, potem kończy
+edycję bloku i oddaje fokus. Podpowiedzi:
 składnia Markdown na początku wiersza, fragmenty inline (Ctrl+Space, otoczenie zaznaczenia),
 komendy LaTeX po `\` w `$…$`/`$$…$$` z listy obsługiwanej przez ścieżkę wzorów D46;
 Ctrl+B/Ctrl+I (Ctrl bez Alt — AltGr). Wykonalność przejęcia klawiszy przez popup, AltGr,
 fokusu i undo własnych komend warunkowa do bramek B1–B6 w PLAN.
-Autozapis 500 ms po zmianie oraz przy zmianie slajdu, przejściu do podglądu, ukryciu Info
-i wyjściu. Qt czyta nakładkę bez edycji (te same notatki w obu playerach). Web (10b) dzieli
+Autozapis 500 ms po zmianie oraz przy zmianie slajdu, zmianie i opuszczeniu bloku, ukryciu
+Info i wyjściu. Qt czyta nakładkę bez edycji (te same notatki w obu playerach). Web (10b) dzieli
 model, komendy i podpowiedzi; trwały zapis w przeglądarce ustali kontrakt 10b.
 Odrzucone: zapis do JSON decku (ginie przy renderze), edycja kodu sceny, mapowanie po treści
 lub nazwie pliku wideo (hash zmienia się z animacją), autouzupełnianie słów z decku (YAGNI).
