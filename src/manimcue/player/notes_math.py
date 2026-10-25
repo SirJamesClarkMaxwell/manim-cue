@@ -5,6 +5,7 @@ from collections import OrderedDict
 
 from .textures import upload
 
+MATH_SCALE = 1.2
 MAX_FORMULAS = 128
 MAX_BYTES = 16 * 1024 * 1024
 _cache = OrderedDict()
@@ -57,7 +58,7 @@ def render_formula(
     try:
         if len(text) > 4096 or FORBIDDEN.search(text):
             raise ValueError("Wzór przekracza limit lub zawiera niedozwolone makro")
-        if not 0 < size <= 48 or not 0 < dpi <= 8 or style not in ("inline", "display"):
+        if not 0 < size <= 57.6 or not 0 < dpi <= 8 or style not in ("inline", "display"):
             raise ValueError("Niepoprawny rozmiar, DPI lub styl wzoru")
         try:
             from imgui_bundle import imgui_microtex
@@ -131,8 +132,17 @@ class NotesRenderer:
         for index, token in enumerate(tokens):
             style = "display" if token.group(1) is not None else "inline"
             source = token.group(1) if style == "display" else token.group(2)
+            if native:
+                source = rf"\scalebox{{{MATH_SCALE}}}{{{source}}}"
             formula = (
-                render_formula(source, size, dpi, style, color=color, native=native)
+                render_formula(
+                    source,
+                    size if native else size * MATH_SCALE,
+                    dpi,
+                    style,
+                    color=color,
+                    native=native,
+                )
                 if index < MAX_FORMULAS
                 else {"error": "Limit 128 wzorów w notatce"}
             )
@@ -141,11 +151,21 @@ class NotesRenderer:
             if _native_dirty:
                 imgui_microtex.clear_texture_cache()
                 _native_dirty = False
-            for token, _, formula in reversed(prepared):
+            for token, style, formula in reversed(prepared):
                 if formula["error"]:
                     text = (
                         text[: token.start()]
                         + f"`{token.group(0)}` (math: {formula['error']})"
+                        + text[token.end() :]
+                    )
+                else:
+                    delimiter = "$$" if style == "display" else "$"
+                    source = token.group(1) if style == "display" else token.group(2)
+                    text = (
+                        text[: token.start()]
+                        + delimiter
+                        + rf"\scalebox{{{MATH_SCALE}}}{{{source}}}"
+                        + delimiter
                         + text[token.end() :]
                     )
             imgui_md.render(text)

@@ -738,3 +738,12 @@ Zwykły pytest po rundach 27–29 (kod worktree przez `PYTHONPATH`): **738 passe
 głównym działają. Load24 (24 identyczne kopie jednego slajdu) dawało wrażenie „zawieszenia na slajdzie 1” —
 sondy klawiatury i wejść: każde → przyjęte, wejścia ~0,1 s. Otwarte: jednorazowe „Brak postępu dekodera przez 2 s”
 po ~45 min bezczynności (sonda bez źródła błędu w tamtej sesji; do obserwacji w odbiorze).
+
+### Runda 30 — rozmiar notatek
+
+- `src/manimcue/player/state.py:27`, `src/manimcue/player/info.py:168`: domyślne 28 logicznych px, także przy brakującym polu snapshotu. `app.py:309` sprawdzony: granice 16–48 bez zmian, brak osobnego domyślnego 24.
+- `src/manimcue/player/notes_math.py:8`: mnożnik 1,2; `:61`: walidacja do 57,6; `:135`: walidacja natywna na postaci z `\scalebox{1.2}{…}` przy bazowym rozmiarze tekstu, a Agg na rozmiarze tekst×1,2. `:156`: transformacja poprawnych tokenów przed Markdownem; istniejące math_tokens chroni kod i escaped dollar. Skala natywna występuje w makrze dokładnie raz; istniejące dzielenie wymiarów i baseline przez DPI pozostaje bez zmian.
+- `README.md:57`: zakres tekstu, domyślne 28 i wzory 1.2×.
+- `tests/test_imgui_info.py:128`: domyślne 28, krok 2 i granice; `:228`: poprawione oczekiwanie fontu; `:476`: fallback i wymiary obrazu dla DPI 1/1,5/2; `:609`: mapowanie pięciu rozmiarów, obu backendów i stylów, transformacja natywna, pogrubienie/lista oraz kod/escaped dollar; `:657`: rzeczywisty raster MicroTeX/Agg, baseline, wymiary względem DPI, walidacja i rozdzielenie cache rozmiarów/DPI/stylów. Tolerancja rastra po przeliczeniu DPI: 4 logiczne px ze względu na hinting i zaokrąglenia.
+
+Weryfikacja: wyłącznie dozwolone dwa moduły, wskazany interpreter, PYTHONPATH tego worktree, TMP/TEMP `.tmp2`, `-q -p no:cacheprovider -m "not gpu"`. Końcowo **58 passed, 1 failed, 2 warnings (0,66 s)**. Wszystkie testy Info i importy PC zielone; `test_pyodide_shared_imports` kończy się przed uruchomieniem bramki: `uv` nie może otworzyć `C:\Users\Franek\AppData\Local\uv\cache\sdists-v9\.git` (Access is denied). Nie zmieniano testu ani środowiska poza worktree. Pełny przebieg nie jest zielony z powodu tej blokady środowiska. Ruff check i ruff format czterech zmienionych plików Python: zielone. Nie otwierano okien, bez commita. Wizualna proporcja natywnego Markdownu, wysokości wierszy i odbiór fontu 28 pozostają do próby człowieka w oknie; cache tekstur MicroTeX nadal poza LRU adaptera.

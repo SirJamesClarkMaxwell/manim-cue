@@ -54,7 +54,7 @@ entry cancels it. Wheel zoom requires the pointer over the active panel. Cairo i
 ImGui Info uses two columns: the current composition and presenter timer on the left,
 the independently playing next slide and scrollable Markdown notes on the right.
 Timer pause/restart affects only presenter time; restart preserves its paused state.
-A−/A+ changes notes and math from 16 to 48 logical pixels (default 24), for the session.
+A−/A+ changes notes text from 16 to 48 logical pixels (default 28), for the session; math is 1.2× the text size.
 Notes support `$inline$` and `$$display$$` math with local MicroTeX and an Agg fallback.
 Invalid formulas remain visible with an error. The full-height column on the left lazily loads static
 thumbnails for the current deck; clicking one jumps directly through the normal entry

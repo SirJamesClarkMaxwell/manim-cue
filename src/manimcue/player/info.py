@@ -165,15 +165,15 @@ def render_info(snapshot: dict, preview: dict) -> list[dict]:
         if imgui.button(label):
             actions.append({"type": "notes_scale", "delta": delta})
         imgui.same_line()
-    imgui.text(f"{snapshot.get('notes_size', 24)} px")
+    imgui.text(f"{snapshot.get('notes_size', 28)} px")
     imgui.begin_child(
         "presenter_notes", (0, 0), window_flags=imgui.WindowFlags_.always_vertical_scrollbar
     )
-    imgui.push_font(None, imgui.get_style().font_size_base * snapshot.get("notes_size", 24) / 16)
+    imgui.push_font(None, imgui.get_style().font_size_base * snapshot.get("notes_size", 28) / 16)
     try:
         render_notes = preview.get("render_notes")
         if render_notes:
-            render_notes(snapshot.get("notes", ""), snapshot.get("notes_size", 24))
+            render_notes(snapshot.get("notes", ""), snapshot.get("notes_size", 28))
         else:
             imgui_md.render(snapshot.get("notes", ""))
     finally:

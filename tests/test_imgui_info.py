@@ -135,6 +135,11 @@ def test_timer_pause_restart_and_notes_scale_limits():
     assert app.state["presenter_timer"]["paused"]
     app.dispatch({"type": "timer_pause"}, start + 20)
     assert app.presenter_snapshot(start + 25)["elapsed"] == 5
+    assert app.state["notes_size"] == 28
+    app.dispatch({"type": "notes_scale", "delta": 2}, start)
+    assert app.state["notes_size"] == 30
+    app.dispatch({"type": "notes_scale", "delta": -2}, start)
+    assert app.state["notes_size"] == 28
     media_state = app.state["clock"].copy()
     for _ in range(40):
         app.dispatch({"type": "notes_scale", "delta": 2}, start)
@@ -220,7 +225,7 @@ def test_thumbnail_column_min_width(monkeypatch, size, scale):
         assert actions == [{"type": "thumbnail_range", "indices": [0]}]
         assert len(sizes) == 2 and sizes[0][0] < sizes[1][0]
         assert 1.4 < sizes[0][1] / sizes[1][1] < 1.7
-        assert fonts == [pytest.approx(imgui.get_style().font_size_base * 24 / 16, abs=1)]
+        assert fonts == [pytest.approx(imgui.get_style().font_size_base * 28 / 16, abs=1)]
         thumbnails, current, notes = (
             children[name]
             for name in ("presenter_thumbnails", "presenter_current", "presenter_next_notes")
@@ -467,7 +472,8 @@ def test_markdown_arrow_merge(monkeypatch):
     ]
 
 
-def test_mathtext_inline_display_without_window(monkeypatch):
+@pytest.mark.parametrize("dpi", [1, 1.5, 2])
+def test_mathtext_inline_display_without_window(monkeypatch, dpi):
     from imgui_bundle import imgui, imgui_md
 
     from manimcue.player import notes_math
@@ -496,11 +502,13 @@ def test_mathtext_inline_display_without_window(monkeypatch):
         monkeypatch.setattr(imgui, "image", image)
         imgui.new_frame()
         imgui.begin("notes")
-        renderer.render("before $x^2$ after\n$$x_1$$", 24, 1)
+        renderer.render("before $x^2$ after\n$$x_1$$", 28, dpi)
         imgui.end()
         imgui.render()
         assert len(images) == 2 and images[0][0] < images[1][0]
         assert all(value.get("lease") for value in notes_math._cache.values())
+        for (_, dimensions), formula in zip(images, notes_math._cache.values(), strict=True):
+            assert dimensions == pytest.approx((formula["width"] / dpi, formula["height"] / dpi))
     finally:
         renderer.after_render(closing=True)
         imgui_md.destroy_context(md_context)
@@ -595,3 +603,94 @@ def test_mathtext_real_markdown_documents_fragment_limit(monkeypatch, tmp_path):
         renderer.after_render(closing=True)
         imgui_md.destroy_context(md_context)
         imgui.destroy_context(context)
+
+
+@pytest.mark.parametrize(
+    "size,expected", [(16, 19.2), (28, 33.6), (40, 48), (42, 50.4), (48, 57.6)]
+)
+@pytest.mark.parametrize("native", [False, True])
+@pytest.mark.parametrize("dpi", [1, 1.5, 2])
+def test_notes_math_scale_tokens(monkeypatch, size, expected, native, dpi):
+    from imgui_bundle import imgui, imgui_md, imgui_microtex
+
+    from manimcue.player import notes_math
+
+    calls, markdown = [], []
+    monkeypatch.setattr(imgui_md, "has_latex", lambda: native)
+    monkeypatch.setattr(imgui_md, "render", markdown.append)
+    monkeypatch.setattr(imgui_microtex, "clear_texture_cache", lambda: None)
+    monkeypatch.setattr(imgui, "get_style", lambda: SimpleNamespace(color_=lambda _: (1, 1, 1, 1)))
+    monkeypatch.setattr(imgui, "text_wrapped", lambda _: None)
+
+    def render(text, formula_size, formula_dpi, style, **kwargs):
+        calls.append((text, formula_size, formula_dpi, style, kwargs["native"]))
+        return {"error": None if native else "kontrolowany brak rastra"}
+
+    monkeypatch.setattr(notes_math, "render_formula", render)
+    text = r"**tekst $x$ dalej**" + "\n- $$x^2$$\n" + r"`$code$` ```$$code$$``` \$cash"
+    notes_math.NotesRenderer().render(text, size, dpi)
+    assert calls == [
+        (
+            r"\scalebox{1.2}{x}" if native else "x",
+            pytest.approx(size if native else expected),
+            dpi,
+            "inline",
+            native,
+        ),
+        (
+            r"\scalebox{1.2}{x^2}" if native else "x^2",
+            pytest.approx(size if native else expected),
+            dpi,
+            "display",
+            native,
+        ),
+    ]
+    if native:
+        assert markdown == [
+            text.replace("$x$", r"$\scalebox{1.2}{x}$").replace(
+                "$$x^2$$", r"$$\scalebox{1.2}{x^2}$$"
+            )
+        ]
+
+
+@pytest.mark.parametrize("native", [False, True])
+def test_scaled_formula_validation_cache_and_dpi(native):
+    from pathlib import Path
+
+    import imgui_bundle
+    from imgui_bundle import imgui_microtex
+
+    from manimcue.player import notes_math
+
+    fonts = Path(imgui_bundle.__file__).parent / "assets" / "fonts" / "latex"
+    imgui_microtex.init(str(fonts / "latinmodern-math.clm1"), str(fonts / "latinmodern-math.otf"))
+    notes_math.clear_cache()
+    try:
+        results = []
+        for size in (16, 28, 40, 42, 48):
+            for style in ("inline", "display"):
+                dimensions = []
+                for dpi in (1, 1.5, 2):
+                    source = r"\scalebox{1.2}{x^2}" if native else "x^2"
+                    formula_size = size if native else size * notes_math.MATH_SCALE
+                    result = notes_math.render_formula(
+                        source, formula_size, dpi, style, native=native
+                    )
+                    assert result["error"] is None
+                    assert 0 < result["baseline"] <= result["height"]
+                    assert (
+                        notes_math.render_formula(source, formula_size, dpi, style, native=native)
+                        is result
+                    )
+                    dimensions.append(
+                        tuple(result[key] / dpi for key in ("width", "height", "baseline"))
+                    )
+                    results.append(result)
+                for dimension in dimensions[1:]:
+                    assert dimension == pytest.approx(dimensions[0], abs=4)
+        assert len({id(result) for result in results}) == 30
+        for invalid in (0, -1, 57.61):
+            assert notes_math.render_formula("x", invalid, 1, "inline", native=native)["error"]
+        assert notes_math.render_formula("x", 57.6, 1, "inline", native=native)["error"] is None
+    finally:
+        notes_math.clear_cache()
