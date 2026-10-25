@@ -1886,17 +1886,160 @@ i kodu, bez testów GPU; przed implementacją przegląd Claude poprawionego kont
 i fonty offline przed 10b. Ryzyka: opóźnione wyniki po restore, skład baseline matematyki,
 podzbiór mathtext, zimna ekstrakcja miniatur przy zajętej puli, start live ~1,6 s.
 
-### 10e — edycja notatek w prezentacji (kierunek, kontrakt po 10d)
+### 10e — edycja notatek w prezentacji (D49)
 
 Po próbie człowieka 2026-10-24 prelegent chce edytować notatki w Info podczas prezentacji,
 z zapisem, obsługą Markdown i podpowiadaniem (auto-completion). Decyzja prelegenta: zmiany
 zapisywane do **pliku obok decku** (np. `slides/Demo.notes.md`), który nadpisuje notatki
 z renderu i przetrwa ponowny render; kod sceny (`next_slide(notes=...)`) i JSON decku bez zmian.
-Stan edycji, komendy i UI wspólne z 10b (D42); odczyt/zapis pliku to adapter platformy PC,
-trwały zapis w web ustali kontrakt 10e.
-Kontrakt (format pliku i mapowanie na slajdy, edytor ImGui, autosave, konflikty z renderem,
-zakres podpowiedzi Markdown/LaTeX, Qt, web 10b) — osobna runda codex po odbiorze 10d;
-kolejność: 10a → 10d → 10e → 10b → 10c, chyba że prelegent zdecyduje inaczej.
+**2026-10-25 prelegent zdecydował: 10e teraz, przed pomiarem odbioru 10d (zadanie 8)** —
+zadanie 8 10d pozostaje otwarte i nie zmienia zakresu; 10e nie dotyka puli, prefetcha
+ani miniatur. Kolejność dalej: 10e → odbiór 10d → 10b → 10c.
+
+**Format pliku (runda 31).** `<folder>/<Scene>.notes.md` (folder z `--folder`, domyślnie
+`slides`). Kodowanie: odczyt UTF-8 z tolerancją BOM (`utf-8-sig`), zapis UTF-8 bez BOM (pierwszy
+zapis usuwa BOM — świadomie); błędny UTF-8 → tryb tylko do odczytu, plik nigdy nie nadpisywany,
+komunikat. Newline: CRLF/CR → LF przy odczycie pliku i notatek z renderu, przed porównaniem,
+hashem i zapisem; zapis LF. Pierwszy wiersz to obowiązkowy nagłówek
+`<!-- manim-cue notes slides=K -->` (K = liczba slajdów decku przy ostatnim zapisie); dalej
+sekcje: wiersz `<!-- manim-cue slide N base=H -->` (N 1…K, H = 8 znaków hex SHA-256 UTF-8
+notatek z renderu), po nim treść i dokładnie jeden terminator `\n`. Odczyt: treść = bajty między
+końcem wiersza znacznika a początkiem następnego znacznika (albo EOF) minus dokładnie jeden
+końcowy `\n`, jeśli jest; bez `strip`/`rstrip`. Round-trip dokładny: `""` → `znacznik\n\n`,
+`"tekst"` → `znacznik\ntekst\n`, `"tekst\n"` → `znacznik\ntekst\n\n`, `"tekst\n\n"` →
+`znacznik\ntekst\n\n\n`. Pusta treść to poprawne nadpisanie (pusta notatka). Błędy składni
+(wiersz `<!-- manim-cue` o innym formacie, N nie liczba, duplikat N) → tryb tylko do odczytu
+w ImGui i ostrzeżenie; poprawne sekcje nadal stosowane, ale **żadna** sekcja zduplikowanego N.
+N > K bieżącego decku: sekcja ignorowana przy wyświetlaniu, zachowana dosłownie przy zapisie.
+Wiersz pasujący do wzorca znacznika w treści notatki jest niedozwolony — edytor odmawia
+zapisu tego slajdu z komunikatem (bez escapowania, YAGNI).
+
+**Struktura decku (runda 31, blokujące 1).** Adres to N, a nagłówek K jest kontrolą struktury
+niezależną od notatek (H nie wykrywa wstawienia slajdu, gdy notatki są puste lub równe). K ≠
+liczba slajdów bieżącego renderu albo brak nagłówka → nakładka **wstrzymana**: oba playery
+pokazują notatki z renderu, log ostrzega, Info pokazuje „nakładka wstrzymana: było K slajdów,
+jest M” i przycisk „Zastosuj do obecnych slajdów” (świadome przypisanie: zapis nagłówka z M,
+sekcje bez zmian N i treści). Edycja w ImGui zablokowana do tej decyzji; plik nienaruszony.
+Przestawienie slajdów bez zmiany liczby wykrywa tylko H (gdy notatki różne) — jawne
+ograniczenie; stabilny identyfikator slajdu od autora dopiero, gdy wymagane będzie
+automatyczne przetrwanie wstawiania/przestawiania (bez migratora teraz, JSON bez zmian).
+
+**Stosowanie.** Jedno miejsce w `present` (fork, styl upstreamu): po
+`get_scenes_presentation_config`, przed wyborem playera — Qt i ImGui widzą te same notatki.
+H liczony z `config.slides[i].notes` po walidacji modelu (dedent już warunkowo zastosowany
+przez `dedent_notes`, config.py:430) i normalizacji newline; nakładki nie dedentować; oryginał
+przechwycić przed podmianą `notes`. ImGui dostaje w manifeście per prezentacja `notes_file`
+(ścieżka kanoniczna) i per slajd `rendered_notes`; walidacja manifestu toleruje oba pola.
+Ten sam deck dwa razy w `present` dzieli plik: stan nakładki per ścieżka kanoniczna, zapis
+z jednej prezentacji aktualizuje drugą. Konflikt: H z pliku ≠ H bieżącego renderu →
+nakładka wygrywa, Info pokazuje „notatki w kodzie zmienione po edycji” i przycisk „Z renderu”,
+który wstawia notatki z renderu do edytora jako zwykłą edycję (Ctrl+Z cofa); treść równa
+renderowi usuwa sekcję. Każdy zapis ustawia H bieżącego renderu i K.
+
+**Bufory i zapis (runda 31, blokujące 2–3).** Niezapisane treści żyją poza widokiem Info:
+magazyn adaptera PC w `runtime` (nie `info_view_state`, który desktop.py:475 czyści po ukryciu
+Info), klucz `(ścieżka kanoniczna, N)`, do udanego zapisu albo ratunku. Ukrycie Info usuwa
+najwyżej stan rysowania. Każdy flush czyta tekst bezpośrednio z `TextEditor.get_text()`, także
+przed upływem opóźnienia. Autozapis 500 ms po ostatniej zmianie (własny zegar monotoniczny
+w GUI albo change callback z opóźnieniem), flush przy zmianie slajdu, przejściu do podglądu,
+ukryciu Info i wyjściu (przed zamknięciem okien). Zapis: ponowny odczyt pliku, podmiana/
+usunięcie sekcji brudnych slajdów, serializacja w kolejności N, zapis do zamkniętego pliku
+tymczasowego w tym samym katalogu i `os.replace`; przy błędzie (także sharing violation na
+Windows, gdy zewnętrzny program trzyma plik) temp usuwany, bufor zostaje brudny, komunikat
+w Info, ponowienie przy następnym wyzwalaczu. Obietnica: zachowane są zewnętrzne zmiany innych
+sekcji istniejące w chwili ponownego odczytu; zapis innego procesu między odczytem a podmianą
+może zginąć — równoczesne zapisy z innych procesów jawnie nieobsługiwane. Plik niepoprawny przy
+ponownym odczycie → brak zapisu, tryb tylko do odczytu, bufory zostają. Ratunek przy wyjściu
+z brudnymi buforami: plik w formacie nakładki z unikalną nazwą
+`<Scene>.notes.unsaved-<YYYYmmdd-HHMMSS>-<pid>.md` tworzony wyłącznie (`open(..., "x")`, bez
+nadpisania; kolizja → kolejny sufiks) obok decku, przy porażce w `tempfile.gettempdir()`,
+ścieżka w logu; gdy oba zawiodą — pełna treść na stderr i do schowka (`imgui.set_clipboard_text`)
+z komunikatem przed zakończeniem. Bez wątku (jeden wątek aplikacji); plik notatek jest mały.
+
+**Edytor ImGui.** Panel notatek: przycisk „Edytuj”/„Podgląd” obok A−/A+. Podgląd = obecny
+render D46 (MicroTeX/Agg, 28 px, wzory 1,2×). Edycja = jeden `TextEditor`
+(`imgui_color_text_edit`, `Language.markdown()`, zawijanie wierszy, bez numerów wierszy,
+paleta ciemna, font notatek przez push_font). Zmiana slajdu w trybie edycji: flush bieżącego,
+`set_text` nowego (historia undo per wejście na slajd; brudny bufor poprzedniego zostaje
+w magazynie). Tryb edycji i popup w stanie widoku Info, bufory w magazynie adaptera, nic
+w reducerze playera. „Edycja przechwytuje wejście” = fokus ImGui childa edytora **lub** jego
+popupu podpowiedzi; flaga unieważniana przy ukryciu Info i `io.app_focus_lost`. Wartość
+z poprzedniej klatki trafia do `input_state["editing_markdown"]` (process_input działa przed
+rysowaniem Info, desktop.py:255/461): router odrzuca wtedy klawisze i gesty (input.py:36), więc
+Q, strzałki, spacja i klikacz nie działają podczas pisania. Klik w okno główne zabiera fokus
+ImGui i przywraca skróty. Esc: zamyka podpowiedzi; bez podpowiedzi oddaje fokus edytora (tryb
+edycji zostaje). Status zapisu w panelu: „zapisano”, „zapisywanie…”, błąd.
+Własne komendy (podpowiedzi, Ctrl+B/I, „Z renderu”) tylko przy jednym kursorze; przy wielu
+kursorach wyłączone.
+
+**Podpowiedzi (auto-completion) i obsługa Markdown.** Popup pod kursorem
+(`doc_pos2_screen_pos`), najwyżej 8 pozycji filtrowanych prefiksem, ↑/↓ wybór, Tab/Enter
+akceptacja, Esc zamknięcie, klik myszą akceptuje. Wyzwalacze: (1) początek wiersza (po
+spacjach) i znak `#`, `-`, `*`, `>`, `1`, `` ` ``, `$` → nagłówki 1–3, lista, lista
+numerowana, cytat, blok kodu, blok `$$…$$`; (2) `\` + litery wewnątrz `$…$`/`$$…$$` →
+komendy LaTeX ze statycznej listy obsługiwanej przez MicroTeX i podzbiór mathtext fallbacku
+D46 (wspólna statyczna lista we wspólnym module, bez importu `notes_math.py` z adapterem PC
+i matplotlib; test na obu ścieżkach renderu), fragmenty z kursorem w pierwszym
+argumencie (`\frac{|}{}`); (3) Ctrl+Space → fragmenty inline: pogrubienie, kursywa, kod,
+link, `$…$`; z zaznaczeniem otacza zaznaczenie. Ctrl+B/Ctrl+I otaczają zaznaczenie albo
+wstawiają parę z kursorem w środku. Logika wyzwalaczy, filtrowania i wstawiania (tekst +
+pozycja kursora) to czyste funkcje we wspólnym module (Pyodide), UI tylko rysuje i podmienia;
+`doc_pos2_screen_pos` dopiero po widocznym `render` (stub imgui_color_text_edit).
+Własne skróty Ctrl+B/I/Space wymagają Ctrl **bez** Alt (AltGr = Ctrl+Alt na Windows).
+Bez autouzupełniania słów i bez sprawdzania pisowni.
+
+**Bramki (zadanie 0, w oknie, raport przed implementacją; runda 31):** B1 przejęcie klawiszy
+przez popup: `imgui.internal.set_key_owner(..., lock_this_frame)` (API eksperymentalne) przed
+`render`, popup czyta klawisz własnym owner ID albo przed blokadą; dowód = zmiana wyboru popupu
+**i brak zmiany tekstu/kursora** edytora dla ↑/↓/Enter/Tab/Esc, także repeat i zamknięcie popupu
+w tej samej klatce; klik podpowiedzi i powrót do pisania. B2 AltGr: test syntetyczny
+(`add_key_event` Ctrl+Alt + `add_input_character`) jako reakcja widgetu **oraz** rzeczywiste
+wpisywanie na polskim układzie Windows (SendInput z RAlt albo próba człowieka, gdy układu brak)
+— ąćęłńóśźż wstawione, żadne skróty wbudowane TextEditor ani własne nie wyzwolone; brak reakcji
+po utracie fokusu. B3 font edytora pod push_font 28 px ma polskie glify (bez „?”). B4 fokus:
+rzeczywisty child edytora i popup, Esc, klik w główne okno, pierwszy klawisz po zmianie fokusu
+idzie we właściwe miejsce (nie wystarcza sam test `route`). B5 Ctrl+C/V/Z/Y z clipboardem GLFW.
+B6 transakcyjne undo własnych komend: podpowiedź, otoczenie zaznaczenia i „Z renderu” przez
+`replace_section_text` + kursor → jedno Ctrl+Z odtwarza tekst i sensowny kursor/zaznaczenie,
+redo przywraca; polskie litery, tabulator, wiele wierszy, zawijanie (pozycje to glify, nie bajty).
+Porażka bramki zatrzymuje zależne zadanie; Claude decyduje o zamienniku z kosztem przed jego
+startem. Po zadaniu 0 ponowna estymacja budżetu.
+
+**Zadania (codex, Claude przegląda po etapie):** 0 bramki B1–B6; 1 moduł nakładki
+(parse/serialize/merge, nagłówek K i wstrzymanie, konflikt H, tylko do odczytu, sekcje spoza
+zakresu) i adapter PC (magazyn brudnych buforów, atomowy zapis, read-modify-write, ratunek
+z fallbackiem); 2 stosowanie w `present` dla Qt i ImGui, pola manifestu; 3 edytor w Info
+(tryb, fokus edytora/popupu → `editing_markdown`, Esc, autozapis, flush, status, „Z renderu”,
+„Zastosuj do obecnych slajdów”); 4 podpowiedzi i Ctrl+B/I (czyste funkcje + popup);
+5 README (format pliku, skróty, ograniczenia) i raport `reports/REPORT-10e.md`.
+
+**Testy (offline, bez okna, poza B1–B6):** round-trip dokładny dla `""`, `"tekst"`,
+`"tekst\n"`, `"tekst\n\n"`, nagłówek K, BOM na wejściu i brak BOM po zapisie, błędny UTF-8 →
+tylko do odczytu bez zapisu, CRLF/CR normalizowane przed hashem i porównaniem, duplikat N →
+żadna sekcja tego N, zły znacznik → tylko do odczytu, N > K zachowane dosłownie, znacznik
+w treści odrzucony; K ≠ M albo brak nagłówka → wstrzymanie w obu playerach i „Zastosuj”
+przepisuje tylko nagłówek; wstawienie slajdu przy pustych notatkach wykryte przez K; H
+z `notes` modelu przy `dedent_notes=False` i `True`, nakładka bez dedentu; konflikt H; treść =
+render usuwa sekcję; zapis atomowy (brak pliku częściowego przy wyjątku, temp sprzątnięty,
+`os.replace` rzucający PermissionError → bufor brudny i ponowienie), read-modify-write
+zachowuje zewnętrzną zmianę innej sekcji, plik zepsuty w międzyczasie → brak zapisu; błąd
+zapisu A → przejście do B → ukrycie Info → wyjście: ratunek zawiera obie edycje; ratunek bez
+nadpisania istniejącego pliku, kolizja nazwy, katalog decku niezapisywalny → temp, oba
+niezapisywalne → stderr i schowek; Qt/ImGui widzą nakładkę (`present` na configach z tmp),
+ten sam deck dwa razy; router: `editing_markdown` blokuje Q/strzałki/spację/gesty, flaga
+gaśnie po ukryciu Info i utracie fokusu aplikacji; autozapis 500 ms i flush przy zmianie
+slajdu/ukryciu Info/wyjściu (atrapa zegara, flush czyta tekst z edytora przed upływem
+opóźnienia); podpowiedzi: wyzwalacze, poza `$` brak komend LaTeX, `\$` i kod inline bez
+wyzwalacza, filtrowanie, wstawianie z kursorem, otaczanie zaznaczenia, wiele kursorów →
+wyłączone, Ctrl+Alt nie jest Ctrl+B/I, lista LaTeX renderuje się w MicroTeX i Agg; shared
+imports (Pyodide) z nowym modułem bez `notes_math`. Zwykły pytest bez regresji. Próba
+człowieka: edycja w trakcie prezentacji, zapis przetrwa restart i ponowny render Demo,
+podpowiedzi i skróty, polskie znaki, konflikt po zmianie kodu, wstrzymanie po dodaniu slajdu.
+
+**Budżet (runda 31):** bramki 2 h, nakładka i adapter 2,5 h, `present`/manifest 1 h, edytor 3 h,
+podpowiedzi 3 h, testy 2 h, README/raport 0,5 h, przegląd, poprawki i próba człowieka 2 h —
+**16 h, stop 32 h**; ponowna estymacja po zadaniu 0. Stop nie usprawiedliwia niedokończonej
+ochrony danych (bufory, atomowy zapis, ratunek).
 
 ### 10b i 10c — granice wspólnego kodu
 

@@ -936,6 +936,42 @@ prelegenta; deterministyczne treści są zwykłymi slajdami plikowymi. Także: w
 w jednym procesie, przejęcie ruchomego preview, spekulacyjne enter_cue/historia,
 prefetch wszystkich slajdów i nieograniczony zapas procesów.
 
+**D49. Edycja notatek w Info z zapisem obok decku — ImGui PC (rozszerza D46), 2026-10-25.**
+Decyzja prelegenta po próbie 2026-10-24: notatki edytowane w Info podczas prezentacji,
+z obsługą Markdown i podpowiedziami, zapis do pliku obok decku `<folder>/<Scene>.notes.md`.
+Plik to nakładka: zawiera tylko slajdy z nadpisaniem i wygrywa z notatkami z renderu; kod
+sceny (`next_slide(notes=...)`), JSON decku i katalog plików renderu bez zmian, więc nakładka
+przetrwa ponowny render. Nagłówek `<!-- manim-cue notes slides=K -->` kontroluje strukturę:
+K ≠ liczba slajdów renderu (albo brak nagłówka) wstrzymuje nakładkę w obu playerach do
+świadomego „Zastosuj do obecnych slajdów” — H nie wykrywa wstawienia slajdu z pustymi
+notatkami (runda 31). Sekcja zaczyna się od wiersza `<!-- manim-cue slide N base=H -->`
+(N od 1, H = 8 znaków hex SHA-256 notatek modelu po normalizacji LF), treść z dokładnie jednym
+terminatorem `\n`, round-trip bez strip. Treść równa notatkom z renderu usuwa sekcję —
+„przywróć z renderu” jest zwykłą, cofalną edycją. Różne H oznacza zmianę notatek w kodzie po
+edycji: nakładka nadal wygrywa, Info pokazuje konflikt. Zapis atomowy (zamknięty plik
+tymczasowy w tym samym katalogu, `os.replace`) z ponownym odczytem i podmianą tylko sekcji
+brudnych slajdów; równoczesne zapisy innych procesów nieobsługiwane. Plik niepoprawny
+składniowo lub z błędnym UTF-8 przełącza Info w tryb tylko do odczytu i nie jest nadpisywany;
+sekcje spoza zakresu decku są zachowywane. Ochrona danych: brudne bufory per (ścieżka, N) żyją
+poza widokiem Info do udanego zapisu; błąd zapisu (także sharing violation) zostawia bufor
+i ponawia; przy wyjściu ratunek z unikalną nazwą bez nadpisania obok decku, potem w katalogu
+tymczasowym, a gdy oba zawiodą — treść na stderr i do schowka z komunikatem.
+
+Edytor: `imgui_color_text_edit.TextEditor` z imgui-bundle 1.93 (Markdown, zawijanie, undo),
+przełącznik podgląd/edycja w panelu notatek, font notatek. Fokus edytora lub jego popupu
+ustawia `editing_markdown` routera — klawisze i gesty playera, łącznie z Q i strzałkami, nie
+działają podczas pisania; Esc najpierw zamyka podpowiedzi, potem oddaje fokus. Podpowiedzi:
+składnia Markdown na początku wiersza, fragmenty inline (Ctrl+Space, otoczenie zaznaczenia),
+komendy LaTeX po `\` w `$…$`/`$$…$$` z listy obsługiwanej przez ścieżkę wzorów D46;
+Ctrl+B/Ctrl+I (Ctrl bez Alt — AltGr). Wykonalność przejęcia klawiszy przez popup, AltGr,
+fokusu i undo własnych komend warunkowa do bramek B1–B6 w PLAN.
+Autozapis 500 ms po zmianie oraz przy zmianie slajdu, przejściu do podglądu, ukryciu Info
+i wyjściu. Qt czyta nakładkę bez edycji (te same notatki w obu playerach). Web (10b) dzieli
+model, komendy i podpowiedzi; trwały zapis w przeglądarce ustali kontrakt 10b.
+Odrzucone: zapis do JSON decku (ginie przy renderze), edycja kodu sceny, mapowanie po treści
+lub nazwie pliku wideo (hash zmienia się z animacją), autouzupełnianie słów z decku (YAGNI).
+Bramki, testy i budżet w PLAN 10e.
+
 ---
 
 ## Zakres, którego nie wolno rozszerzyć bez decyzji

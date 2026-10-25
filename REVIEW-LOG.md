@@ -2529,3 +2529,47 @@ Claude uruchomił `codex exec -s read-only`.
 **Zmiany:** PLAN.md (D46 notatki, 10e, kolejność), SPEC.md (D46). Implementacja w zadaniu 2/4, bez zmiany budżetu.
 
 **Werdykt:** A przyjęte z poprawkami 1–5 (bramka natywna zaliczona); B przyjęte z 6–7.
+
+## Runda 31 — codex, 2026-10-25: kontrakt 10e — edycja notatek w Info (D49)
+
+**Przedmiot:** decyzja prelegenta 2026-10-25 — 10e teraz, przed pomiarem odbioru 10d. Kontrakt: plik nakładki
+`<folder>/<Scene>.notes.md` ze znacznikami sekcji i hashem notatek z renderu, stosowanie w `present` dla Qt
+i ImGui, atomowy read-modify-write z ratunkiem, `TextEditor` imgui-bundle 1.93 w panelu notatek, fokus →
+`editing_markdown`, autozapis 500 ms, podpowiedzi Markdown/LaTeX, bramki B1–B5, budżet 12 h. Claude uruchomił
+`codex exec -s read-only`.
+
+**Ustalenia i rozstrzygnięcia:**
+
+1. **[BLOKUJĄCE] H nie wykrywa zmiany tożsamości slajdu** (wstawienie slajdu przy pustych notatkach). Przyjęto:
+   N zostaje adresem, obowiązkowy nagłówek `<!-- manim-cue notes slides=K -->`; K ≠ liczba slajdów albo brak
+   nagłówka wstrzymuje nakładkę w obu playerach do świadomego „Zastosuj do obecnych slajdów”. Przestawienie przy
+   tej samej liczbie i równych notatkach — jawne ograniczenie; bez migratora i stabilnego ID teraz.
+2. **[BLOKUJĄCE] Błąd zapisu + zmiana slajdu kasuje edycję**, `info_view_state` czyszczony po ukryciu Info.
+   Przyjęto: magazyn brudnych buforów per (ścieżka kanoniczna, N) w `runtime` adaptera PC, flush czyta
+   `get_text()` przed upływem opóźnienia, test A-błąd → B → ukrycie → wyjście.
+3. **[BLOKUJĄCE] Ratunek obok decku zawodzi z tego samego powodu.** Przyjęto: unikalna nazwa z pid, `open("x")`,
+   fallback `tempfile.gettempdir()`, ostatecznie stderr + schowek z komunikatem; testy awarii ratunku.
+4. **[ISTOTNE] B1 nie dowodzi integracji.** Przyjęto: `imgui.internal.set_key_owner` (eksperymentalne), dowód =
+   zmiana wyboru popupu i brak zmiany tekstu/kursora, repeat, zamknięcie w tej samej klatce, klik; porażka
+   zatrzymuje zadanie 3.
+5. **[ISTOTNE] Syntetyczny AltGr omija translację Windows.** Przyjęto: B2 także SendInput na polskim układzie albo
+   próba człowieka; własne skróty Ctrl bez Alt.
+6. **[ISTOTNE] Fokus i popup.** Przyjęto: przechwycenie = fokus childa edytora lub popupu, unieważnienie po ukryciu
+   Info i utracie fokusu aplikacji; B4 na rzeczywistych widgetach i pierwszym klawiszu po zmianie fokusu.
+7. **[ISTOTNE] `os.replace` na Windows i wyścig RMW.** Przyjęto: obsługa sharing violation (temp sprzątany, bufor
+   brudny, ponowienie, ratunek), obietnica zawężona do zmian istniejących przy ponownym odczycie; równoczesne
+   zapisy innych procesów nieobsługiwane.
+8. **[ISTOTNE] Domknięcie formatu.** Przyjęto: dokładnie jeden terminator `\n`, przykłady round-trip, duplikat N →
+   żadna sekcja, błędny UTF-8 → tylko odczyt bez zapisu, BOM tolerowany przy odczycie i usuwany przy zapisie,
+   CRLF/CR → LF przed hashem, porównaniem i zapisem.
+9. **[ISTOTNE] Undo własnych komend.** Przyjęto bramkę B6 (jedno undo/redo, polskie litery, tab, wiele wierszy,
+   zawijanie); własne komendy tylko przy jednym kursorze.
+10. **[ISTOTNE] Budżet.** Przyjęto: bramki 2 h, testy 2 h, próba 2 h — 16 h, stop 32 h, re-estymacja po zadaniu 0.
+11. **[DROBNE] H a `dedent_notes=False`.** Przyjęto: H z `config.slides[i].notes` po walidacji modelu, nakładka bez
+    dedentu, oryginał przechwycony przed podmianą. Także: lista LaTeX we wspólnym module bez importu `notes_math`,
+    `doc_pos2_screen_pos` po widocznym `render`.
+
+**Zmiany:** PLAN.md (10e: format, struktura decku, bufory i zapis, fokus, bramki B1–B6, zadania, testy, budżet),
+SPEC.md (D49). Kolejność 10e → odbiór 10d według decyzji prelegenta; zadanie 8 10d pozostaje obowiązkowe.
+
+**Werdykt:** przyjęte z poprawkami 1–11 naniesionymi w PLAN/SPEC; wykonalność edytora warunkowa do B1–B6.
