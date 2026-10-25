@@ -22,6 +22,7 @@ def test_pc_shared_imports():
     assert result["forbidden_imports"] == []
     assert set(result["cases"]) == {
         "notes_overlay",
+        "notes_complete",
         "clock_pause",
         "navigation_table",
         "geometry_clip",

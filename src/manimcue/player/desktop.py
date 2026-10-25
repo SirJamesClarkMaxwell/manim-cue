@@ -8,10 +8,11 @@ import warnings
 
 from .app import App
 from .geometry import fit
-from .info import render_info, state_text
+from .info import flush_notes, render_info, state_text
 from .input import route
 from .keys import bindings
 from .live import view
+from .notes_overlay import DirtyBuffers
 from .sources_av import close_pool
 from .stage import compose, draw
 
@@ -177,7 +178,7 @@ def run_desktop(manifest: dict, options: dict) -> int:
     params.imgui_window_params.default_imgui_window_type = (
         hello_imgui.DefaultImGuiWindowType.no_default_window
     )
-    runtime = {}
+    runtime = {"dirty_notes": DirtyBuffers()}
 
     def setup():
         io = imgui.get_io()
@@ -247,6 +248,8 @@ def run_desktop(manifest: dict, options: dict) -> int:
         now = time.monotonic()
         io = imgui.get_io()
         if io.app_focus_lost:
+            runtime.get("info_view_state", {})["editing_markdown"] = False
+            runtime.get("info_view_state", {})["popup"] = []
             app.live.cancel_steps()
             app.live.active = None
             runtime["capture"] = None
@@ -262,6 +265,11 @@ def run_desktop(manifest: dict, options: dict) -> int:
                 "reserved": app.state["preparing"]
                 or any(history.reserved for history in app.live.histories.values()),
                 "editing_text": io.want_text_input,
+                "editing_markdown": bool(
+                    app.show_info
+                    and not io.app_focus_lost
+                    and runtime.get("info_view_state", {}).get("editing_markdown")
+                ),
                 "capture": runtime.get("capture"),
                 "entry_id": app.state["entry_id"],
             }
@@ -462,6 +470,8 @@ def run_desktop(manifest: dict, options: dict) -> int:
                 state,
                 {
                     "view_state": runtime.setdefault("info_view_state", {}),
+                    "runtime": runtime,
+                    "now": now,
                     "composition": app.preview_composition,
                     "render": render,
                     "render_notes": lambda text, size: runtime["notes"].render(
@@ -472,8 +482,12 @@ def run_desktop(manifest: dict, options: dict) -> int:
                 action(effect, now)
             imgui.end()
         else:
+            if runtime.get("info_view_state"):
+                flush_notes(runtime, now)
             runtime.pop("info_view_state", None)
+            runtime.pop("notes_edit", None)
         if app.closed:
+            flush_notes(runtime, now, exiting=True)
             app.drop_all()
             close_pool()
             params.app_shall_exit = True
@@ -498,6 +512,10 @@ def run_desktop(manifest: dict, options: dict) -> int:
         app.after_render()
         runtime["notes"].after_render(app.closed)
 
+    def load_editor_font():
+        runtime["editor_font"] = hello_imgui.load_font_ttf("fonts/Inconsolata-Medium.ttf", 28)
+
+    params.callbacks.load_additional_fonts = load_editor_font
     params.callbacks.setup_imgui_config = setup
     params.callbacks.post_init = post_init
     params.callbacks.show_gui = gui

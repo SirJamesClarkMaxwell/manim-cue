@@ -113,3 +113,65 @@ popup na wierzchu przez `bring_window_to_display_front`, Alt-tap przed `SetForeg
 
 **Decyzja Claude:** bramki zależne od API zaliczone (B1 klawisze, B2 syntetyczne, B3, B4, B6); zadania 3–4 ruszają.
 B1 klik, B2 Windows i B5 w próbie człowieka. Ponowna estymacja: bez zmian, 16 h / stop 32 h.
+
+## Etap zadań 3–5 (2026-10-25)
+
+Implementacja bez commita, nowych zależności i wątków aplikacji. Etap 1 i format nakładki bez zmian.
+
+### Pliki i decyzje
+
+- `src/manimcue/player/info.py:168`: Edytuj/Podgląd obok A−/A+; dotychczasowy renderer podglądu.
+- `src/manimcue/player/info.py:198`: dokładny tekst wyłącznie z wierszy widgetu; synchronizacja
+  efektywnych notatek wszystkich prezentacji o tej samej kanonicznej ścieżce.
+- `src/manimcue/player/info.py:213`: walidacja znacznika przed dodaniem do DirtyBuffers, autozapis
+  po 500 ms od ostatniej zmiany, flush czytający widget niezależnie od opóźnienia, zachowanie
+  buforów po błędzie, ratunek i ostateczny fallback stderr/schowek.
+- `src/manimcue/player/info.py:272`: jeden TextEditor, Markdown, wrap, brak numerów i ciemna
+  paleta; wejście na slajd resetuje undo i bierze brudny bufor albo efektywne notatki.
+- `src/manimcue/player/info.py:321`: status także w podglądzie, blokada tylko do odczytu,
+  wstrzymanie i Zastosuj, konflikt H i cofalne Z renderu.
+- `src/manimcue/player/info.py:395`: popup z właścicielem klawiszy przed renderem, blokada
+  zaakceptowanego klawisza do key-up, osobne okno ImGui w viewporcie Info i wynoszenie na wierzch,
+  pozycja kursora dopiero po widocznym renderze; fokus childa/popupu, Esc oddający fokus;
+  własne komendy tylko z jednym kursorem i Ctrl bez Alt. Akceptacja nie otwiera ponownie popupu.
+- `src/manimcue/player/desktop.py:11`: DirtyBuffers należą do runtime, nie info_view_state;
+  flush przy ukryciu i przed zamknięciem okien, unieważnienie editing_markdown po ukryciu
+  i app_focus_lost, osobny font Inconsolata z load_additional_fonts. Bez nowych akcji reducera.
+- `src/manimcue/player/notes_complete.py:1`: wyłącznie stdlib, pozycje w glifach, wyzwalacze,
+  filtrowanie do ośmiu, otaczanie zaznaczenia, statyczny wspólny podzbiór LaTeX. Minimalna
+  kopia tokenizacji notes_math ma test zgodności, bez importu adaptera PC.
+- `experiments/f10a_gate/imports.py:7`, `tests/test_imgui_shared_imports.py:24`: nowy moduł
+  i nazwany przypadek we wspólnej bramce PC/Pyodide.
+- `tests/test_notes_complete.py:1`: 42 nowe przypadki, także rzeczywisty widget w kontekście
+  ImGui bez okien OS, przejęcie ↑/↓/Esc bez zmiany tekstu/kursora, oba renderery LaTeX,
+  przyciski statusu, cykl desktop z atrapami natywnych okien i monotoniczne opóźnienie.
+- `README.md:60`: format, edycja, skróty, podpowiedzi, konflikty, wstrzymanie, ratunek,
+  Qt tylko do odczytu i ograniczenia.
+
+### Weryfikacja
+
+- Wskazane pliki: `test_notes_overlay.py`, `test_notes_complete.py`, `test_imgui_info.py`,
+  `test_imgui_cli.py`, `test_imgui_shared_imports.py`, `test_imgui_input.py`, z `-m "not gpu"`:
+  **172 passed, 1 failed** (1,64 s). Jedyna porażka: istniejąca bramka Pyodide potrzebuje
+  `uv --with playwright`; playwright nie jest zainstalowany ani dostępny w cache offline.
+  Domyślny cache uv jest niedostępny (Access denied); z lokalnym cache i UV_OFFLINE=1
+  wynik jasno wskazuje brak pakietu. Testu nie zmieniano na skip. Bramka importów PC przechodzi.
+- Domyślne `.tmp/pytest-of-Franek` ma niedostępne ACL; przebiegi używają osobnych
+  `--basetemp=.tmp/10e-stage2-*` w tym worktree, pozostałe ustawienia zgodnie z poleceniem.
+- Zwykły przebieg całego repo zawiera testy okien. Próba z wyłączeniem gpu wykryła również
+  nieoznaczony `experiments/f5i_imgui/test_poc.py::test_desktop_smoke_one_clip_with_info`:
+  test zdążył otworzyć okno i przeszedł, co naruszyło polecenie nieotwierania okien. Przebieg zatrzymano.
+  Dalsza regresja wyłącza gpu, slow (tak jak domyślny pytest) i oba stare smoke testy PoC
+  desktop/web. Nie jest to pełny zwykły pytest ani ponowne zaliczenie bramek B1–B6.
+- Regresja repo (bez gpu/slow i dwóch smoke testów PoC): **743 passed, 1 skipped,
+  154 deselected, 1 failed**, 308,30 s. Jedyna porażka to ta sama bramka Pyodide
+  (brak playwright w cache offline). Log: `.tmp/10e-full3.txt`. Ten przebieg zebrał testy
+  przed dodaniem ostatnich trzech przypadków przycisków statusu; końcowy przebieg wskazanych
+  plików (172 passed, 1 failed) obejmuje również te trzy i końcową wersję Info.
+- `ruff check` i `ruff format --check` wszystkich sześciu zmienionych plików Python:
+  **PASS**; `git diff --check`: **PASS**.
+- Osiem zmienionych plików sprawdzono bajtowo: poprawny UTF-8, LF, brak BOM.
+  Wyszukiwanie dwóch znaków zapytania (odpowiednik żądanego grep na Windows): brak trafień. Dodatkowa kontrola
+  pojedynczych znaków `?` naprawiła etykietę Podgląd; pozostałe należą do regexu.
+- Próba człowieka i pełny zwykły pytest z testami okien pozostają niezaliczone. Nie
+  instalowano pakietów, nie zmieniano testów środowiskowych na skip, nie commitowano.

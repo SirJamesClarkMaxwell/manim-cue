@@ -4,7 +4,16 @@ import json
 import sys
 from pathlib import Path
 
-MODULES = ("__init__", "manifest", "clock", "controller", "geometry", "state", "notes_overlay")
+MODULES = (
+    "__init__",
+    "manifest",
+    "clock",
+    "controller",
+    "geometry",
+    "state",
+    "notes_overlay",
+    "notes_complete",
+)
 FORBIDDEN = (
     "qtpy",
     "PySide6",
@@ -27,8 +36,11 @@ def run_shared_cases() -> dict:
     from manimcue.player.controller import reduce
     from manimcue.player.geometry import clip, fit, layer_box
     from manimcue.player.manifest import validate_manifest
+    from manimcue.player.notes_complete import suggestions
     from manimcue.player.notes_overlay import apply, notes_hash, parse, serialize
     from manimcue.player.state import initial_state, snapshot
+
+    assert suggestions("żółć $\\fr$", (0, 9))[0][0] == r"\frac"
 
     overlay_text = (
         "<!-- manim-cue notes slides=1 -->\n"
@@ -103,6 +115,7 @@ def run_shared_cases() -> dict:
     assert stale["index"] == [0, 1]
     return {
         "notes_overlay": {"stdlib": True},
+        "notes_complete": {"stdlib": True},
         "clock_pause": {"position": media_time(clock, 101)},
         "navigation_table": {"index": next_state["index"], "entry_id": 2},
         "geometry_clip": {"frame": list(frame), "clip": list(clipped)},

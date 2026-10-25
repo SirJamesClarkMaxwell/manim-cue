@@ -56,6 +56,56 @@ the independently playing next slide and scrollable Markdown notes on the right.
 Timer pause/restart affects only presenter time; restart preserves its paused state.
 A−/A+ changes notes text from 16 to 48 logical pixels (default 28), for the session; math is 1.2× the text size.
 Notes support `$inline$` and `$$display$$` math with local MicroTeX and an Agg fallback.
+
+In the ImGui Info window, **Edytuj** switches the notes panel to a Markdown editor;
+**Podgląd** returns to the preview. Changes save after 500 ms without typing and when
+changing slides, returning to preview, hiding Info or exiting. The editor uses the
+notes font size, word wrap and a monospace font. While the editor or its suggestions
+have focus, player keys (including Q, arrows and Space) and gestures are blocked.
+Esc closes suggestions first; another Esc releases editor focus.
+
+- Ctrl+B / Ctrl+I wraps the selection in bold / italic, or inserts an empty pair.
+- Ctrl+Space offers inline bold, italic, code, links and math, wrapping a selection.
+- At the start of a line (after spaces), type `#`, `-`, `*`, `>`, `1`, a backtick or `$` for Markdown
+  blocks. In math, a backslash followed by letters offers supported LaTeX commands.
+- Use Up/Down to choose, Tab/Enter or a mouse click to insert, Esc to dismiss.
+  Suggestions show at most eight prefix matches. Own commands require one cursor;
+  Ctrl+Alt (Windows AltGr) does not activate these shortcuts.
+
+Edits are stored in `<folder>/<Scene>.notes.md` beside the deck (`slides` by default),
+so rendering the scene again preserves them. Qt reads the same overlay, without an
+editor. Scene code and deck JSON stay unchanged. The UTF-8 file has this format:
+
+```markdown
+<!-- manim-cue notes slides=2 -->
+<!-- manim-cue slide 1 base=01234567 -->
+Edited notes for slide 1.
+```
+
+The header records the slide count; each section uses a one-based slide number and
+the first eight hex digits of SHA-256 of the rendered notes after LF normalization.
+Only overrides are stored. Each section has exactly one extra final newline;
+trailing blank lines in notes are preserved. Returning to the rendered text removes
+the override. Reading accepts a UTF-8 BOM; writing uses UTF-8 without BOM and LF.
+Lines beginning with `<!-- manim-cue` are reserved and refused in edited text.
+
+If the slide count changes or the header is missing, the overlay is suspended and
+rendered notes appear. **Zastosuj do obecnych slajdów** explicitly reassigns existing
+sections to the current slide numbers. If rendered notes changed after editing,
+the overlay still wins and Info reports a conflict. **Z renderu** inserts rendered
+notes as an ordinary edit (one Ctrl+Z undoes it). Invalid syntax or UTF-8 makes the
+file read-only. Errors appear in the panel; failed saves retain dirty buffers even
+when Info is hidden. On exit, unsaved notes go to a unique
+`<Scene>.notes.unsaved-<timestamp>-<pid>.md` beside the deck, then the system temp
+folder if needed. The path is logged; if both writes fail, full contents go to
+stderr and the clipboard.
+
+Limitations: slide numbers are addresses. Reordering without changing the count
+can only be detected when rendered notes differ. Concurrent writes by other
+processes are unsupported (changes to other sections already present when a save
+starts are preserved). No spell checking, word completion or persistent undo history
+across slide entries. Web persistence is outside this desktop feature.
+
 Invalid formulas remain visible with an error. The full-height column on the left lazily loads static
 thumbnails for the current deck; clicking one jumps directly through the normal entry
 barrier. Clicking the current slide does nothing. A jump starts local live history without
