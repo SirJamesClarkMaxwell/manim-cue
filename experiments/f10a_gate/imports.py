@@ -4,7 +4,7 @@ import json
 import sys
 from pathlib import Path
 
-MODULES = ("__init__", "manifest", "clock", "controller", "geometry", "state")
+MODULES = ("__init__", "manifest", "clock", "controller", "geometry", "state", "notes_overlay")
 FORBIDDEN = (
     "qtpy",
     "PySide6",
@@ -17,6 +17,7 @@ FORBIDDEN = (
     "manimlib",
     "click",
     "manimcue.slides",
+    "manimcue.player.notes_math",
 )
 
 
@@ -26,7 +27,16 @@ def run_shared_cases() -> dict:
     from manimcue.player.controller import reduce
     from manimcue.player.geometry import clip, fit, layer_box
     from manimcue.player.manifest import validate_manifest
+    from manimcue.player.notes_overlay import apply, notes_hash, parse, serialize
     from manimcue.player.state import initial_state, snapshot
+
+    overlay_text = (
+        "<!-- manim-cue notes slides=1 -->\n"
+        f"<!-- manim-cue slide 1 base={notes_hash('render')} -->\nżółć\n\n"
+    )
+    overlay = parse(overlay_text)
+    assert apply(["render"], overlay) == (["żółć\n"], [])
+    assert serialize(overlay) == overlay_text
 
     manifest = {
         "version": 1,
@@ -92,6 +102,7 @@ def run_shared_cases() -> dict:
     copy["index"][0] = 99
     assert stale["index"] == [0, 1]
     return {
+        "notes_overlay": {"stdlib": True},
         "clock_pause": {"position": media_time(clock, 101)},
         "navigation_table": {"index": next_state["index"], "entry_id": 2},
         "geometry_clip": {"frame": list(frame), "clip": list(clipped)},

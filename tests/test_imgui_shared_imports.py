@@ -21,6 +21,7 @@ def test_pc_shared_imports():
     result = json.loads(process.stdout)
     assert result["forbidden_imports"] == []
     assert set(result["cases"]) == {
+        "notes_overlay",
         "clock_pause",
         "navigation_table",
         "geometry_clip",

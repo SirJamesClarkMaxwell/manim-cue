@@ -88,7 +88,12 @@ def get_scenes_presentation_config(
                 f"File {config_file} does not exist, check the scene name and make sure to use Slide as your scene base class"
             )
         try:
-            presentation_configs.append(PresentationConfig.from_file(config_file))
+            presentation_config = PresentationConfig.from_file(config_file)
+            object.__setattr__(
+                presentation_config, "_notes_file",
+                str(config_file.with_suffix(".notes.md").resolve()),
+            )
+            presentation_configs.append(presentation_config)
         except ValidationError as e:
             raise click.UsageError(str(e)) from None
 
@@ -277,6 +282,23 @@ def present(  # noqa: C901
         exit_after_last_slide = True
 
     presentation_configs = get_scenes_presentation_config(scenes, folder)
+
+    from manimcue.player.notes_overlay import apply, canonical_path, read_overlay
+
+    for presentation_config in presentation_configs:
+        notes_file = canonical_path(presentation_config._notes_file)
+        rendered = [slide.notes for slide in presentation_config.slides]
+        object.__setattr__(presentation_config, "_notes_file", notes_file)
+        object.__setattr__(presentation_config, "_rendered_notes", rendered)
+        if Path(notes_file).exists():
+            try:
+                effective, warnings = apply(rendered, read_overlay(notes_file))
+                for warning in warnings:
+                    logger.warning(f"{notes_file}: {warning}")
+                for slide, notes in zip(presentation_config.slides, effective):
+                    object.__setattr__(slide, "notes", notes)
+            except OSError as error:
+                logger.warning(f"{notes_file}: {error}")
 
     # F5 (D29): długości warstw raz przed prezentacją, nie w from_file (sonda multimediów).
     from manimcue.media import check_presentation_durations

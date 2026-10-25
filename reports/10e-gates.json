@@ -1,0 +1,163 @@
+{
+  "results": [
+    {
+      "gate": "B1",
+      "status": "FAIL",
+      "details": {
+        "keys": [
+          {
+            "key": "515",
+            "editor_unchanged": true,
+            "popup_reacted": true,
+            "repeat": true
+          },
+          {
+            "key": "516",
+            "editor_unchanged": true,
+            "popup_reacted": true,
+            "repeat": true
+          },
+          {
+            "key": "525",
+            "editor_unchanged": true,
+            "popup_reacted": true,
+            "repeat": true
+          },
+          {
+            "key": "512",
+            "editor_unchanged": true,
+            "popup_reacted": true,
+            "repeat": true
+          },
+          {
+            "key": "526",
+            "editor_unchanged": true,
+            "popup_reacted": true,
+            "repeat": true
+          }
+        ],
+        "mouse_then_typing": {
+          "text_changed": false,
+          "popup_open": true
+        }
+      }
+    },
+    {
+      "gate": "B2.synthetic",
+      "status": "PASS",
+      "details": {
+        "text": "ąćęłńóśźż",
+        "own_shortcuts": 0
+      }
+    },
+    {
+      "gate": "B2.windows",
+      "status": "FAIL",
+      "details": "Okno bramki nie jest na pierwszym planie"
+    },
+    {
+      "gate": "B2.focus_lost",
+      "status": "SKIP",
+      "details": "znaki wstrzykiwane omijają fokus OS; test flagi w implementacji"
+    },
+    {
+      "gate": "B3",
+      "status": "PASS",
+      "details": {
+        "missing": [],
+        "size": 28
+      }
+    },
+    {
+      "gate": "B4",
+      "status": "PASS",
+      "details": {
+        "child": true,
+        "popup": true,
+        "first_escape": true,
+        "second_escape": true,
+        "main_first_key": true,
+        "editor_first_key": true
+      }
+    },
+    {
+      "gate": "B5",
+      "status": "FAIL",
+      "details": {
+        "copy": false,
+        "paste": "zażółć",
+        "undo": "zażółć",
+        "redo": "zażółć"
+      }
+    },
+    {
+      "gate": "B6",
+      "status": "PASS",
+      "details": [
+        {
+          "name": "suggestion",
+          "undo": [
+            "żółć\tzawijanie zawijanie zawijanie zawijanie zawijanie zawijanie zawijanie zawijanie zawijanie zawijanie zawijanie zawijanie zawijanie zawijanie zawijanie zawijanie zawijanie zawijanie zawijanie zawijanie zawijanie zawijanie zawijanie zawijanie zawijanie zawijanie zawijanie zawijanie zawijanie zawijanie \nłąka\nkoniec",
+            [
+              0,
+              0
+            ]
+          ],
+          "selection_before": "",
+          "selection_after_redo": "",
+          "selection_after_undo": "",
+          "redo": [
+            "\\frac{}{}żółć\tzawijanie zawijanie zawijanie zawijanie zawijanie zawijanie zawijanie zawijanie zawijanie zawijanie zawijanie zawijanie zawijanie zawijanie zawijanie zawijanie zawijanie zawijanie zawijanie zawijanie zawijanie zawijanie zawijanie zawijanie zawijanie zawijanie zawijanie zawijanie zawijanie zawijanie \nłąka\nkoniec",
+            [
+              0,
+              9
+            ]
+          ],
+          "pass": true
+        },
+        {
+          "name": "bold",
+          "undo": [
+            "żółć\tzawijanie zawijanie zawijanie zawijanie zawijanie zawijanie zawijanie zawijanie zawijanie zawijanie zawijanie zawijanie zawijanie zawijanie zawijanie zawijanie zawijanie zawijanie zawijanie zawijanie zawijanie zawijanie zawijanie zawijanie zawijanie zawijanie zawijanie zawijanie zawijanie zawijanie \nłąka\nkoniec",
+            [
+              1,
+              4
+            ]
+          ],
+          "selection_before": "łąka",
+          "selection_after_redo": "",
+          "selection_after_undo": "łąka",
+          "redo": [
+            "żółć\tzawijanie zawijanie zawijanie zawijanie zawijanie zawijanie zawijanie zawijanie zawijanie zawijanie zawijanie zawijanie zawijanie zawijanie zawijanie zawijanie zawijanie zawijanie zawijanie zawijanie zawijanie zawijanie zawijanie zawijanie zawijanie zawijanie zawijanie zawijanie zawijanie zawijanie \n**łąka**\nkoniec",
+            [
+              1,
+              8
+            ]
+          ],
+          "pass": true
+        },
+        {
+          "name": "rendered",
+          "undo": [
+            "żółć\tzawijanie zawijanie zawijanie zawijanie zawijanie zawijanie zawijanie zawijanie zawijanie zawijanie zawijanie zawijanie zawijanie zawijanie zawijanie zawijanie zawijanie zawijanie zawijanie zawijanie zawijanie zawijanie zawijanie zawijanie zawijanie zawijanie zawijanie zawijanie zawijanie zawijanie \nłąka\nkoniec",
+            [
+              0,
+              0
+            ]
+          ],
+          "selection_before": "",
+          "selection_after_redo": "",
+          "selection_after_undo": "",
+          "redo": [
+            "\tZ renderu\nżółć\n",
+            [
+              2,
+              0
+            ]
+          ],
+          "pass": true
+        }
+      ]
+    }
+  ]
+}

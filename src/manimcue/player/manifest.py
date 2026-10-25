@@ -94,8 +94,10 @@ def model_to_manifest(configs: list) -> dict:
     presentations = []
     for config in configs:
         slides = []
-        for model in config.slides:
+        for slide_index, model in enumerate(config.slides):
             slide = model.model_dump(mode="json")
+            if hasattr(config, "_rendered_notes"):
+                slide["rendered_notes"] = config._rendered_notes[slide_index]
             slide["kind"] = media_kind(slide["file"])
             slide["rate"] = slide.pop("playback_rate")
             slide["reverse_rate"] = slide.pop("reversed_playback_rate")
@@ -119,6 +121,9 @@ def model_to_manifest(configs: list) -> dict:
         presentations.append(
             {"resolution": list(config.resolution), "slides": slides, "background": color}
         )
+    for config, presentation in zip(configs, presentations):
+        if hasattr(config, "_notes_file"):
+            presentation["notes_file"] = config._notes_file
     return validate_manifest(
         {"version": 1, "resolution": presentations[0]["resolution"], "presentations": presentations}
     )
