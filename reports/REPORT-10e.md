@@ -107,19 +107,9 @@ popup na wierzchu przez `bring_window_to_display_front`, Alt-tap przed `SetForeg
 | B5 | próba człowieka | `OpenClipboard` zwraca ERROR_ACCESS_DENIED także w zwykłym procesie Pythona tej sesji — ograniczenie środowiska, nie aplikacji. |
 | B6 | PASS | `replace_section_text` + `set_cursor`: jedno Ctrl+Z/Ctrl+Y dla podpowiedzi, otoczenia `**…**` i „Z renderu”; polskie litery, tab, wiele wierszy, zawijanie. |
 
-**Odkrycie dla zadania 3:** `TextEditor.get_text()` jest stratny — `'a'` i `'a
-'` dają `'a
-'`, `'a
-b'` daje
-`'a
-b
-'`. Dokładny tekst = `"
-".join(get_line_text(i) for i in range(get_line_count()))` (round-trip `""`,
-`"a"`, `"a
-"`, `"a
-
-"`). Bez tego każde wejście na slajd brudziłoby bufor i dopisywało `
-`.
+**Odkrycie dla zadania 3:** `TextEditor.get_text()` jest stratny — `'a'` i `'a\n'` dają `'a\n'`, `'a\r\nb'` daje
+`'a\nb\n'`. Dokładny tekst = `"\n".join(get_line_text(i) for i in range(get_line_count()))` (round-trip `""`,
+`"a"`, `"a\n"`, `"a\n\n"`). Bez tego każde wejście na slajd brudziłoby bufor i dopisywało `\n`.
 
 **Decyzja Claude:** bramki zależne od API zaliczone (B1 klawisze, B2 syntetyczne, B3, B4, B6); zadania 3–4 ruszają.
 B1 klik, B2 Windows i B5 w próbie człowieka. Ponowna estymacja: bez zmian, 16 h / stop 32 h.
