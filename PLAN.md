@@ -2000,9 +2000,14 @@ osobne wywołania `imgui_md` i obrazy wzorów.
   proporcjonalnego do Y kliknięcia w bloku (render nie mapuje się na pozycje źródła —
   przybliżenie, ograniczenie), `set_focus` edytora; klik pod ostatnim blokiem → koniec
   ostatniego bloku. ↑ w pierwszym wierszu wizualnym / ↓ w ostatnim → sąsiedni blok (kursor
-  w jego ostatnim/pierwszym wierszu, kolumna przycięta). Backspace na początku bloku / Delete na
-  końcu → scalenie z poprzednim/następnym blokiem (usunięcie separatora; jedyny sposób łączenia
-  akapitów, bo separatory są poza edytorem), kursor w miejscu złączenia. Klawisze nawigacji
+  w jego ostatnim/pierwszym wierszu **wizualnym**, ta sama kolumna wizualna, przycięta —
+  zawijanie sąsiada znane po pierwszym render, korekta kursora w tej klatce; runda 33, 2;
+  pozycja na granicy zawinięcia należy do wcześniejszego wiersza — ograniczenie
+  `TextEditor`). Backspace na początku bloku / Delete na
+  końcu → scalenie z poprzednim/następnym blokiem (usunięcie **jednego znaku** separatora jak
+  w Obsidianie: `\n\n` → `\n`, akapity łączą się wierszem bez sklejania słów, kolejny Backspace
+  w edytorze dokleja wiersz; jedyny sposób łączenia akapitów, bo separatory są poza edytorem;
+  doprecyzowanie po przeglądzie etapu 3), kursor w miejscu złączenia. Klawisze nawigacji
   i scalania przejmowane tylko bez popupu, przy jednym kursorze bez zaznaczenia i **bez
   modyfikatorów** (Shift+↓, Ctrl+Backspace, Alt, Super zostają dla edytora; runda 32, 7),
   mechanizmem B1 (`set_key_owner` przed `render`); krawędź = pierwszy/ostatni wiersz
@@ -2038,6 +2043,47 @@ spacja i klikacz nie działają podczas pisania. Klik w okno główne zabiera fo
 dezaktywuje blok i przywraca skróty. Status zapisu w panelu: „zapisano”, „zapisywanie…”, błąd.
 Własne komendy (podpowiedzi, Ctrl+B/I, „Z renderu”, nawigacja i scalanie bloków) tylko przy
 jednym kursorze; przy wielu kursorach wyłączone.
+
+**Ergonomia edytora (zadanie 7, decyzja prelegenta 2026-10-25 po próbie trybu blokowego).**
+- *Otaczanie zaznaczenia.* Znak `$`, `*`, `_`, `` ` ``, `(`, `[`, `{` wpisany przy niepustym
+  zaznaczeniu (jeden kursor) otacza je parą (`)`, `]`, `}` dla nawiasów) zamiast zastąpić;
+  zaznaczenie zostaje na treści (drugie `*` → pogrubienie). Znak czytany z
+  `io.input_queue_characters` przed `render` edytora, kolejka czyszczona; tylko gdy w klatce
+  jest dokładnie jeden znak. Jedna komenda `replace_section_text` (Ctrl+Z cofa całość).
+- *Ctrl+Enter* (także numeryczny; runda 33, 4) zatwierdza blok jak Esc (flush, render
+  całości), także przy otwartym popupie; Enter nie trafia wtedy do edytora.
+- *Ctrl+Backspace/Ctrl+Delete* (zgłoszenie z próby: `TextEditor` ich nie obsługuje): usuwają
+  znak nowego wiersza albo odstęp ze słowem lub ciągiem interpunkcji w stronę ruchu, przy
+  zaznaczeniu — zaznaczenie; na krawędzi bloku nic (scalanie zostaje dla klawiszy bez
+  modyfikatorów). Czysta funkcja w `notes_complete.py`, przejęcie mechanizmem B1.
+- *Kontynuacja list.* Enter bez modyfikatorów, bez popupu, jeden kursor bez zaznaczenia,
+  w wierszu elementu listy (`-`, `*`, `+`, `1.`, `1)`, opcjonalnie pole zadania `[ ]`/`[x]`)
+  albo cytatu (`>`), z kursorem za znacznikiem: wstawia `\n` + to samo wcięcie + znacznik
+  (numer +1 z tym samym ogranicznikiem, pole zadania zawsze `[ ] `); tekst za kursorem
+  przechodzi do nowego elementu. Enter w elemencie bez treści usuwa jego znacznik (koniec
+  listy, jak w Obsidianie). Czysta funkcja w `notes_complete.py`; przejęcie Enter mechanizmem
+  B1 jak scalanie, jedna komenda `replace_section_text`.
+- *Tekst-cień.* Przy widocznym popupie reszta wybranej podpowiedzi (szablon bez `|`, minus
+  wpisany prefiks; brak, gdy szablon nie zaczyna się prefiksem) rysowana za kursorem kolorem
+  `text_disabled` czcionką edytora, na tle edytora zasłaniającym tekst za kursorem na długości
+  cienia; Tab/Enter akceptują jak dotąd. Reszta liczona czystą funkcją w `notes_complete.py`.
+  Rozmiar cienia = bieżący rozmiar fontu (`get_font_size`, skala DPI), popup pod kursorem
+  o wysokość wiersza edytora (runda 33, 3). Widoczność kursora dla popupu i cienia:
+  `is_rect_visible` w panelu — `is_doc_pos_visible` zwraca False w edytorze o wysokości jednego
+  wiersza (błąd znaleziony w próbie: w trybie blokowym popup nie pojawiał się wcale).
+- *Wzory w renderze.* MicroTeX inicjalizowany przy tworzeniu `NotesRenderer` (imgui_md robi to
+  dopiero przy pierwszym wzorze — walidacja przed nim szła do mathtext z `\scalebox` i błąd
+  zostawał w cache); ścieżka natywna tylko przy `is_initialized()`. `hard_soft_breaks = True`:
+  nowy wiersz łamie linię jak w Obsidianie (także notatki z kodu D46). imgui_md wyrównuje wzór
+  inline do linii bazowej, podnosząc go ponad narysowany już wiersz: nad pierwszym wierszem
+  bloku rezerwa (`dummy` o nadmiar wysokości), dla dalszych rozpórka
+  `$\raisebox{-Dpx}{\rule{0px}{Dpx}}$` na końcu poprzedniego wiersza (D = najniższy element
+  poprzedniego wiersza — descent tekstu albo głębokość jego wzoru — plus nadmiar, w pikselach
+  fizycznych; `px` MicroTeX nie zależy od rozmiaru). Bez rozpórki wewnątrz ```` ``` ````,
+  `~~~` i `$$` (parzystość znaczników), za ich zamknięciem (także ze spacjami na końcu),
+  w wierszu z `|` (tabele), w wierszu z samych `-=*_` (podkreślenie Setext, linia pozioma;
+  runda 33, 1) i przy niesparowanym `$` w poprzednim wierszu (wzór w trakcie pisania złapałby
+  rozpórkę); wcięty kod — ograniczenie.
 
 **Podpowiedzi (auto-completion) i obsługa Markdown.** Popup pod kursorem
 (`doc_pos2_screen_pos`), najwyżej 8 pozycji filtrowanych prefiksem, ↑/↓ wybór, Tab/Enter
@@ -2088,6 +2134,10 @@ viewportem panelu, wklejenia, scalenia, zmiany szerokości okna i A−/A+; klik 
 pierwszy klawisz trafia do edytora w tej samej albo następnej klatce; przejęcie
 ↑/↓/Backspace/Delete na krawędzi bez zmiany tekstu edytora, z modyfikatorami bez przejęcia.
 Porażka B7 zatrzymuje odbiór zadania 6; Claude decyduje o zamienniku z kosztem.
+7 ergonomia edytora (decyzja 2026-10-25 po próbie trybu blokowego): otaczanie zaznaczenia,
+Ctrl+Enter, Ctrl+Backspace/Delete, inicjalizacja MicroTeX, `hard_soft_breaks`, rozpórki
+wzorów, widoczność popupu i poprawki rundy 33 (Claude, w próbie); kontynuacja list
+i tekst-cień (codex); README i raport.
 
 **Testy (offline, bez okna, poza B1–B6):** round-trip dokładny dla `""`, `"tekst"`,
 `"tekst\n"`, `"tekst\n\n"`, nagłówek K, BOM na wejściu i brak BOM po zapisie, błędny UTF-8 →
@@ -2123,7 +2173,17 @@ przez bloki; zmiana slajdu przed autozapisem (także z brudnym buforem innego sl
 tekstu; niepoprawny tekst → inny blok → inny slajd → powrót przywraca go, wyjście wypisuje go
 na stderr; kliknięcie bloku przed i za aktywnym, akceptacja podpowiedzi myszą i „Z renderu”
 z natychmiastowym Ctrl+Z nie są zjadane przez dezaktywację; Esc i utrata fokusu dezaktywują
-z flushem; tylko do odczytu blokuje aktywację.
+z flushem; tylko do odczytu blokuje aktywację. Ergonomia: otaczanie zaznaczenia z polskimi
+literami, nawias i drugie `*` na zachowanym zaznaczeniu, dwa znaki w klatce bez otaczania;
+Ctrl+Enter dezaktywuje bez nowego wiersza; kontynuacja `-`, `*`, `+`, `1.` → `2.`, `1)` → `2)`,
+pole zadania (`[x]` → `[ ] `), cytat, wcięcie zachowane, kursor w środku treści, pusty element
+kończy listę, kursor przed znacznikiem i modyfikator/popup bez przejęcia; reszta cienia
+(prefiks, brak dopasowania, polskie litery); rozpórka po pierwszym i kolejnym wierszu,
+głębokość ponad wzór poprzedniego wiersza, brak za ```` ``` ```` (także ze spacjami), na
+separatorze tabeli, podkreśleniu Setext i przy niesparowanym `$`; Ctrl+Backspace/Delete
+(słowo z polskimi literami, interpunkcja, nowy wiersz, zaznaczenie, krawędź bloku); ↑ do
+zawiniętego sąsiada trafia w jego ostatni wiersz wizualny; MicroTeX gotowy przed pierwszym
+renderem notatki ze wzorem.
 Zwykły pytest bez regresji. Próba człowieka: edycja w trakcie prezentacji, zapis przetrwa
 restart i ponowny render Demo, podpowiedzi i skróty, polskie znaki, konflikt po zmianie kodu,
 wstrzymanie po dodaniu slajdu, tryb blokowy (klik, ↑/↓, scalanie, Esc).
@@ -2134,7 +2194,8 @@ podpowiedzi 3 h, testy 2 h, README/raport 0,5 h, przegląd, poprawki i próba cz
 ochrony danych (bufory, atomowy zapis, ratunek). Zadanie 6 (zmiana zakresu decyzją prelegenta
 2026-10-25): funkcje bloków 1 h, UI 2,5 h, stan roboczy w `runtime` 0,5 h, B7 1 h, testy
 1,5 h, przegląd i próba 0,5 h — **+7 h, razem 23 h, stop 46 h** (runda 32); ponowna estymacja
-po B7.
+po B7. Zadanie 7: poprawki z próby 1 h, listy 1 h, cień 1,5 h, testy i dokumentacja 0,5 h —
+**+4 h, razem 27 h, stop 46 h bez zmian** (runda 33).
 
 ### 10b i 10c — granice wspólnego kodu
 

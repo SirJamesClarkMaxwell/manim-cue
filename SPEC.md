@@ -972,7 +972,13 @@ edycję bloku i oddaje fokus. Podpowiedzi:
 składnia Markdown na początku wiersza, fragmenty inline (Ctrl+Space, otoczenie zaznaczenia),
 komendy LaTeX po `\` w `$…$`/`$$…$$` z listy obsługiwanej przez ścieżkę wzorów D46;
 Ctrl+B/Ctrl+I (Ctrl bez Alt — AltGr). Wykonalność przejęcia klawiszy przez popup, AltGr,
-fokusu i undo własnych komend warunkowa do bramek B1–B6 w PLAN.
+fokusu i undo własnych komend warunkowa do bramek B1–B6 w PLAN. Ergonomia (zadanie 7, decyzja
+prelegenta 2026-10-25 po próbie trybu blokowego): znak `$ * _ ` ( [ {` przy zaznaczeniu otacza
+je zamiast zastąpić, Ctrl+Enter zatwierdza blok, Enter w elemencie listy lub cytatu kontynuuje
+znacznik (pusty element kończy listę), reszta wybranej podpowiedzi rysowana jako tekst-cień za
+kursorem. Render: nowy wiersz notatki łamie linię jak w Obsidianie (`hard_soft_breaks`, także
+dla notatek z kodu), wzór inline wyższy od wiersza dostaje miejsce nad wierszem (imgui_md
+wyrównuje do linii bazowej bez podnoszenia wiersza).
 Autozapis 500 ms po zmianie oraz przy zmianie slajdu, zmianie i opuszczeniu bloku, ukryciu
 Info i wyjściu. Qt czyta nakładkę bez edycji (te same notatki w obu playerach). Web (10b) dzieli
 model, komendy i podpowiedzi; trwały zapis w przeglądarce ustali kontrakt 10b.

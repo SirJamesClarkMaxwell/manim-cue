@@ -2611,3 +2611,38 @@ wirtualny blok, wspólny limit wzorów, modyfikatory, zadanie 6 z B7, testy, bud
 re-estymacja po B7; flush czyta wiersze edytora, nie stratne `get_text()`), SPEC.md (D49).
 
 **Werdykt:** przyjęte z poprawkami 1–7 naniesionymi w PLAN/SPEC; odbiór zadania 6 warunkowy do B7.
+
+---
+
+## Runda 33 — codex, 2026-10-25: implementacja trybu blokowego i ergonomia edytora 10e (zadania 6–7)
+
+**Przedmiot:** diff etapu 3 w worktree (tryb blokowy: `notes_complete.blocks`/`block_target`, `render_blocks`,
+`render_editor`, wspólny limit wzorów) i zmiany kontraktu: doprecyzowanie scalania (Backspace/Delete usuwa jeden
+znak separatora jak Obsidian — implementacja kleiła słowa, poprawione przez Claude przed rundą) oraz zadanie 7
+„Ergonomia edytora” z próby prelegenta 2026-10-25 (otaczanie zaznaczenia, Ctrl+Enter, kontynuacja list,
+tekst-cień, inicjalizacja MicroTeX, `hard_soft_breaks`, rozpórki wzorów). Claude uruchomił `codex exec -s read-only`.
+
+**Ustalenia i rozstrzygnięcia:**
+
+1. **[ISTOTNE] Rozpórki uszkadzają składnię Markdown** — zamknięcie ```` ``` ```` ze spacjami na końcu, separator
+   tabeli bez zewnętrznych `|`, podkreślenie Setext `---`. Przyjęto: zamknięcia po `strip`, także `~~~`; bez
+   rozpórki w wierszu z `|` i z samych `-=*_`; test trzech wejść. Wcześniej, w próbie: niesparowany `$`
+   w poprzednim wierszu łapał rozpórkę jako zamknięcie wzoru, a głębokość nie liczyła wzoru poprzedniego wiersza —
+   poprawione (pominięcie przy niesparowanym `$`, D = najniższy element + nadmiar).
+2. **[ISTOTNE] ↑ trafia w pierwszy wiersz wizualny zawiniętego sąsiada.** Przyjęto: przejście zapamiętuje kolumnę
+   wizualną, po pierwszym render sąsiada kursor w jego ostatnim/pierwszym wierszu wizualnym
+   (`vis_pos2_doc_pos`); test zawiniętego bloku docelowego. Pozycja na granicy zawinięcia należy do wcześniejszego
+   wiersza — ograniczenie `TextEditor`.
+3. **[ISTOTNE] Tekst-cień nie skaluje się z DPI** (stałe 28 px). Przyjęto: `get_font_size()`, popup pod kursorem
+   o wysokość wiersza edytora. W próbie wyszło też, że popup i cień w trybie blokowym nie pojawiały się wcale:
+   `is_doc_pos_visible` zwraca False w edytorze o wysokości jednego wiersza — zastąpione `is_rect_visible`.
+4. **[DROBNE] Ctrl+Enter numeryczny nie zatwierdza.** Przyjęto: oba Entery.
+
+**Poza recenzją, z próby:** Ctrl+Backspace/Delete nie działały (`TextEditor` ich nie obsługuje) — dodana komenda
+usuwania słowa/zaznaczenia z testami; popup podpowiedzi bez paska tytułu.
+
+**Zmiany:** PLAN.md (10e: scalanie jednym znakiem, ↑/↓ do wiersza wizualnego, zadanie 7 z Ctrl+Backspace/Delete,
+regułami rozpórek, DPI cienia i widocznością popupu, testy, budżet +4 h → 27 h, stop 46 h), SPEC.md (D49:
+ergonomia); kod i testy w worktree przed commitem.
+
+**Werdykt:** przyjęte w całości; odbiór zadań 6–7 warunkowy do B7 i próby prelegenta.
