@@ -57,15 +57,38 @@ Timer pause/restart affects only presenter time; restart preserves its paused st
 A−/A+ changes notes text from 16 to 48 logical pixels (default 28), for the session; math is 1.2× the text size.
 Notes support `$inline$` and `$$display$$` math with local MicroTeX and an Agg fallback.
 
-In the ImGui Info window, **Edytuj** switches the notes panel to a Markdown editor;
-**Podgląd** returns to the preview. Changes save after 500 ms without typing and when
-changing slides, returning to preview, hiding Info or exiting. The editor uses the
+In the ImGui Info window, click a rendered paragraph to edit that block as Markdown.
+Blank lines separate blocks; fenced code and `$$` math stay together. Click below the
+last block to edit its end. Empty notes offer a clickable placeholder. Changes save
+after 500 ms without typing and when changing or leaving blocks, changing slides,
+hiding Info or exiting. The editor grows with wrapped lines and the panel scrolls
+to the cursor. It uses the
 notes font size, word wrap and a monospace font. While the editor or its suggestions
 have focus, player keys (including Q, arrows and Space) and gestures are blocked.
-Esc closes suggestions first; another Esc releases editor focus.
+Esc closes suggestions first; another Esc renders the block and releases focus.
+Clicking elsewhere also ends editing. Read-only and suspended overlays prevent activation.
+
+- Up/Down at the first/last visual row moves to the previous/next block.
+- Backspace at the start / Delete at the end joins adjacent blocks, removing their
+  blank-line separator. These commands require one cursor, no selection, no modifiers
+  and no suggestions popup; holding a key repeats across blocks.
+- Undo and selections are limited to the current block activation. Click position
+  approximates the source line from the rendered block height. Rendering blocks
+  separately loses Markdown context across blank lines (loose lists, reference links).
 
 - Ctrl+B / Ctrl+I wraps the selection in bold / italic, or inserts an empty pair.
 - Ctrl+Space offers inline bold, italic, code, links and math, wrapping a selection.
+- Typing `$`, `*`, `_`, a backtick, `(`, `[` or `{` wraps selected text and keeps it
+  selected. Ctrl+Enter renders and saves the block, including when suggestions are open.
+- Ctrl+Backspace / Ctrl+Delete delete the previous / next word, a line break or the
+  selection.
+- Enter continues lists (`-`, `*`, `+`, `1.`, `1)`), task lists and quotes with the same
+  indentation. Numbers advance and checked tasks become unchecked. Enter on an empty
+  item removes its marker to end the list. This requires one cursor, no selection,
+  no modifiers and no suggestions popup.
+- Suggestions show the remaining completion as dim ghost text at the cursor.
+  Each newline also produces a line break in rendered notes; inline formulas taller
+  than a line get extra room so they do not overlap the line above.
 - At the start of a line (after spaces), type `#`, `-`, `*`, `>`, `1`, a backtick or `$` for Markdown
   blocks. In math, a backslash followed by letters offers supported LaTeX commands.
 - Use Up/Down to choose, Tab/Enter or a mouse click to insert, Esc to dismiss.

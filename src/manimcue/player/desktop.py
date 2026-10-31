@@ -474,8 +474,8 @@ def run_desktop(manifest: dict, options: dict) -> int:
                     "now": now,
                     "composition": app.preview_composition,
                     "render": render,
-                    "render_notes": lambda text, size: runtime["notes"].render(
-                        text, size, imgui.get_window_viewport().dpi_scale
+                    "render_notes": lambda text, size, used=0: runtime["notes"].render(
+                        text, size, imgui.get_window_viewport().dpi_scale, used
                     ),
                 },
             ):
@@ -485,7 +485,7 @@ def run_desktop(manifest: dict, options: dict) -> int:
             if runtime.get("info_view_state"):
                 flush_notes(runtime, now)
             runtime.pop("info_view_state", None)
-            runtime.pop("notes_edit", None)
+            runtime.get("notes_edit", {})["span"] = None
         if app.closed:
             flush_notes(runtime, now, exiting=True)
             app.drop_all()
@@ -523,6 +523,8 @@ def run_desktop(manifest: dict, options: dict) -> int:
     # Notatki w Info używają imgui_md; samo hello_imgui.run go nie inicjalizuje.
     markdown = imgui_md.MarkdownOptions()
     markdown.with_latex = True
+    # Nowy wiersz w notatce łamie linię jak w Obsidianie; rozpórki wzorów liczą na to.
+    markdown.hard_soft_breaks = True
     # Roboto Markdownu nie ma strzałek z notatek; Inconsolata z assets imgui_bundle je ma.
     markdown.font_options.merge_fonts = ["fonts/Inconsolata-Medium.ttf"]
     immapp.run(

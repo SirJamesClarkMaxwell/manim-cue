@@ -102,6 +102,77 @@ def position(text, index):
     return before.count("\n"), len(before.rsplit("\n", 1)[-1])
 
 
+def blocks(text):
+    """Zakresy bez separatorów; zamknięte i otwarte ogrodzenia chronią puste wiersze."""
+    protected = []
+    scanner = re.compile(
+        r"```(?:[\s\S]*?```|[\s\S]*$)|`[^`\n]*`|\\\$|"
+        r"(?<!\\)\$\$(?:[\s\S]*?(?<!\\)\$\$|[\s\S]*$)|"
+        r"(?<!\\)\$([^$\n]*?)(?<!\\)\$"
+    )
+    for token in scanner.finditer(text):
+        if token[0].startswith(("```", "$$")):
+            protected.append(token.span())
+    result = []
+    start = None
+    offset = 0
+    previous_end = 0
+    for line in text.splitlines(keepends=True):
+        end = offset + len(line.rstrip("\n"))
+        blank = not line.strip(" \t\n") and not any(a <= offset < b for a, b in protected)
+        if blank:
+            if start is not None:
+                result.append((start, previous_end))
+                start = None
+        else:
+            if start is None:
+                start = offset
+            previous_end = end
+        offset += len(line)
+    if start is not None:
+        result.append(
+            (start, len(text) if protected and protected[-1][1] == len(text) else previous_end)
+        )
+    return result or [(len(text), len(text))]
+
+
+def compose(text, span, replacement):
+    return text[: span[0]] + replacement + text[span[1] :]
+
+
+def shifted_offset(target, span, replacement):
+    """Cel kliknięcia za widgetem przesuwa się o zmianę długości widgetu."""
+    return target + (len(replacement) - (span[1] - span[0]) if target >= span[1] else 0)
+
+
+def block_target(text, span, replacement, direction, *, merge=False):
+    """Sąsiad po ponownym podziale; scalenie kasuje jeden znak separatora jak Obsidian."""
+    full = compose(text, span, replacement)
+    edge = span[0] if direction < 0 else span[0] + len(replacement)
+    ranges = blocks(full)
+    candidates = (
+        [part for part in ranges if part[1] < edge]
+        if direction < 0
+        else [part for part in ranges if part[0] > edge]
+    )
+    if not candidates:
+        return None
+    neighbor = candidates[-1] if direction < 0 else candidates[0]
+    if merge:
+        # Separator "\n\n" po jednym znaku daje "\n": akapity łączą się bez sklejenia słów.
+        cut = edge - 1 if direction < 0 else edge
+        full = full[:cut] + full[cut + 1 :]
+        ranges = blocks(full)
+        inside = [part for part in ranges if part[0] <= cut <= part[1]]
+        after = [part for part in ranges if part[0] >= cut]
+        before = [part for part in ranges if part[1] <= cut]
+        # Edytor zaczynający się pustym wierszem: cięcie wypada w separatorze, zostań w swoim bloku.
+        ordered = (after[:1], before[-1:]) if direction < 0 else (before[-1:], after[:1])
+        active = (inside or ordered[0] or ordered[1])[0]
+        return full, active, min(max(cut - active[0], 0), active[1] - active[0])
+    return full, neighbor, neighbor[1] - neighbor[0] if direction < 0 else 0
+
+
 def suggestions(text, cursor, *, explicit=False, cursors=1):
     """Zwróć (etykieta, początek, koniec, szablon), najwyżej osiem pozycji."""
     if cursors != 1:
@@ -164,3 +235,39 @@ def shortcut(key, ctrl, alt, cursors=1):
     if ctrl and not alt and cursors == 1:
         return {"b": "**|**", "i": "*|*", "space": "popup"}.get(key)
     return None
+
+
+def continue_list(text, cursor):
+    """Kontynuuj element lub usuń pusty znacznik; pozycje są liczone w glifach."""
+    line, column = cursor
+    current = text.split("\n")[line]
+    match = re.match(r"([ \t]*)([-*+>]|\d+[.)])([ \t]+|$)(\[[ xX]\][ \t]*)?", current)
+    if match is None or column < match.end():
+        return None
+    indent, marker, spacing, task = match.groups()
+    start = offset(text, (line, 0))
+    if not current[match.end() :].strip():
+        return insertion(text, start, start + len(current), "")
+    if marker[0].isdigit():
+        marker = str(int(marker[:-1]) + 1) + marker[-1]
+    prefix = indent + marker + spacing + ("[ ] " if task else "")
+    at = offset(text, cursor)
+    return insertion(text, at, at, "\n" + prefix)
+
+
+def ghost_remainder(text, cursor, item):
+    """Reszta szablonu po wpisanym prefiksie, bez znacznika kursora."""
+    _, start, _, template = item
+    prefix = text[start : offset(text, cursor)]
+    template = template.replace("|", "")
+    return template[len(prefix) :] if prefix and template.startswith(prefix) else ""
+
+
+def delete_word(text, cursor, direction):
+    """Ctrl+Backspace/Delete: znak nowego wiersza albo odstęp i słowo lub ciąg interpunkcji."""
+    at = offset(text, cursor)
+    part = text[:at][::-1] if direction < 0 else text[at:]
+    size = len(re.match(r"\n|[ \t]*(?:\w+|[^\w\s]+)?", part)[0])
+    if not size:
+        return None
+    return insertion(text, *((at - size, at) if direction < 0 else (at, at + size)), "")

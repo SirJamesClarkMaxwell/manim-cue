@@ -163,15 +163,9 @@ def render_info(snapshot: dict, preview: dict) -> list[dict]:
         imgui.text_wrapped("Brak następnego slajdu")
     for label, delta in (("A−", -2), ("A+", 2)):
         if imgui.button(label):
+            if preview.get("runtime"):
+                deactivate_notes(preview)
             actions.append({"type": "notes_scale", "delta": delta})
-        imgui.same_line()
-    if preview.get("runtime"):
-        if imgui.button("Podgląd" if view_state.get("editing") else "Edytuj"):
-            if view_state.get("editing"):
-                flush_notes(preview["runtime"], preview["now"])
-                view_state["editing_markdown"] = False
-                view_state["popup"] = []
-            view_state["editing"] = not view_state.get("editing")
         imgui.same_line()
     imgui.text(f"{snapshot.get('notes_size', 28)} px")
     imgui.begin_child(
@@ -181,8 +175,8 @@ def render_info(snapshot: dict, preview: dict) -> list[dict]:
     try:
         render_notes = preview.get("render_notes")
         status = render_notes_status(snapshot, preview) if preview.get("runtime") else None
-        if view_state.get("editing") and preview.get("runtime"):
-            render_editor(snapshot, preview, status)
+        if preview.get("runtime"):
+            render_blocks(snapshot, preview, status)
         elif render_notes:
             render_notes(snapshot.get("notes", ""), snapshot.get("notes_size", 28))
         else:
@@ -211,12 +205,17 @@ def refresh_notes(manifest, path, overlay):
 
 
 def capture_notes(runtime, now):
+    from .notes_complete import compose
     from .notes_overlay import validate_text
 
     state = runtime.get("notes_edit", {})
     if not state.get("target"):
         return
-    text = editor_text(state["editor"])
+    text = state["text"]
+    if state.get("span") is not None:
+        replacement = editor_text(state["editor"])
+        text = compose(text, state["span"], replacement)
+        state["span"] = (state["span"][0], state["span"][0] + len(replacement))
     if text != state["text"]:
         state["text"], state["changed"] = text, now
         try:
@@ -224,8 +223,10 @@ def capture_notes(runtime, now):
         except ValueError as error:
             state["status"] = str(error)
             state["invalid"] = True
+            runtime.setdefault("invalid_notes", {})[state["target"]] = text
             return
         state["invalid"] = False
+        runtime.setdefault("invalid_notes", {}).pop(state["target"], None)
         path, number = state["target"]
         runtime["dirty_notes"].set(path, number, text)
         state["status"] = "zapisywanie…"
@@ -268,17 +269,28 @@ def flush_notes(runtime, now, *, exiting=False):
                 else:
                     print(f"Ratunek notatek: {target}", file=sys.stderr)
     state["changed"] = None
+    if exiting and runtime.get("invalid_notes"):
+        from imgui_bundle import imgui
+
+        text = "Niepoprawne notatki — ratunek: stderr i schowek\n" + "\n".join(
+            f"{path}, slajd {number}:\n{text}"
+            for (path, number), text in runtime["invalid_notes"].items()
+        )
+        print(text, file=sys.stderr)
+        imgui.set_clipboard_text(text)
 
 
 def enter_notes(runtime, index, now):
     """Jedno wejście na slajd resetuje undo, nigdy nie tworzy brudnego bufora."""
     from imgui_bundle import imgui_color_text_edit as edit
 
+    from .notes_overlay import canonical_path
+
     deck_index, slide_index = index
     deck = runtime["app"].manifest["presentations"][deck_index]
     path = deck.get("notes_file")
     state = runtime.setdefault("notes_edit", {})
-    target = (path, slide_index + 1) if path else None
+    target = (canonical_path(path), slide_index + 1) if path else None
     if state.get("index") == tuple(index) and state.get("target") == target:
         return state
     flush_notes(runtime, now)
@@ -296,19 +308,156 @@ def enter_notes(runtime, index, now):
         if path
         else deck["slides"][slide_index].get("notes", "")
     )
+    text = runtime.get("invalid_notes", {}).get(target, text)
     editor.set_text(text)
     state.update(
         editor=editor,
         index=tuple(index),
         target=target,
         text=text,
+        span=None,
         changed=None,
-        invalid=False,
+        invalid=target in runtime.get("invalid_notes", {}),
         status=state.get("status", "zapisano") if runtime["dirty_notes"].buffers else "zapisano",
         popup=[],
         focus=False,
     )
     return state
+
+
+def deactivate_notes(preview):
+    flush_notes(preview["runtime"], preview["now"])
+    preview["runtime"].get("notes_edit", {})["span"] = None
+    preview["view_state"].update(editing_markdown=False, popup=[])
+
+
+def activate_block(preview, span, cursor=0):
+    """Utrwal stary zakres przed resetem historii nowego widgetu."""
+    from imgui_bundle import imgui_color_text_edit as edit
+
+    from .notes_complete import position, shifted_offset
+
+    state = preview["runtime"]["notes_edit"]
+    old = state.get("span")
+    if old is not None:
+        replacement = editor_text(state["editor"])
+        span = tuple(shifted_offset(value, old, replacement) for value in span)
+    flush_notes(preview["runtime"], preview["now"])
+    state["span"] = span
+    text = state["text"][span[0] : span[1]]
+    state["editor"].set_text(text)
+    state["editor"].set_cursor(edit.TextEditor.DocPos(*position(text, cursor)))
+    state["editor"].set_focus()
+    preview["view_state"].update(popup=[], editing_markdown=True, activated=True)
+    preview["view_state"].pop("signature", None)
+    preview["view_state"].pop("visual_rows", None)
+    preview["view_state"].pop("deactivate", None)
+
+
+def render_blocks(snapshot, preview, status):
+    from imgui_bundle import imgui, imgui_md
+
+    from . import notes_complete as complete
+
+    state, blocked = status
+    view = preview["view_state"]
+    capture_notes(preview["runtime"], preview["now"])
+    if blocked and state.get("span") is not None:
+        deactivate_notes(preview)
+    text, active = state["text"], state.get("span")
+    ranges = complete.blocks(text)
+    if active is not None:
+        # Niedomknięte ``` w edytorze ciągnie blok przez sufiks: rysuj części poza widgetem.
+        ranges = [
+            piece
+            for part in ranges
+            for piece in (
+                [part]
+                if part[1] <= active[0] or part[0] >= active[1]
+                else [(part[0], active[0]), (active[1], part[1])]
+            )
+            if piece[0] < piece[1] or piece == part
+        ]
+        ranges = sorted(set(ranges + [active]))
+    clicked = None
+    used = 0
+    for start, end in ranges:
+        source = text[start:end]
+        if active == (start, end):
+            render_editor(snapshot, preview, status)
+        else:
+            imgui.push_id(start)
+            imgui.begin_group()
+            if not source:
+                imgui.text_wrapped("kliknij, aby pisać")
+            elif preview.get("render_notes"):
+                preview["render_notes"](source, snapshot.get("notes_size", 28), used)
+            else:
+                imgui_md.render(source)
+            imgui.end_group()
+            if imgui.is_item_hovered():
+                a, b = imgui.get_item_rect_min(), imgui.get_item_rect_max()
+                imgui.get_window_draw_list().add_rect(
+                    a, b, imgui.get_color_u32(imgui.Col_.header_hovered)
+                )
+                if imgui.is_item_clicked() and not blocked:
+                    fraction = (imgui.get_io().mouse_pos.y - a.y) / max(1, b.y - a.y)
+                    lines = source.split("\n")
+                    line = min(len(lines) - 1, max(0, int(fraction * len(lines))))
+                    clicked = ((start, end), complete.offset(source, (line, 0)))
+            imgui.pop_id()
+        used += sum(
+            m.group(1) is not None or m.group(2) is not None
+            for m in complete.TOKEN.finditer(source)
+        )
+    if imgui.get_content_region_avail().y > 0:
+        imgui.invisible_button(
+            "notes-end",
+            (
+                max(1, imgui.get_content_region_avail().x),
+                max(1, imgui.get_content_region_avail().y),
+            ),
+        )
+        if imgui.is_item_clicked() and not blocked:
+            clicked = (ranges[-1], ranges[-1][1] - ranges[-1][0])
+    if clicked:
+        if active is not None:
+            clicked = (
+                tuple(
+                    complete.shifted_offset(value, active, editor_text(state["editor"]))
+                    for value in clicked[0]
+                ),
+                clicked[1],
+            )
+        activate_block(preview, *clicked)
+        view.pop("transition", None)
+    elif view.get("transition"):
+        from imgui_bundle import imgui_color_text_edit as edit
+
+        (full, span, cursor), direction, merge, column = view.pop("transition")
+        flush_notes(preview["runtime"], preview["now"])
+        if merge:
+            state["span"] = (0, len(state["text"]))
+            state["editor"].set_text(full)
+            capture_notes(preview["runtime"], preview["now"])
+            flush_notes(preview["runtime"], preview["now"])
+        state["span"] = None
+        activate_block(preview, span, cursor)
+        if not merge:
+            source = full[span[0] : span[1]]
+            line = source.count("\n") if direction < 0 else 0
+            state["editor"].set_cursor(
+                edit.TextEditor.DocPos(line, min(column, len(source.split("\n")[line])))
+            )
+            # Zawijanie sąsiada znane dopiero po render: render_editor poprawia wiersz wizualny.
+            view["vertical"] = (direction, column)
+    elif state.get("span") is not None and not view.get("activated"):
+        escaped = view.pop("deactivate", False)
+        if escaped or not view.get("editing_markdown"):
+            deactivate_notes(preview)
+            if escaped:
+                imgui.set_window_focus(None)
+    view["activated"] = False
 
 
 def replace_notes(editor, replacement):
@@ -334,6 +483,8 @@ def render_notes_status(snapshot, preview):
     state = enter_notes(runtime, snapshot["index"], now)
     if previous != tuple(snapshot["index"]):
         view["popup"] = []
+        view["editing_markdown"] = False
+        view["activated"] = False
         view.pop("signature", None)
         view.pop("dismissed", None)
     editor = state["editor"]
@@ -356,6 +507,7 @@ def render_notes_status(snapshot, preview):
                     f"nakładka wstrzymana: było {overlay.count} slajdów, jest {len(deck['slides'])}"
                 )
                 if imgui.button("Zastosuj do obecnych slajdów"):
+                    deactivate_notes(preview)
                     updated = save_overlay(
                         path,
                         [s.get("rendered_notes", "") for s in deck["slides"]],
@@ -377,7 +529,8 @@ def render_notes_status(snapshot, preview):
                     imgui.text_wrapped("notatki w kodzie zmienione po edycji")
                     imgui.begin_disabled(editor.get_number_of_cursors() != 1)
                     if imgui.button("Z renderu"):
-                        view["editing"] = True
+                        capture_notes(runtime, now)
+                        activate_block(preview, (0, len(state["text"])))
                         text = editor_text(editor)
                         replace_notes(
                             editor,
@@ -400,6 +553,7 @@ def render_notes_status(snapshot, preview):
 
 def render_editor(snapshot, preview, status=None):
     from imgui_bundle import imgui
+    from imgui_bundle import imgui_color_text_edit as edit
 
     from . import notes_complete as complete
 
@@ -419,11 +573,53 @@ def render_editor(snapshot, preview, status=None):
     )
     if blocked or editor.get_number_of_cursors() != 1 or io.app_focus_lost:
         view["popup"] = []
-    popup = view.get("popup", []) if view.get("editing_markdown") else []
     consumed = view.setdefault("consumed", set())
+    if view.get("editing_markdown") and io.key_ctrl:
+        # Ctrl+Enter zatwierdza blok jak Esc, także przy otwartej podpowiedzi.
+        for key in (imgui.Key.enter, imgui.Key.keypad_enter):
+            imgui.internal.set_key_owner(
+                key, owner, imgui.internal.InputFlagsPrivate_.lock_this_frame
+            )
+            if imgui.internal.is_key_pressed(key, imgui.InputFlags_.repeat, owner):
+                consumed.add(key)
+                view["deactivate"] = True
+                view["popup"] = []
+        # TextEditor pomija Ctrl+Backspace/Delete: słowo albo zaznaczenie usuwa ta komenda.
+        if (
+            not blocked
+            and editor.get_number_of_cursors() == 1
+            and not any((io.key_shift, io.key_alt, io.key_super))
+        ):
+            for key, direction in ((imgui.Key.backspace, -1), (imgui.Key.delete, 1)):
+                imgui.internal.set_key_owner(
+                    key, owner, imgui.internal.InputFlagsPrivate_.lock_this_frame
+                )
+                if imgui.internal.is_key_pressed(key, imgui.InputFlags_.repeat, owner):
+                    consumed.add(key)
+                    text = editor_text(editor)
+                    selection = editor.get_cursor_selection(0)
+                    cursor = editor.get_cursor_position(0)
+                    change = (
+                        complete.insertion(
+                            text,
+                            *sorted(
+                                complete.offset(text, (pos.line, pos.index))
+                                for pos in (selection.start, selection.end)
+                            ),
+                            "",
+                        )
+                        if selection.start != selection.end
+                        else complete.delete_word(text, (cursor.line, cursor.index), direction)
+                    )
+                    if change:
+                        replace_notes(editor, change)
+    popup = view.get("popup", []) if view.get("editing_markdown") else []
     accepted = None
     if popup:
         for key in keys:
+            imgui.internal.set_key_owner(
+                key, owner, imgui.internal.InputFlagsPrivate_.lock_this_frame
+            )
             if imgui.internal.is_key_pressed(key, imgui.InputFlags_.repeat, owner):
                 choice = view.get("choice", 0)
                 if key in (imgui.Key.up_arrow, imgui.Key.down_arrow):
@@ -437,13 +633,63 @@ def render_editor(snapshot, preview, status=None):
                     view["dismissed"] = view.get("signature")
                     view["popup"] = []
                     editor.set_focus()
-            imgui.internal.set_key_owner(
-                key, owner, imgui.internal.InputFlagsPrivate_.lock_this_frame
-            )
-    elif view.get("editing_markdown") and imgui.is_key_pressed(imgui.Key.escape):
-        imgui.set_window_focus(None)
+    elif view.get("editing_markdown"):
+        key = imgui.Key.escape
+        imgui.internal.set_key_owner(key, owner, imgui.internal.InputFlagsPrivate_.lock_this_frame)
+        if imgui.internal.is_key_pressed(key, imgui.InputFlags_.repeat, owner):
+            consumed.add(key)
+            view["deactivate"] = True
+        if (
+            not blocked
+            and editor.get_number_of_cursors() == 1
+            and not any((io.key_shift, io.key_ctrl, io.key_alt, io.key_super))
+        ):
+            selection = editor.get_cursor_selection(0)
+            cursor = editor.get_cursor_position(0)
+            text = editor_text(editor)
+            end = type(cursor)(*complete.position(text, len(text)))
+            visual = editor.doc_pos2_vis_pos(cursor)
+            last = editor.doc_pos2_vis_pos(end)
+            if selection.start == selection.end:
+                continuation = complete.continue_list(text, (cursor.line, cursor.index))
+                if continuation is not None:
+                    for key in (imgui.Key.enter, imgui.Key.keypad_enter):
+                        imgui.internal.set_key_owner(
+                            key, owner, imgui.internal.InputFlagsPrivate_.lock_this_frame
+                        )
+                        if imgui.internal.is_key_pressed(key, imgui.InputFlags_.repeat, owner):
+                            consumed.add(key)
+                            replace_notes(editor, continuation)
+                            break
+                for key, direction, boundary, merge in (
+                    (imgui.Key.up_arrow, -1, visual.row == 0, False),
+                    (imgui.Key.down_arrow, 1, visual.row == last.row, False),
+                    (imgui.Key.backspace, -1, cursor.line == 0 and cursor.index == 0, True),
+                    (
+                        imgui.Key.delete,
+                        1,
+                        cursor.line == end.line and cursor.index == end.index,
+                        True,
+                    ),
+                ):
+                    target = (
+                        complete.block_target(
+                            state["text"], state["span"], text, direction, merge=merge
+                        )
+                        if boundary and state.get("span") is not None
+                        else None
+                    )
+                    if target is None:
+                        continue
+                    imgui.internal.set_key_owner(
+                        key, owner, imgui.internal.InputFlagsPrivate_.lock_this_frame
+                    )
+                    if imgui.internal.is_key_pressed(key, imgui.InputFlags_.repeat, owner):
+                        consumed.add(key)
+                        view["transition"] = (target, direction, merge, visual.column)
+                        break
     for key in list(consumed):
-        if imgui.is_key_down(key):
+        if imgui.internal.is_key_down(key, owner):
             imgui.internal.set_key_owner(
                 key, owner, imgui.internal.InputFlagsPrivate_.lock_this_frame
             )
@@ -451,6 +697,31 @@ def render_editor(snapshot, preview, status=None):
             consumed.remove(key)
     explicit = False
     if view.get("editing_markdown") and not blocked:
+        chars = io.input_queue_characters
+        selection = editor.get_cursor_selection(0)
+        mark = chr(chars[0]) if chars.size() == 1 else ""
+        pairs = {"$": "$", "*": "*", "_": "_", "`": "`", "(": ")", "[": "]", "{": "}"}
+        # Znak Markdown/LaTeX lub nawias przy zaznaczeniu otacza je jak w Obsidianie.
+        if (
+            mark in pairs
+            and editor.get_number_of_cursors() == 1
+            and selection.start != selection.end
+        ):
+            chars.clear()
+            text = editor_text(editor)
+            bounds = sorted(
+                complete.offset(text, (pos.line, pos.index))
+                for pos in (selection.start, selection.end)
+            )
+            replace_notes(
+                editor,
+                complete.insertion(text, *bounds, f"{mark}|{pairs[mark]}", selection=bounds),
+            )
+            # Zaznaczenie zostaje na treści: drugie * daje pogrubienie.
+            text = editor_text(editor)
+            editor.select_region(
+                *(type(selection.start)(*complete.position(text, at + 1)) for at in bounds)
+            )
         for name in ("b", "i", "space"):
             template = complete.shortcut(
                 name, io.key_ctrl, io.key_alt, editor.get_number_of_cursors()
@@ -474,17 +745,45 @@ def render_editor(snapshot, preview, status=None):
                         editor, complete.insertion(text, *bounds, template, selection=bounds)
                     )
     if accepted:
+        view["activated"] = True
+        view["editing_markdown"] = True
         text = editor_text(editor)
         _, start, end, template = accepted
         selection = view.get("selection")
         replace_notes(editor, complete.insertion(text, start, end, template, selection=selection))
         cursor = editor.get_cursor_position(0)
         view["dismissed"] = (editor_text(editor), cursor.line, cursor.index)
-    visible = imgui.begin_child("notes-editor-host", (0, 0))
+    text = editor_text(editor)
+    end = type(editor.get_cursor_position(0))(*complete.position(text, len(text)))
+    rows = max(editor.get_line_count(), view.get("visual_rows", 1))
+    imgui.push_font(runtime.get("editor_font"), snapshot.get("notes_size", 28))
+    line_height = editor.get_line_height() or snapshot.get("notes_size", 28)
+    height = rows * line_height + 2 * imgui.get_style().window_padding.y
+    visible = imgui.begin_child(
+        "notes-editor-host",
+        (0, height),
+        window_flags=imgui.WindowFlags_.no_scrollbar
+        | imgui.WindowFlags_.no_scroll_with_mouse
+        | imgui.WindowFlags_.no_move,
+    )
     if visible:
-        imgui.push_font(runtime.get("editor_font"), snapshot.get("notes_size", 28))
-        editor.render("notes-editor", (0, 0), True)
-        imgui.pop_font()
+        editor.render(
+            "notes-editor",
+            (0, height),
+            0,
+            imgui.WindowFlags_.no_scrollbar
+            | imgui.WindowFlags_.no_scroll_with_mouse
+            | imgui.WindowFlags_.no_move,
+        )
+        if "vertical" in view:
+            # ↑ do ostatniego, ↓ do pierwszego wiersza wizualnego sąsiada, ta sama kolumna.
+            direction, column = view.pop("vertical")
+            lines = editor_text(editor).split("\n")
+            edge = (len(lines) - 1, len(lines[-1])) if direction < 0 else (0, 0)
+            row = editor.doc_pos2_vis_pos(type(end)(*edge)).row
+            editor.set_cursor(editor.vis_pos2_doc_pos(edit.TextEditor.VisPos(row, column)))
+        end = type(end)(*complete.position(editor_text(editor), len(editor_text(editor))))
+        view["visual_rows"] = editor.doc_pos2_vis_pos(end).row + 1
         focused = imgui.is_window_focused(imgui.FocusedFlags_.child_windows)
         view["editing_markdown"] = focused and not io.app_focus_lost
         text = editor_text(editor)
@@ -515,19 +814,25 @@ def render_editor(snapshot, preview, status=None):
         if view.get("dismissed") == signature:
             view["popup"] = []
         popup = view.get("popup", [])
+        point = editor.doc_pos2_screen_pos(cursor)
+        # is_doc_pos_visible zwraca False w edytorze o wysokości jednego wiersza (zakres wyłączny);
+        # edytor bloku nie przewija się, więc liczy się widoczność w panelu.
         if (
             popup
             and view.get("dismissed") != signature
-            and editor.is_doc_pos_visible(cursor)
+            and imgui.is_rect_visible(point, (point.x + 1, point.y + line_height))
             and not io.app_focus_lost
         ):
-            point = editor.doc_pos2_screen_pos(cursor)
-            imgui.set_next_window_pos((point.x, point.y + snapshot.get("notes_size", 28)))
+            host = imgui.internal.get_current_window()
+            clip = host.clip_rect
+            viewport = imgui.get_window_viewport()
+            imgui.set_next_window_pos((point.x, point.y + line_height))
             imgui.set_next_window_viewport(imgui.get_window_viewport().id_)
             imgui.begin(
                 "Podpowiedzi##notes",
                 flags=imgui.WindowFlags_.no_focus_on_appearing
-                | imgui.WindowFlags_.always_auto_resize,
+                | imgui.WindowFlags_.always_auto_resize
+                | imgui.WindowFlags_.no_title_bar,
             )
             imgui.internal.bring_window_to_display_front(imgui.internal.get_current_window())
             view["editing_markdown"] |= imgui.is_window_focused()
@@ -536,6 +841,8 @@ def render_editor(snapshot, preview, status=None):
             for index, item in enumerate(popup):
                 clicked, _ = imgui.selectable(item[0], index == view.get("choice", 0))
                 if clicked:
+                    view["activated"] = True
+                    view["editing_markdown"] = True
                     _, start, end, template = item
                     replace_notes(
                         editor,
@@ -548,9 +855,43 @@ def render_editor(snapshot, preview, status=None):
                     view["dismissed"] = (editor_text(editor), cursor.line, cursor.index)
                     editor.set_focus()
             imgui.end()
+            if view.get("popup"):
+                ghost = complete.ghost_remainder(
+                    text, (cursor.line, cursor.index), popup[view.get("choice", 0) % len(popup)]
+                )
+                if ghost:
+                    # Lista rodzica jest pod tekstem childa; cień musi trafić nad oba okna.
+                    draw = imgui.get_foreground_draw_list(viewport)
+                    draw.push_clip_rect(clip.min, clip.max, True)
+                    size = imgui.calc_text_size(ghost)
+                    draw.add_rect_filled(
+                        point,
+                        (point.x + size.x, point.y + size.y),
+                        editor.get_palette().get(edit.TextEditor.Color.background),
+                    )
+                    draw.add_text(
+                        imgui.get_font(),
+                        imgui.get_font_size(),
+                        point,
+                        imgui.get_color_u32(imgui.Col_.text_disabled),
+                        ghost,
+                    )
+                    draw.pop_clip_rect()
     else:
         view["editing_markdown"] = False
     imgui.end_child()
+    imgui.pop_font()
+    cursor = editor.get_cursor_position(0)
+    follow = (editor_text(editor), cursor.line, cursor.index)
+    # Tylko po ruchu kursora albo pisaniu: kółko myszy nadal przewija panel podczas edycji.
+    if visible and view.get("editing_markdown") and view.get("follow") != follow:
+        point = editor.doc_pos2_screen_pos(cursor)
+        top = imgui.get_window_pos().y
+        bottom = top + imgui.get_window_height()
+        if point.y < top or point.y + line_height > bottom:
+            # local_y względem okna; ImGui sam dodaje bieżący scroll.
+            imgui.set_scroll_from_pos_y(point.y - top, 0.5)
+    view["follow"] = follow
     autosave_notes(runtime, now)
 
 

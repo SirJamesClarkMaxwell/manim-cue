@@ -1,5 +1,6 @@
 """Adapter PC wzorów: lokalny MicroTeX, awaryjnie mathtext/Agg, bez procesu TeX."""
 
+import math
 import re
 from collections import OrderedDict
 
@@ -116,7 +117,23 @@ def render_formula(
 class NotesRenderer:
     """Natywny Markdown zachowuje skład, fallback używa baseline rastrów Agg."""
 
-    def render(self, text, size, dpi):
+    def __init__(self):
+        # imgui_md startuje MicroTeX dopiero przy pierwszym wzorze; walidacja przed nim szła do
+        # mathtext ze \scalebox i błąd zostawał w cache (notatka z wzorem od startu).
+        try:
+            from pathlib import Path
+
+            import imgui_bundle
+            from imgui_bundle import imgui_microtex
+
+            fonts = Path(imgui_bundle.__file__).parent / "assets" / "fonts" / "latex"
+            imgui_microtex.init(
+                str(fonts / "latinmodern-math.clm1"), str(fonts / "latinmodern-math.otf")
+            )
+        except Exception:  # noqa: BLE001, S110 — bez MicroTeX zostaje fallback mathtext
+            pass
+
+    def render(self, text, size, dpi, used_formulas=0):
         global _native_dirty
         from imgui_bundle import imgui, imgui_md
 
@@ -125,7 +142,9 @@ class NotesRenderer:
         except ImportError:
             imgui_microtex = None
 
-        native = imgui_microtex is not None and imgui_md.has_latex()
+        native = (
+            imgui_microtex is not None and imgui_md.has_latex() and imgui_microtex.is_initialized()
+        )
         color = tuple(imgui.get_style().color_(imgui.Col_.text))
         tokens = math_tokens(text)
         prepared = []
@@ -143,7 +162,7 @@ class NotesRenderer:
                     color=color,
                     native=native,
                 )
-                if index < MAX_FORMULAS
+                if used_formulas + index < MAX_FORMULAS
                 else {"error": "Limit 128 wzorów w notatce"}
             )
             prepared.append((token, style, formula))
@@ -151,23 +170,70 @@ class NotesRenderer:
             if _native_dirty:
                 imgui_microtex.clear_texture_cache()
                 _native_dirty = False
-            for token, style, formula in reversed(prepared):
+            edits = []
+            tops, bottoms = {}, {}
+            for token, style, formula in prepared:
                 if formula["error"]:
-                    text = (
-                        text[: token.start()]
-                        + f"`{token.group(0)}` (math: {formula['error']})"
-                        + text[token.end() :]
+                    edits.append(
+                        (
+                            token.start(),
+                            token.end(),
+                            f"`{token.group(0)}` (math: {formula['error']})",
+                        )
                     )
-                else:
-                    delimiter = "$$" if style == "display" else "$"
-                    source = token.group(1) if style == "display" else token.group(2)
-                    text = (
-                        text[: token.start()]
-                        + delimiter
-                        + rf"\scalebox{{{MATH_SCALE}}}{{{source}}}"
-                        + delimiter
-                        + text[token.end() :]
+                    continue
+                delimiter = "$$" if style == "display" else "$"
+                source = token.group(1) if style == "display" else token.group(2)
+                edits.append(
+                    (
+                        token.start(),
+                        token.end(),
+                        delimiter + rf"\scalebox{{{MATH_SCALE}}}{{{source}}}" + delimiter,
                     )
+                )
+                if style == "inline" and formula.get("baseline"):
+                    line = text.count("\n", 0, token.start())
+                    tops[line] = max(tops.get(line, 0), formula["baseline"] / dpi)
+                    depth = (formula.get("height", 0) - formula["baseline"]) / dpi
+                    bottoms[line] = max(bottoms.get(line, 0), depth)
+            # imgui_md wyrównuje wzór do linii bazowej i podnosi go ponad narysowany już wiersz:
+            # nad pierwszym wierszem rezerwa, dalej rozpórka (sama głębokość) na końcu poprzedniego,
+            # sięgająca poniżej jego najniższego elementu o nadmiar wzoru.
+            if tops:
+                font = imgui_md.get_font(imgui_md.MarkdownFontSpec())
+                baked = font.font.get_font_baked(font.size)
+                ascent, descent = baked.ascent, -baked.descent
+                breaks = [match.start() for match in re.finditer("\n", text)]
+                for line, top in tops.items():
+                    rise = top - ascent
+                    if rise <= 0:
+                        continue
+                    if line == 0:
+                        imgui.dummy((0, rise))
+                        continue
+                    end = breaks[line - 1]
+                    head = text[:end]
+                    previous = head[head.rfind("\n") + 1 :]
+                    stripped = previous.strip()
+                    # ponytail: parzystość ``` i $$ zamiast parsera; wcięty kod i tabele bez rozpórki.
+                    # Niesparowany $ (wzór w trakcie pisania) złapałby rozpórkę jako zamknięcie;
+                    # linia z samych -=*_ to podkreślenie Setext albo linia pozioma.
+                    if (
+                        head.count("```") % 2
+                        or head.count("~~~") % 2
+                        or head.count("$$") % 2
+                        or stripped.endswith(("```", "~~~", "$$"))
+                        or "|" in previous
+                        or (stripped and not stripped.strip("-=*_ "))
+                        or "$" in TOKEN.sub("", previous)
+                    ):
+                        continue
+                    depth = math.ceil((max(bottoms.get(line - 1, 0), descent) + rise) * dpi)
+                    edits.append(
+                        (end, end, rf" $\raisebox{{-{depth}px}}{{\rule{{0px}}{{{depth}px}}}}$")
+                    )
+            for start, end, replacement in sorted(edits, reverse=True):
+                text = text[:start] + replacement + text[end:]
             imgui_md.render(text)
             return
         # Fallback dzieli Markdown przy wzorze; formatowanie przez wzór wymaga integracji z parserem.
